@@ -7,6 +7,61 @@ import org.junit.Test
 
 class VideoQueryTest {
     @Test
+    fun groesse_setztGrenzen() {
+        val q = VideoQuery.build(VideoFilter(sizeRange = SizeRange.FROM_100_MB_TO_1_GB), 1)
+        assertTrue(q.sql.contains("size >= ?"))
+        assertTrue(q.sql.contains("size < ?"))
+        assertEquals(listOf<Any>(100L shl 20, 1L shl 30), q.args)
+    }
+
+    @Test
+    fun komprimiert_nutztPhasenAbfrage() {
+        val only = VideoQuery.build(VideoFilter(compressed = CompressedFilter.ONLY), 1)
+        assertTrue(only.sql.contains("compression_record"))
+        assertTrue(only.sql.contains("IN (SELECT"))
+        val not = VideoQuery.build(VideoFilter(compressed = CompressedFilter.NOT), 1)
+        assertTrue(not.sql.contains("NOT IN (SELECT"))
+    }
+
+    @Test
+    fun aufsteigendeSortierung() {
+        assertTrue(VideoQuery.build(VideoFilter(sort = VideoSort.SIZE_ASC), 1).sql.contains("size ASC"))
+        assertTrue(VideoQuery.build(VideoFilter(sort = VideoSort.DURATION_ASC), 1).sql.contains("durationMs"))
+    }
+
+    @Test
+    fun alleMedien_nimmtVideosUndBilder() {
+        val q = VideoQuery.build(VideoFilter(), 1, type = "ALL")
+        assertTrue(q.sql.contains("type IN ('VIDEO', 'IMAGE')"))
+    }
+
+    @Test
+    fun ordneransicht_direktImOrdner() {
+        val root = VideoQuery.build(VideoFilter(directFolder = ""), 1)
+        assertTrue(root.sql.contains("instr"))
+        val sub = VideoQuery.build(VideoFilter(directFolder = "A/B"), 1)
+        assertTrue(sub.args.any { it.toString().startsWith("A/B") })
+    }
+
+    @Test
+    fun ordnerzeilen_gruppierenNachErsterEbene() {
+        val q = VideoQuery.buildFolderRows(VideoFilter(), "VIDEO", "")
+        assertTrue(q.sql.contains("GROUP BY name"))
+        assertTrue(q.sql.contains("COUNT(*) AS cnt"))
+        assertEquals(1, q.args.first())
+        val sub = VideoQuery.buildFolderRows(VideoFilter(), "VIDEO", "Ordner")
+        assertEquals("Ordner".length + 2, sub.args.first())
+        assertTrue(sub.args.last().toString().endsWith("/%"))
+    }
+
+    @Test
+    fun ordnerVorschau_begrenztAnzahl() {
+        val q = VideoQuery.buildFolderPreview(VideoFilter(), "IMAGE", "A", limit = 4)
+        assertTrue(q.sql.endsWith("LIMIT 4"))
+        assertTrue(q.sql.contains("type = 'IMAGE'"))
+    }
+
+    @Test
     fun standard_nurVideosOhneGeloeschte_neuesteZuerst() {
         val q = VideoQuery.build(VideoFilter(), 1)
         assertTrue(q.sql.contains("type = 'VIDEO'"))
