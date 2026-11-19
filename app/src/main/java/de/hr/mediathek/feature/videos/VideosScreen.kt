@@ -3,7 +3,11 @@ package de.hr.mediathek.feature.videos
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +21,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -61,14 +66,54 @@ fun VideosScreen(onOpen: (String) -> Unit, viewModel: VideosViewModel = hiltView
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val items = viewModel.videos.collectAsLazyPagingItems()
     var sortMenu by remember { mutableStateOf(false) }
+    val selected by viewModel.selected.collectAsStateWithLifecycle()
+    val categories by viewModel.categoryList.collectAsStateWithLifecycle()
+    val usedCategories by viewModel.usedCategories.collectAsStateWithLifecycle()
+    var showCategoryDialog by remember { mutableStateOf(false) }
+    var rateMenu by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-        Text(
-            stringResource(R.string.nav_videos),
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-        )
+        if (selected.isEmpty()) {
+            Text(
+                stringResource(R.string.nav_videos),
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+            )
+        } else {
+            Row(
+                Modifier.padding(top = 8.dp, bottom = 4.dp).horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.video_selected, selected.size),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                OutlinedButton(onClick = { viewModel.favoriteSelected(true) }) { Text(stringResource(R.string.video_fav_set)) }
+                OutlinedButton(onClick = { viewModel.favoriteSelected(false) }) { Text(stringResource(R.string.video_fav_unset)) }
+                Box {
+                    OutlinedButton(onClick = { rateMenu = true }) { Text(stringResource(R.string.video_rate_action)) }
+                    DropdownMenu(expanded = rateMenu, onDismissRequest = { rateMenu = false }) {
+                        (0..5).forEach { r ->
+                            DropdownMenuItem(
+                                text = { Text(if (r == 0) stringResource(R.string.video_rate_none) else "★".repeat(r)) },
+                                onClick = {
+                                    rateMenu = false
+                                    viewModel.rateSelected(r)
+                                },
+                            )
+                        }
+                    }
+                }
+                OutlinedButton(onClick = {
+                    viewModel.loadUsedCategories()
+                    showCategoryDialog = true
+                }) { Text(stringResource(R.string.video_category_action)) }
+                TextButton(onClick = viewModel::clearSelection) { Text(stringResource(R.string.video_clear_selection)) }
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = filter.search,
@@ -122,6 +167,17 @@ fun VideosScreen(onOpen: (String) -> Unit, viewModel: VideosViewModel = hiltView
                 onClick = { viewModel.update { it.copy(onlineOnly = !it.onlineOnly) } },
                 label = { Text(stringResource(R.string.video_filter_online)) },
             )
+            categories.forEach { category ->
+                FilterChip(
+                    selected = filter.categoryUuid == category.uuid,
+                    onClick = {
+                        viewModel.update {
+                            it.copy(categoryUuid = if (it.categoryUuid == category.uuid) null else category.uuid)
+                        }
+                    },
+                    label = { Text(category.name) },
+                )
+            }
             listOf("mp4", "mkv", "avi", "mov").forEach { ext ->
                 FilterChip(
                     selected = filter.format == ext,
@@ -129,6 +185,18 @@ fun VideosScreen(onOpen: (String) -> Unit, viewModel: VideosViewModel = hiltView
                     label = { Text(ext) },
                 )
             }
+        }
+
+        if (showCategoryDialog) {
+            CategoryDialog(
+                categories = categories,
+                used = usedCategories,
+                onAssign = viewModel::assignSelected,
+                onUnassign = viewModel::unassignSelected,
+                onCreate = viewModel::createCategory,
+                onDelete = viewModel::deleteCategory,
+                onDismiss = { showCategoryDialog = false },
+            )
         }
 
         if (items.itemCount == 0) {
@@ -147,10 +215,82 @@ fun VideosScreen(onOpen: (String) -> Unit, viewModel: VideosViewModel = hiltView
             items(count = items.itemCount, key = { index -> items.peek(index)?.uuid ?: index }) { index ->
                 val video = items[index]
                 if (video != null) {
-                    VideoCard(video, viewModel, onOpen)
+                    VideoCard(
+                        video = video,
+                        viewModel = viewModel,
+                        selected = video.uuid in selected,
+                        onClick = {
+                            if (selected.isNotEmpty()) viewModel.toggleSelected(video.uuid) else onOpen(video.uuid)
+                        },
+                        onLongClick = { viewModel.toggleSelected(video.uuid) },
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun CategoryDialog(
+    categories: List<de.hr.mediathek.data.db.CategoryEntity>,
+    used: Set<String>,
+    onAssign: (String) -> Unit,
+    onUnassign: (String) -> Unit,
+    onCreate: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var newName by remember { mutableStateOf("") }
+    var confirmDelete by remember { mutableStateOf<de.hr.mediathek.data.db.CategoryEntity?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.video_category_action)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (categories.isEmpty()) Text(stringResource(R.string.category_none))
+                categories.forEach { c ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            c.name + if (c.uuid in used) " ✓" else "",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        TextButton(onClick = { onAssign(c.uuid) }) { Text(stringResource(R.string.category_add)) }
+                        TextButton(onClick = { onUnassign(c.uuid) }) { Text(stringResource(R.string.category_remove)) }
+                        TextButton(onClick = { confirmDelete = c }) { Text(stringResource(R.string.category_delete)) }
+                    }
+                }
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text(stringResource(R.string.category_new)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Button(
+                    onClick = {
+                        onCreate(newName)
+                        newName = ""
+                    },
+                    enabled = newName.isNotBlank(),
+                ) { Text(stringResource(R.string.category_create)) }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.storage_message_ok)) } },
+    )
+    confirmDelete?.let { c ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            title = { Text(stringResource(R.string.category_delete_title, c.name)) },
+            text = { Text(stringResource(R.string.category_delete_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDelete(c.uuid)
+                    confirmDelete = null
+                }) { Text(stringResource(R.string.category_delete)) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(stringResource(R.string.diag_cancel)) } },
+        )
     }
 }
 
@@ -166,15 +306,27 @@ private fun sortLabel(sort: VideoSort): Int = when (sort) {
 }
 
 @Composable
-private fun VideoCard(video: MediaFileEntity, viewModel: VideosViewModel, onOpen: (String) -> Unit) {
+@OptIn(ExperimentalFoundationApi::class)
+private fun VideoCard(
+    video: MediaFileEntity,
+    viewModel: VideosViewModel,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     val offline = video.status != MediaStatus.ONLINE
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        ),
         modifier = Modifier
             .fillMaxWidth()
             .alpha(if (offline) 0.5f else 1f)
-            // Offline-Dateien bleiben sichtbar und bewertbar, lassen sich aber nicht abspielen.
-            .clickable(enabled = !offline) { onOpen(video.uuid) },
+            // Offline-Dateien bleiben sichtbar und lassen sich auswählen/bewerten, aber nicht abspielen.
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            ),
     ) {
         Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Thumbnail(video.uuid, viewModel)

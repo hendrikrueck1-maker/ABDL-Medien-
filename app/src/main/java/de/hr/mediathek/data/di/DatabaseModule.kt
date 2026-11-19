@@ -36,5 +36,6 @@ object DatabaseModule {
     @Provides fun provideErrorLogDao(db: MediathekDatabase): ErrorLogDao = db.errorLogDao()
     @Provides fun provideMediaFileDao(db: MediathekDatabase): MediaFileDao = db.mediaFileDao()
     @Provides fun provideJobDao(db: MediathekDatabase): JobDao = db.jobDao()
+    @Provides fun provideCategoryDao(db: MediathekDatabase): de.hr.mediathek.data.db.CategoryDao = db.categoryDao()
     @Provides fun provideThumbnailDao(db: MediathekDatabase): ThumbnailDao = db.thumbnailDao()
 }

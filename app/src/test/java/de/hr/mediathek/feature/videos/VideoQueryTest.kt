@@ -54,4 +54,12 @@ class VideoQueryTest {
         val q = VideoQuery.build(VideoFilter(minRating = 9), 1)
         assertEquals(listOf<Any>(5), q.args)
     }
+
+    @Test
+    fun kategorie_filterNutztZuordnungenOhneGeloeschte() {
+        val q = VideoQuery.build(VideoFilter(categoryUuid = "abc"), 1)
+        assertTrue(q.sql.contains("FROM category_assignment"))
+        assertTrue(q.sql.contains("deletedAt IS NULL)"))
+        assertEquals(listOf<Any>("abc"), q.args)
+    }
 }

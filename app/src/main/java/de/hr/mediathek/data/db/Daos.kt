@@ -213,6 +213,15 @@ interface MediaFileDao {
     )
     suspend fun setProgress(uuid: String, position: Long, seen: SeenState, now: Long)
 
+    @Query("UPDATE media_file SET updatedAt = :now, userUpdatedAt = :now WHERE uuid IN (:uuids)")
+    suspend fun touch(uuids: List<String>, now: Long)
+
+    @Query("UPDATE media_file SET favorite = :favorite, updatedAt = :now, userUpdatedAt = :now WHERE uuid IN (:uuids)")
+    suspend fun setFavoriteBulk(uuids: List<String>, favorite: Boolean, now: Long)
+
+    @Query("UPDATE media_file SET rating = :rating, updatedAt = :now, userUpdatedAt = :now WHERE uuid IN (:uuids)")
+    suspend fun setRatingBulk(uuids: List<String>, rating: Int, now: Long)
+
     @Query("UPDATE media_file SET status = 'OFFLINE', updatedAt = :now WHERE uuid = :uuid AND status = 'ONLINE'")
     suspend fun markOffline(uuid: String, now: Long)
 
@@ -339,4 +348,47 @@ interface ThumbnailDao {
             "AND (t.mediaUuid IS NULL OR t.fingerprint IS NOT m.fingerprint OR t.variant != 'NORMAL')",
     )
     suspend fun countPending(): Int
+}
+
+@Dao
+interface CategoryDao {
+    @Query("SELECT * FROM category WHERE deletedAt IS NULL AND scope IN ('VIDEO', 'ALL') ORDER BY name COLLATE NOCASE")
+    fun observeVideoCategories(): Flow<List<CategoryEntity>>
+
+    @Insert
+    suspend fun insert(category: CategoryEntity): Long
+
+    @Query("UPDATE category SET name = :name, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun rename(uuid: String, name: String, now: Long)
+
+    @Query("UPDATE category SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun tombstone(uuid: String, now: Long)
+
+    @Query(
+        "UPDATE category_assignment SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now " +
+            "WHERE categoryUuid = :categoryUuid AND deletedAt IS NULL",
+    )
+    suspend fun tombstoneAllAssignments(categoryUuid: String, now: Long)
+
+    @Query(
+        "SELECT * FROM category_assignment WHERE entityType = 'MEDIA' AND categoryUuid = :categoryUuid " +
+            "AND entityUuid IN (:mediaUuids)",
+    )
+    suspend fun assignmentsFor(categoryUuid: String, mediaUuids: List<String>): List<CategoryAssignmentEntity>
+
+    @Upsert
+    suspend fun upsertAssignments(items: List<CategoryAssignmentEntity>)
+
+    @Query(
+        "UPDATE category_assignment SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now " +
+            "WHERE entityType = 'MEDIA' AND categoryUuid = :categoryUuid AND entityUuid IN (:mediaUuids) AND deletedAt IS NULL",
+    )
+    suspend fun tombstoneAssignments(categoryUuid: String, mediaUuids: List<String>, now: Long)
+
+    /** Kategorien, die mindestens einem der Medien zugeordnet sind (für die Anzeige im Auswahldialog). */
+    @Query(
+        "SELECT DISTINCT categoryUuid FROM category_assignment WHERE entityType = 'MEDIA' AND deletedAt IS NULL " +
+            "AND entityUuid IN (:mediaUuids)",
+    )
+    suspend fun usedCategories(mediaUuids: List<String>): List<String>
 }

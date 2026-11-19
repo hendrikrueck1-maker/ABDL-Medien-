@@ -13,6 +13,7 @@ data class VideoFilter(
     val onlineOnly: Boolean = false,
     /** Dateiendung ohne Punkt, z. B. "mp4"; null = alle. */
     val format: String? = null,
+    val categoryUuid: String? = null,
 )
 
 /** Baut die Listenabfrage aus dem Filter (rein, damit sie testbar bleibt). */
@@ -42,6 +43,13 @@ object VideoQuery {
         filter.format?.takeIf { it.isNotBlank() }?.let {
             where.append(" AND LOWER(displayName) LIKE ? ESCAPE '\\'")
             args += "%." + escapeLike(it.lowercase().removePrefix("."))
+        }
+        filter.categoryUuid?.let {
+            where.append(
+                " AND uuid IN (SELECT entityUuid FROM category_assignment " +
+                    "WHERE entityType = 'MEDIA' AND categoryUuid = ? AND deletedAt IS NULL)",
+            )
+            args += it
         }
         val order = when (filter.sort) {
             VideoSort.ADDED_DESC -> "createdAt DESC"

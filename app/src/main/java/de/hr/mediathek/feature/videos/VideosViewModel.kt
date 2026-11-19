@@ -8,6 +8,8 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import androidx.sqlite.db.SimpleSQLiteQuery
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.hr.mediathek.data.category.CategoryRepository
+import de.hr.mediathek.data.db.CategoryEntity
 import de.hr.mediathek.data.db.MediaFileDao
 import de.hr.mediathek.data.db.MediaFileEntity
 import de.hr.mediathek.data.db.ThumbVariant
@@ -18,7 +20,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
 
@@ -27,6 +32,7 @@ import javax.inject.Inject
 class VideosViewModel @Inject constructor(
     private val dao: MediaFileDao,
     private val thumbs: ThumbnailCache,
+    private val categories: CategoryRepository,
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow(VideoFilter())
@@ -44,6 +50,57 @@ class VideosViewModel @Inject constructor(
             }.flow
         }
         .cachedIn(viewModelScope)
+
+    val categoryList: StateFlow<List<CategoryEntity>> = categories.observeVideoCategories()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Mehrfachauswahl: UUIDs der markierten Videos. Leer = keine Auswahl. */
+    private val _selected = MutableStateFlow<Set<String>>(emptySet())
+    val selected: StateFlow<Set<String>> = _selected
+
+    /** Kategorien, die mindestens einem ausgewählten Video zugeordnet sind (für den Dialog). */
+    private val _usedCategories = MutableStateFlow<Set<String>>(emptySet())
+    val usedCategories: StateFlow<Set<String>> = _usedCategories
+
+    fun toggleSelected(uuid: String) {
+        _selected.update { if (uuid in it) it - uuid else it + uuid }
+    }
+
+    fun clearSelection() {
+        _selected.value = emptySet()
+    }
+
+    fun favoriteSelected(favorite: Boolean) = withSelection { dao.setFavoriteBulk(it, favorite, now()) }
+    fun rateSelected(rating: Int) = withSelection { dao.setRatingBulk(it, rating.coerceIn(0, 5), now()) }
+    fun assignSelected(categoryUuid: String) = withSelection { categories.assign(it, categoryUuid) }
+    fun unassignSelected(categoryUuid: String) = withSelection { categories.unassign(it, categoryUuid) }
+
+    fun loadUsedCategories() {
+        val ids = _selected.value.toList()
+        viewModelScope.launch { _usedCategories.value = categories.usedBy(ids) }
+    }
+
+    fun createCategory(name: String) {
+        viewModelScope.launch { categories.create(name) }
+    }
+
+    fun deleteCategory(uuid: String) {
+        viewModelScope.launch {
+            categories.delete(uuid)
+            if (_filter.value.categoryUuid == uuid) update { it.copy(categoryUuid = null) }
+        }
+    }
+
+    private fun now() = System.currentTimeMillis()
+
+    private fun withSelection(block: suspend (List<String>) -> Unit) {
+        val ids = _selected.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            block(ids)
+            loadUsedCategories()
+        }
+    }
 
     fun update(change: (VideoFilter) -> VideoFilter) {
         _filter.update(change)
