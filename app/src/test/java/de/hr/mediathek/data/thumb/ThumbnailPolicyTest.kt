@@ -15,8 +15,8 @@ class ThumbnailPolicyTest {
 
     @Test
     fun wenigPlatz_cacheSchrumpftUmFehlbetrag() {
-        // 1 GB belegt, nur 600 MB frei -> 400 MB fehlen -> Limit 1 GB - 400 MB
-        val limit = ThumbnailPolicy.effectiveLimit(1 * gb, 600 * mb)
+        // 1 GB belegt, nur 624 MB frei -> 400 MB fehlen -> Limit 1 GB - 400 MB
+        val limit = ThumbnailPolicy.effectiveLimit(1 * gb, 624 * mb)
         assertEquals(1 * gb - 400 * mb, limit)
     }
 
