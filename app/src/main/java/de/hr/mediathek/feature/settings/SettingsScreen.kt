@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -22,14 +24,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hr.mediathek.BuildConfig
 import de.hr.mediathek.R
 import de.hr.mediathek.core.update.ApkInstaller
+import de.hr.mediathek.feature.diag.DiagRoutes
 
 @Composable
-fun SettingsScreen(viewModel: UpdateViewModel = hiltViewModel()) {
+fun SettingsScreen(onOpenDiag: (String) -> Unit, viewModel: UpdateViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
@@ -118,6 +121,33 @@ fun SettingsScreen(viewModel: UpdateViewModel = hiltViewModel()) {
                             Text(stringResource(R.string.update_check))
                         }
                     }
+                }
+            }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(R.string.diag_section_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+                Text(
+                    text = stringResource(R.string.diag_section_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+                Button(onClick = { onOpenDiag(DiagRoutes.SCAN) }) {
+                    Text(stringResource(R.string.diag_open_scan))
+                }
+                Button(onClick = { onOpenDiag(DiagRoutes.TRANSCODE) }) {
+                    Text(stringResource(R.string.diag_open_transcode))
+                }
+                Button(onClick = { onOpenDiag(DiagRoutes.PDF) }) {
+                    Text(stringResource(R.string.diag_open_pdf))
                 }
             }
         }

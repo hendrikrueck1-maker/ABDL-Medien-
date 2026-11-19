@@ -93,6 +93,10 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.core)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
+    implementation(libs.androidx.media3.common)
+    implementation(libs.androidx.media3.transformer)
+    implementation(libs.pdfbox.android)
+
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)

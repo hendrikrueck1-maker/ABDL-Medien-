@@ -22,6 +22,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import de.hr.mediathek.feature.diag.DiagRoutes
+import de.hr.mediathek.feature.diag.PdfDiagScreen
+import de.hr.mediathek.feature.diag.ScanDiagScreen
+import de.hr.mediathek.feature.diag.TranscodeDiagScreen
 import de.hr.mediathek.feature.home.HomeScreen
 import de.hr.mediathek.feature.placeholder.PlaceholderScreen
 import de.hr.mediathek.feature.settings.SettingsScreen
@@ -60,8 +64,11 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
             HomeScreen(onOpen = { navController.navigateTopLevel(it) })
         }
         composable(Destination.Settings.route) {
-            SettingsScreen()
+            SettingsScreen(onOpenDiag = { navController.navigate(it) })
         }
+        composable(DiagRoutes.SCAN) { ScanDiagScreen(onBack = { navController.popBackStack() }) }
+        composable(DiagRoutes.TRANSCODE) { TranscodeDiagScreen(onBack = { navController.popBackStack() }) }
+        composable(DiagRoutes.PDF) { PdfDiagScreen(onBack = { navController.popBackStack() }) }
         Destination.entries
             .filter { it != Destination.Home && it != Destination.Settings }
             .forEach { destination ->

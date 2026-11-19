@@ -14,6 +14,30 @@
     <string name="placeholder_coming_soon">Dieser Bereich wird in einer späteren Etappe gebaut.</string>
     <string name="version_label">Version %1$s</string>
 
+    <string name="diag_section_title">Diagnose-Werkzeuge</string>
+    <string name="diag_section_hint">Messungen für die Entwicklung. Ergebnisse bitte kopieren und mir schicken.</string>
+    <string name="diag_open_scan">SD-Karten-Scan messen</string>
+    <string name="diag_open_transcode">Videokomprimierung testen</string>
+    <string name="diag_open_pdf">PDF-Text auslesen</string>
+    <string name="diag_back">Zurück</string>
+    <string name="diag_copy">Ergebnis kopieren</string>
+    <string name="diag_cancel">Abbrechen</string>
+    <string name="diag_scan_title">SD-Karten-Scan</string>
+    <string name="diag_scan_hint">Wähle einen Ordner mit vielen Videos oder Bildern auf der SD-Karte. Es wird nichts verändert oder kopiert.</string>
+    <string name="diag_pick_folder">Ordner wählen</string>
+    <string name="diag_transcode_title">Videokomprimierung</string>
+    <string name="diag_transcode_hint">Wähle bis zu 5 Videos. Die App muss während des Tests geöffnet bleiben. Die Originale werden nicht verändert.</string>
+    <string name="diag_stage_light">Kaum sichtbar (65 %)</string>
+    <string name="diag_stage_balanced">Ausgewogen (50 %)</string>
+    <string name="diag_stage_strong">Stark (35 %)</string>
+    <string name="diag_clip_label">Nur die ersten 60 Sekunden</string>
+    <string name="diag_pick_videos">Videos wählen</string>
+    <string name="diag_preview">Vorschau %1$d</string>
+    <string name="diag_pdf_title">PDF-Text auslesen</string>
+    <string name="diag_pdf_hint">Wähle eine Bewertungs-PDF. Der Text wird nur hier angezeigt und nicht gespeichert.</string>
+    <string name="diag_pdf_sort">Nach Position sortieren</string>
+    <string name="diag_pick_pdf">PDF wählen</string>
+
     <string name="update_title">App-Update</string>
     <string name="update_check">Nach Update suchen</string>
     <string name="update_checking">Suche nach Update …</string>
