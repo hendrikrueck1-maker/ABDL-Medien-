@@ -1,6 +1,9 @@
 package de.hr.mediathek.data.db
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
+import androidx.room.RawQuery
+import androidx.sqlite.db.SupportSQLiteQuery
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Transaction
@@ -191,6 +194,27 @@ interface MediaFileDao {
             "FROM media_file WHERE deletedAt IS NULL AND status != 'TRASHED' GROUP BY sourceUuid",
     )
     fun observeCounts(): Flow<List<SourceCount>>
+
+    @RawQuery(observedEntities = [MediaFileEntity::class])
+    fun pagingVideos(query: SupportSQLiteQuery): PagingSource<Int, MediaFileEntity>
+
+    @Query("SELECT * FROM media_file WHERE uuid = :uuid AND deletedAt IS NULL")
+    suspend fun getByUuid(uuid: String): MediaFileEntity?
+
+    @Query("UPDATE media_file SET rating = :rating, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun setRating(uuid: String, rating: Int, now: Long)
+
+    @Query("UPDATE media_file SET favorite = :favorite, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun setFavorite(uuid: String, favorite: Boolean, now: Long)
+
+    @Query(
+        "UPDATE media_file SET resumePositionMs = :position, seenState = :seen, updatedAt = :now, userUpdatedAt = :now " +
+            "WHERE uuid = :uuid",
+    )
+    suspend fun setProgress(uuid: String, position: Long, seen: SeenState, now: Long)
+
+    @Query("UPDATE media_file SET status = 'OFFLINE', updatedAt = :now WHERE uuid = :uuid AND status = 'ONLINE'")
+    suspend fun markOffline(uuid: String, now: Long)
 
     @Query("UPDATE media_file SET status = 'DEFECT', updatedAt = :now WHERE uuid = :uuid")
     suspend fun markDefect(uuid: String, now: Long)

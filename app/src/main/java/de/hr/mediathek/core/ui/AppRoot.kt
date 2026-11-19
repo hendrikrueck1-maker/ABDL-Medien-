@@ -31,6 +31,10 @@ import de.hr.mediathek.feature.home.HomeScreen
 import de.hr.mediathek.feature.placeholder.PlaceholderScreen
 import de.hr.mediathek.feature.settings.SettingsScreen
 import de.hr.mediathek.feature.storage.StorageScreen
+import de.hr.mediathek.feature.videos.PlayerScreen
+import de.hr.mediathek.feature.videos.VideosScreen
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 
 private const val WIDE_LAYOUT_MIN_WIDTH_DP = 600
 
@@ -79,8 +83,15 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         composable(DiagRoutes.SCAN) { ScanDiagScreen(onBack = { navController.popBackStack() }) }
         composable(DiagRoutes.TRANSCODE) { TranscodeDiagScreen(onBack = { navController.popBackStack() }) }
         composable(DiagRoutes.PDF) { PdfDiagScreen(onBack = { navController.popBackStack() }) }
+        composable(Destination.Videos.route) {
+            VideosScreen(onOpen = { navController.navigate("player/$it") })
+        }
+        composable(
+            route = "player/{uuid}",
+            arguments = listOf(navArgument("uuid") { type = NavType.StringType }),
+        ) { PlayerScreen(onBack = { navController.popBackStack() }) }
         Destination.entries
-            .filter { it != Destination.Home && it != Destination.Settings }
+            .filter { it != Destination.Home && it != Destination.Settings && it != Destination.Videos }
             .forEach { destination ->
                 composable(destination.route) {
                     PlaceholderScreen(title = stringResource(destination.label))
