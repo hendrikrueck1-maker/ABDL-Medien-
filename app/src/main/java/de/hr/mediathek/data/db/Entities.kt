@@ -40,6 +40,7 @@ data class SourceEntity(
         Index("type", "rating"),
         Index("type", "size"),
         Index("type", "durationMs"),
+        Index("contentHash"),
     ],
 )
 data class MediaFileEntity(
@@ -73,6 +74,10 @@ data class MediaFileEntity(
     val seenState: SeenState = SeenState.UNSEEN,
     // Bild
     val perceptualHash: Long? = null,
+    /** SHA-256 des ganzen Dateiinhalts (nur Bilder), für exakte Duplikate. */
+    val contentHash: String? = null,
+    /** Fingerabdruck, für den die Hashes berechnet wurden; weicht er ab, wird neu berechnet. */
+    val hashFingerprint: String? = null,
     val createdAt: Long = nowMillis(),
     val updatedAt: Long = createdAt,
     val userUpdatedAt: Long = createdAt,

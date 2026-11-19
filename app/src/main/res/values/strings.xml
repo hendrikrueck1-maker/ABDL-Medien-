@@ -3,6 +3,18 @@
     <string name="nav_home">Übersicht</string>
     <string name="nav_stories">Geschichten</string>
     <string name="nav_images">Bilder</string>
+    <string name="image_dup_open">Duplikate</string>
+    <string name="image_dup_title">Bild-Duplikate</string>
+    <string name="image_dup_progress">%1$d von %2$d Bildern analysiert</string>
+    <string name="image_dup_start">Analyse starten</string>
+    <string name="image_dup_refresh">Aktualisieren</string>
+    <string name="image_dup_exact">Exakt gleich</string>
+    <string name="image_dup_similar">Ähnlich</string>
+    <string name="image_dup_threshold">Toleranz: %1$d (0 = nur nahezu identische, höher = auch stärker abweichende Bilder)</string>
+    <string name="image_dup_none">Keine Duplikate gefunden.</string>
+    <string name="image_dup_groups">%1$d Gruppen</string>
+    <string name="image_dup_group_size">%1$d Bilder</string>
+    <string name="image_dup_mark_rest">Alle außer dem größten markieren</string>
     <string name="nav_videos">Videos</string>
     <string name="nav_products">Produkte</string>
     <string name="nav_tracker">Tracker</string>

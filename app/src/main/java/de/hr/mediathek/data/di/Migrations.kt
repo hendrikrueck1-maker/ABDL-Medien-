@@ -32,5 +32,14 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+/** 4 -> 5: Bild-Hashes für Duplikaterkennung. */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE media_file ADD COLUMN contentHash TEXT")
+        db.execSQL("ALTER TABLE media_file ADD COLUMN hashFingerprint TEXT")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_media_file_contentHash` ON `media_file` (`contentHash`)")
+    }
+}
+
 /** Alle Schema-Migrationen in Reihenfolge. */
-val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)

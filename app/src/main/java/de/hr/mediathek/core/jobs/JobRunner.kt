@@ -33,6 +33,7 @@ class JobRunner @Inject constructor(
     private val jobDao: JobDao,
     private val scanExecutor: ScanJobExecutor,
     private val thumbnailExecutor: ThumbnailJobExecutor,
+    private val hashExecutor: de.hr.mediathek.data.images.ImageHashJobExecutor,
     private val backupExecutor: BackupJobExecutor,
     private val compressionExecutor: de.hr.mediathek.data.compress.CompressionJobExecutor,
     private val compressionSettings: de.hr.mediathek.data.compress.CompressionSettings,
@@ -93,7 +94,10 @@ class JobRunner @Inject constructor(
         }
 
         if (cancelRequestedFor == job.uuid) cancelRequestedFor = null
-        if (job.type == JobType.SCAN && outcome is JobOutcome.Completed) enqueueThumbnailsIfIdle()
+        if (job.type == JobType.SCAN && outcome is JobOutcome.Completed) {
+            enqueueThumbnailsIfIdle()
+            enqueueHashesIfIdle()
+        }
         val now = System.currentTimeMillis()
         when (outcome) {
             is JobOutcome.Completed -> jobDao.update(
@@ -122,9 +126,16 @@ class JobRunner @Inject constructor(
         }
     }
 
+    private suspend fun enqueueHashesIfIdle() {
+        if (jobDao.findActive(JobType.PHASH, "%") == null) {
+            jobDao.insert(JobEntity(type = JobType.PHASH, priority = JobPriority.LOW))
+        }
+    }
+
     private suspend fun execute(job: JobEntity, context: JobContext): JobOutcome = when (job.type) {
         JobType.SCAN -> scanExecutor.execute(job, context)
         JobType.THUMBNAILS -> thumbnailExecutor.execute(context)
+        JobType.PHASH -> hashExecutor.execute(context)
         JobType.BACKUP -> backupExecutor.execute(context)
         JobType.COMPRESS -> compressionExecutor.execute(job, context)
         else -> JobOutcome.Failed("Job-Typ ${job.type} ist noch nicht verfügbar")

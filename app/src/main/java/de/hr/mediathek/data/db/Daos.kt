@@ -98,6 +98,18 @@ data class ScanRow(
     val fingerprint: String?,
 )
 
+data class HashCandidate(
+    val uuid: String,
+    val relativePath: String,
+    val sourceUuid: String,
+    val documentIdCache: String?,
+    val fingerprint: String?,
+)
+
+data class HashStats(val total: Int, val done: Int)
+
+data class PerceptualRow(val uuid: String, val hash: Long)
+
 data class SourceCount(val sourceUuid: String, val total: Int, val offline: Int)
 
 @Dao
@@ -270,6 +282,49 @@ interface MediaFileDao {
         uuid: String, path: String, name: String, size: Long, fingerprint: String,
         docId: String, modified: Long?, now: Long,
     )
+
+    // --- Bild-Hashes ---
+
+    @Query(
+        "SELECT uuid, relativePath, sourceUuid, documentIdCache, fingerprint FROM media_file " +
+            "WHERE type = 'IMAGE' AND status = 'ONLINE' AND deletedAt IS NULL AND documentIdCache IS NOT NULL " +
+            "AND hashFingerprint IS NOT fingerprint LIMIT :limit",
+    )
+    suspend fun imagesNeedingHash(limit: Int): List<HashCandidate>
+
+    @Query("UPDATE media_file SET contentHash = :content, perceptualHash = :perceptual, hashFingerprint = :fingerprint WHERE uuid = :uuid")
+    suspend fun setHashes(uuid: String, content: String?, perceptual: Long?, fingerprint: String?)
+
+    @Query(
+        "SELECT COUNT(*) AS total, " +
+            "COALESCE(SUM(CASE WHEN hashFingerprint IS fingerprint THEN 1 ELSE 0 END), 0) AS done FROM media_file " +
+            "WHERE type = 'IMAGE' AND status != 'TRASHED' AND deletedAt IS NULL",
+    )
+    fun observeHashStats(): Flow<HashStats>
+
+    @Query(
+        "SELECT COUNT(*) AS total, " +
+            "COALESCE(SUM(CASE WHEN hashFingerprint IS fingerprint THEN 1 ELSE 0 END), 0) AS done FROM media_file " +
+            "WHERE type = 'IMAGE' AND status != 'TRASHED' AND deletedAt IS NULL",
+    )
+    suspend fun hashStatsOnce(): HashStats
+
+    @Query(
+        "SELECT * FROM media_file WHERE type = 'IMAGE' AND deletedAt IS NULL AND status != 'TRASHED' " +
+            "AND contentHash IN (SELECT contentHash FROM media_file WHERE type = 'IMAGE' AND contentHash IS NOT NULL " +
+            "AND deletedAt IS NULL AND status != 'TRASHED' GROUP BY contentHash HAVING COUNT(*) > 1) " +
+            "ORDER BY contentHash, size DESC",
+    )
+    suspend fun exactImageDuplicates(): List<MediaFileEntity>
+
+    @Query(
+        "SELECT uuid, perceptualHash AS hash FROM media_file WHERE type = 'IMAGE' AND perceptualHash IS NOT NULL " +
+            "AND deletedAt IS NULL AND status != 'TRASHED'",
+    )
+    suspend fun perceptualHashes(): List<PerceptualRow>
+
+    @Query("SELECT * FROM media_file WHERE uuid IN (:uuids) AND deletedAt IS NULL")
+    suspend fun byUuids(uuids: List<String>): List<MediaFileEntity>
 
     @Query("UPDATE media_file SET status = 'OFFLINE', updatedAt = :now WHERE uuid = :uuid AND status = 'ONLINE'")
     suspend fun markOffline(uuid: String, now: Long)

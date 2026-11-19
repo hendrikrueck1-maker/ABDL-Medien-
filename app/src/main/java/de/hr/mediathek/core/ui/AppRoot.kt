@@ -93,12 +93,21 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
             )
         }
         composable(Destination.Images.route) {
-            de.hr.mediathek.feature.images.ImagesScreen(onOpen = { navController.navigate("image/$it") })
+            de.hr.mediathek.feature.images.ImagesScreen(
+                onOpen = { navController.navigate("image/$it") },
+                onOpenDuplicates = { navController.navigate("image-duplicates") },
+            )
         }
         composable(
             route = "image/{uuid}",
             arguments = listOf(navArgument("uuid") { type = NavType.StringType }),
         ) { de.hr.mediathek.feature.images.ImageViewerScreen(onBack = { navController.popBackStack() }) }
+        composable("image-duplicates") {
+            de.hr.mediathek.feature.images.ImageDuplicatesScreen(
+                onBack = { navController.popBackStack() },
+                onOpen = { navController.navigate("image/$it") },
+            )
+        }
         composable("trash") { TrashScreen(onBack = { navController.popBackStack() }) }
         composable("duplicates") { DuplicatesScreen(onBack = { navController.popBackStack() }) }
         composable(

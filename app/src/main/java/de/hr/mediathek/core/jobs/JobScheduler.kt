@@ -59,6 +59,14 @@ class JobScheduler @Inject constructor(
         return true
     }
 
+    /** Bilder-Analyse (Hashes für Duplikate) starten. */
+    suspend fun enqueueHashes(): Boolean {
+        if (jobDao.findActive(JobType.PHASH, "%") != null) return false
+        jobDao.insert(JobEntity(type = JobType.PHASH, priority = JobPriority.LOW))
+        trigger()
+        return true
+    }
+
     /** Komprimierung eines Videos einreihen. false, wenn für dasselbe Video schon einer eingereiht ist oder läuft. */
     suspend fun enqueueCompress(params: de.hr.mediathek.data.compress.CompressionParams): Boolean {
         if (jobDao.findActive(JobType.COMPRESS, "%\"mediaUuid\":\"${params.mediaUuid}\"%") != null) return false
