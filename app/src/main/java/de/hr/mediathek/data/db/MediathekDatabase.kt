@@ -45,9 +45,10 @@ abstract class MediathekDatabase : RoomDatabase() {
     abstract fun trashDao(): TrashDao
     abstract fun tagDao(): TagDao
     abstract fun playlistDao(): PlaylistDao
+    abstract fun compressionDao(): CompressionDao
 
     companion object {
-        const val VERSION = 3
+        const val VERSION = 4
         const val NAME = "mediathek.db"
     }
 }

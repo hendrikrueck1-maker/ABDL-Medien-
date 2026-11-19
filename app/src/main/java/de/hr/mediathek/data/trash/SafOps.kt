@@ -68,4 +68,34 @@ object SafOps {
         runCatching {
             DocumentsContract.deleteDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, docId))
         }.getOrDefault(false)
+
+    class Stat(val name: String, val size: Long, val modified: Long?)
+
+    /** Name, Größe und Änderungszeit eines Dokuments; null, wenn es nicht existiert oder nicht lesbar ist. */
+    fun stat(resolver: ContentResolver, tree: Uri, docId: String): Stat? = try {
+        resolver.query(
+            DocumentsContract.buildDocumentUriUsingTree(tree, docId),
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_SIZE,
+                DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+            ),
+            null, null, null,
+        )?.use { c ->
+            if (c.moveToFirst()) Stat(c.getString(0) ?: "", c.getLong(1), if (c.isNull(2)) null else c.getLong(2)) else null
+        }
+    } catch (e: Exception) {
+        null
+    }
+
+    /** Ohne erreichbare Wurzel (Karte entfernt) wird nie etwas als "gelöscht" oder "fehlend" angenommen. */
+    fun rootReachable(resolver: ContentResolver, tree: Uri): Boolean = try {
+        val root = DocumentsContract.getTreeDocumentId(tree)
+        resolver.query(
+            DocumentsContract.buildDocumentUriUsingTree(tree, root),
+            arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID), null, null, null,
+        )?.use { it.moveToFirst() } ?: false
+    } catch (e: Exception) {
+        false
+    }
 }

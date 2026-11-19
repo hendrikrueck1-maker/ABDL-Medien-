@@ -367,6 +367,20 @@ data class CompressionRecordEntity(
     val tempPath: String? = null,
     val altPath: String? = null,
     val deleteAfter: Long? = null,
+    // Ab Datenbankversion 4: alles, was das Phasen-Journal zum Fortsetzen braucht.
+    val sourceUuid: String? = null,
+    val relativePath: String? = null,
+    val origName: String? = null,
+    val targetName: String? = null,
+    val level: String? = null,
+    val origDocId: String? = null,
+    val newDocId: String? = null,
+    val localTemp: String? = null,
+    val oldFingerprint: String? = null,
+    val newFingerprint: String? = null,
+    val origSize: Long? = null,
+    val newSize: Long? = null,
+    val note: String? = null,
 )
 
 @Entity(tableName = "trash_item", indices = [Index("uuid", unique = true), Index("expiresAt")])

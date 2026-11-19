@@ -23,6 +23,7 @@ class JobScheduler @Inject constructor(
     private val scanExecutor: ScanJobExecutor,
     private val storage: de.hr.mediathek.data.storage.StorageRepository,
     private val backupStore: de.hr.mediathek.data.backup.BackupStore,
+    private val compressionExecutor: de.hr.mediathek.data.compress.CompressionJobExecutor,
 ) {
     /** Gibt false zurück, wenn für diese Quelle schon ein Scan eingereiht ist, läuft oder auf Bestätigung wartet. */
     suspend fun enqueueScan(sourceUuid: String): Boolean {
@@ -53,6 +54,14 @@ class JobScheduler @Inject constructor(
     suspend fun enqueueThumbnails(): Boolean {
         if (jobDao.findActive(JobType.THUMBNAILS, "%") != null) return false
         jobDao.insert(JobEntity(type = JobType.THUMBNAILS, priority = JobPriority.LOW))
+        trigger()
+        return true
+    }
+
+    /** Komprimierung eines Videos einreihen. false, wenn für dasselbe Video schon einer eingereiht ist oder läuft. */
+    suspend fun enqueueCompress(params: de.hr.mediathek.data.compress.CompressionParams): Boolean {
+        if (jobDao.findActive(JobType.COMPRESS, "%\"mediaUuid\":\"${params.mediaUuid}\"%") != null) return false
+        jobDao.insert(JobEntity(type = JobType.COMPRESS, priority = JobPriority.MEDIUM, paramsJson = params.toJson()))
         trigger()
         return true
     }
@@ -99,6 +108,17 @@ class JobScheduler @Inject constructor(
     /** Beim Start: laufende Jobs eines früheren Prozesses wieder einreihen und Alt-Einträge aufräumen. */
     suspend fun recover() {
         jobDao.resetRunning()
+        // Angefangene Komprimierungen: vor VERIFIED verwerfen, danach zu Ende führen.
+        compressionExecutor.abandonInterrupted().forEach {
+            enqueueCompress(
+                de.hr.mediathek.data.compress.CompressionParams(
+                    it.mediaUuid,
+                    runCatching { de.hr.mediathek.data.compress.CompressionLevel.valueOf(it.level ?: "") }
+                        .getOrDefault(de.hr.mediathek.data.compress.CompressionLevel.BALANCED),
+                    confirmed = true,
+                ),
+            )
+        }
         jobDao.deleteFinishedBefore(System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000)
         if (runner.hasWork()) trigger()
         // Verpasste Backups (Karte war nicht da, App war zu) werden spätestens hier nachgeholt.

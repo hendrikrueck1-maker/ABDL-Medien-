@@ -185,6 +185,8 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
             onDismissMessage = viewModel::dismissRestoreMessage,
         )
 
+        CompressionCard()
+
         confirmRestore?.let { file ->
             AlertDialog(
                 onDismissRequest = { confirmRestore = null },

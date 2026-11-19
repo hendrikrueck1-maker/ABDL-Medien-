@@ -249,6 +249,17 @@ interface MediaFileDao {
     @RawQuery(observedEntities = [MediaFileEntity::class])
     suspend fun uuids(query: SupportSQLiteQuery): List<String>
 
+    /** Nach der Komprimierung: Datei umhängen, alle Nutzerdaten (Bewertung, Kategorien, Datum, ...) bleiben. */
+    @Query(
+        "UPDATE media_file SET relativePath = :path, displayName = :name, size = :size, fingerprint = :fingerprint, " +
+            "documentIdCache = :docId, lastModified = :modified, mimeType = 'video/mp4', status = 'ONLINE', " +
+            "missingScanCount = 0, updatedAt = :now WHERE uuid = :uuid",
+    )
+    suspend fun applyCompression(
+        uuid: String, path: String, name: String, size: Long, fingerprint: String,
+        docId: String, modified: Long?, now: Long,
+    )
+
     @Query("UPDATE media_file SET status = 'OFFLINE', updatedAt = :now WHERE uuid = :uuid AND status = 'ONLINE'")
     suspend fun markOffline(uuid: String, now: Long)
 
@@ -527,4 +538,44 @@ interface PlaylistDao {
             "WHERE playlistUuid = :uuid AND mediaUuid IN (:mediaUuids) AND deletedAt IS NULL",
     )
     suspend fun tombstoneItems(uuid: String, mediaUuids: List<String>, now: Long)
+}
+
+data class GraceStats(val count: Int, val bytes: Long)
+
+@Dao
+interface CompressionDao {
+    @Insert
+    suspend fun insert(record: CompressionRecordEntity): Long
+
+    @Update
+    suspend fun update(record: CompressionRecordEntity)
+
+    @Query("DELETE FROM compression_record WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    /** Ein Eintrag, der noch zu Ende geführt werden muss (Phase ENCODING bis RENAMED). */
+    @Query(
+        "SELECT * FROM compression_record WHERE mediaUuid = :mediaUuid " +
+            "AND phase IN ('ENCODING', 'VERIFIED', 'ORIGINAL_MOVED', 'RENAMED') LIMIT 1",
+    )
+    suspend fun unfinishedFor(mediaUuid: String): CompressionRecordEntity?
+
+    @Query("SELECT * FROM compression_record WHERE phase IN ('ENCODING', 'VERIFIED', 'ORIGINAL_MOVED', 'RENAMED')")
+    suspend fun allUnfinished(): List<CompressionRecordEntity>
+
+    /** Originale in der Schonfrist (liegen im _alt-Ordner). */
+    @Query("SELECT * FROM compression_record WHERE phase = 'DB_UPDATED' AND altPath IS NOT NULL")
+    suspend fun inGrace(): List<CompressionRecordEntity>
+
+    @Query("SELECT * FROM compression_record WHERE phase = 'DB_UPDATED' AND altPath IS NOT NULL AND deleteAfter <= :now")
+    suspend fun graceExpired(now: Long): List<CompressionRecordEntity>
+
+    @Query("SELECT COUNT(*) AS count, COALESCE(SUM(origSize), 0) AS bytes FROM compression_record WHERE phase = 'DB_UPDATED'")
+    fun observeGrace(): Flow<GraceStats>
+
+    @Query("SELECT mediaUuid FROM compression_record WHERE phase = 'BLOCKED'")
+    fun observeBlocked(): Flow<List<String>>
+
+    @Query("DELETE FROM compression_record WHERE mediaUuid = :mediaUuid AND phase IN ('BLOCKED', 'FAILED')")
+    suspend fun clearMarks(mediaUuid: String)
 }

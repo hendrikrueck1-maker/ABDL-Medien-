@@ -21,5 +21,16 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+/** 3 -> 4: Phasen-Journal der Komprimierung bekommt die Felder zum Fortsetzen. */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        listOf(
+            "sourceUuid TEXT", "relativePath TEXT", "origName TEXT", "targetName TEXT", "level TEXT",
+            "origDocId TEXT", "newDocId TEXT", "localTemp TEXT", "oldFingerprint TEXT", "newFingerprint TEXT",
+            "origSize INTEGER", "newSize INTEGER", "note TEXT",
+        ).forEach { db.execSQL("ALTER TABLE compression_record ADD COLUMN $it") }
+    }
+}
+
 /** Alle Schema-Migrationen in Reihenfolge. */
-val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)

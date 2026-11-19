@@ -23,6 +23,7 @@ class MediathekApp : Application() {
     @Inject lateinit var errorLogger: ErrorLogger
     @Inject lateinit var jobScheduler: JobScheduler
     @Inject lateinit var trashRepository: de.hr.mediathek.data.trash.TrashRepository
+    @Inject lateinit var compressionRepository: de.hr.mediathek.data.compress.CompressionRepository
 
     private fun scheduleDailyBackupCheck() {
         val request = PeriodicWorkRequestBuilder<BackupTriggerWorker>(1, TimeUnit.DAYS)
@@ -43,5 +44,7 @@ class MediathekApp : Application() {
         scheduleDailyBackupCheck()
         // Abgelaufene Papierkorb-Dateien (30 Tage) endgültig entfernen.
         appScope.launch { trashRepository.purgeExpired() }
+        // Originale, deren 7-tägige Schonfrist nach einer Komprimierung abgelaufen ist, endgültig entfernen.
+        appScope.launch { compressionRepository.purgeDue() }
     }
 }

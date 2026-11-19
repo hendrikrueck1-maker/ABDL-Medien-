@@ -82,6 +82,10 @@ fun VideosScreen(
     var showPlaylistDialog by remember { mutableStateOf(false) }
     var showPlaylistPick by remember { mutableStateOf(false) }
     var noRandom by remember { mutableStateOf(false) }
+    val compression: CompressionViewModel = hiltViewModel()
+    val plan by compression.plan.collectAsStateWithLifecycle()
+    val queued by compression.queued.collectAsStateWithLifecycle()
+    var compressTarget by remember { mutableStateOf<String?>(null) }
     var rateMenu by remember { mutableStateOf(false) }
     val trashResult by viewModel.trashResult.collectAsStateWithLifecycle()
     var confirmTrash by remember { mutableStateOf(0) } // 0 = zu, 1 = erste Rückfrage, 2 = zweite ab 10 Dateien
@@ -139,6 +143,13 @@ fun VideosScreen(
                     viewModel.loadUsedTags()
                     showTagDialog = true
                 }) { Text(stringResource(R.string.tag_action)) }
+                if (selected.size == 1) {
+                    OutlinedButton(onClick = {
+                        val id = selected.first()
+                        compressTarget = id
+                        compression.load(id)
+                    }) { Text(stringResource(R.string.compress_action)) }
+                }
                 OutlinedButton(onClick = { showPlaylistPick = true }) { Text(stringResource(R.string.playlist_add_action)) }
                 if (filter.playlistUuid != null) {
                     OutlinedButton(onClick = viewModel::removeSelectedFromCurrentPlaylist) { Text(stringResource(R.string.playlist_remove_action)) }
@@ -310,6 +321,23 @@ fun VideosScreen(
                 onSaveSmart = {},
                 onDelete = {},
                 onDismiss = { showPlaylistPick = false },
+            )
+        }
+        plan?.let { state ->
+            CompressDialog(
+                state = state,
+                onStart = { level, confirmed ->
+                    compressTarget?.let { compression.start(it, level, confirmed) }
+                    viewModel.clearSelection()
+                },
+                onDismiss = compression::dismissPlan,
+            )
+        }
+        queued?.let { ok ->
+            AlertDialog(
+                onDismissRequest = compression::dismissQueued,
+                text = { Text(stringResource(if (ok) R.string.compress_queued else R.string.compress_exists)) },
+                confirmButton = { TextButton(onClick = compression::dismissQueued) { Text(stringResource(R.string.storage_message_ok)) } },
             )
         }
         if (noRandom) {

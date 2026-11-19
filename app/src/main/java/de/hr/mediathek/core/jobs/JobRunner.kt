@@ -34,6 +34,7 @@ class JobRunner @Inject constructor(
     private val scanExecutor: ScanJobExecutor,
     private val thumbnailExecutor: ThumbnailJobExecutor,
     private val backupExecutor: BackupJobExecutor,
+    private val compressionExecutor: de.hr.mediathek.data.compress.CompressionJobExecutor,
     private val errorLogger: ErrorLogger,
 ) {
     private val runLock = Mutex()
@@ -124,6 +125,7 @@ class JobRunner @Inject constructor(
         JobType.SCAN -> scanExecutor.execute(job, context)
         JobType.THUMBNAILS -> thumbnailExecutor.execute(context)
         JobType.BACKUP -> backupExecutor.execute(context)
+        JobType.COMPRESS -> compressionExecutor.execute(job, context)
         else -> JobOutcome.Failed("Job-Typ ${job.type} ist noch nicht verfügbar")
     }
 
