@@ -314,7 +314,7 @@ class CompressionJobExecutor @Inject constructor(
         }
 
         val saved = (r.origSize ?: 0) - (r.newSize ?: 0)
-        return JobOutcome.Completed("Komprimiert, ${saved / 1_000_000} MB gespart; Original bleibt 7 Tage im Ordner _alt")
+        return JobOutcome.Completed("Komprimiert, ${saved / 1_000_000} MB gespart; Original bleibt im Ordner _alt")
     }
 
     // --- Aufräumen ---------------------------------------------------------------------------

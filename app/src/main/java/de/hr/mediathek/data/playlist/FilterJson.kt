@@ -1,6 +1,8 @@
 package de.hr.mediathek.data.playlist
 
+import de.hr.mediathek.feature.videos.CompressedFilter
 import de.hr.mediathek.feature.videos.SeenFilter
+import de.hr.mediathek.feature.videos.SizeRange
 import de.hr.mediathek.feature.videos.VideoFilter
 import de.hr.mediathek.feature.videos.VideoSort
 import org.json.JSONObject
@@ -20,6 +22,8 @@ object FilterJson {
         filter.format?.let { o.put("format", it) }
         filter.categoryUuid?.let { o.put("categoryUuid", it) }
         filter.tagUuid?.let { o.put("tagUuid", it) }
+        if (filter.sizeRange != SizeRange.ALL) o.put("sizeRange", filter.sizeRange.name)
+        if (filter.compressed != CompressedFilter.ALL) o.put("compressed", filter.compressed.name)
         return o.toString()
     }
 
@@ -39,6 +43,8 @@ object FilterJson {
                 format = o.optString("format").ifBlank { null },
                 categoryUuid = o.optString("categoryUuid").ifBlank { null },
                 tagUuid = o.optString("tagUuid").ifBlank { null },
+                sizeRange = runCatching { SizeRange.valueOf(o.optString("sizeRange")) }.getOrDefault(SizeRange.ALL),
+                compressed = runCatching { CompressedFilter.valueOf(o.optString("compressed")) }.getOrDefault(CompressedFilter.ALL),
             )
         } catch (e: Exception) {
             VideoFilter()

@@ -39,6 +39,7 @@ fun CompressionCard(viewModel: CompressionViewModel = hiltViewModel()) {
     val queue by viewModel.queue.collectAsStateWithLifecycle()
     val paused by viewModel.paused.collectAsStateWithLifecycle()
     val onlyCharging by viewModel.onlyCharging.collectAsStateWithLifecycle()
+    val keepOriginals by viewModel.keepOriginals.collectAsStateWithLifecycle()
     var confirm by remember { mutableStateOf(false) }
     val onColor = MaterialTheme.colorScheme.onSecondaryContainer
     val running = job?.status == JobStatus.QUEUED || job?.status == JobStatus.RUNNING
@@ -72,6 +73,15 @@ fun CompressionCard(viewModel: CompressionViewModel = hiltViewModel()) {
                 Switch(checked = onlyCharging, onCheckedChange = viewModel::setOnlyCharging)
                 Text(stringResource(R.string.compress_only_charging), style = MaterialTheme.typography.bodyMedium, color = onColor)
             }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Switch(checked = keepOriginals, onCheckedChange = viewModel::setKeepOriginals)
+                Text(stringResource(R.string.compress_keep_originals), style = MaterialTheme.typography.bodyMedium, color = onColor)
+            }
+            Text(
+                stringResource(if (keepOriginals) R.string.compress_keep_hint_on else R.string.compress_keep_hint_off),
+                style = MaterialTheme.typography.bodySmall,
+                color = onColor,
+            )
             if (queue.isNotEmpty() || paused) {
                 Text(
                     stringResource(if (paused) R.string.compress_queue_paused else R.string.compress_queue_title, queue.size),

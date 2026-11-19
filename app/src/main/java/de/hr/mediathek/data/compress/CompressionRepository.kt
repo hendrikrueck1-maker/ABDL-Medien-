@@ -58,6 +58,7 @@ class CompressionRepository @Inject constructor(
     private val scheduler: JobScheduler,
     private val engine: CompressionEngine,
     private val errorLogger: ErrorLogger,
+    private val settings: CompressionSettings,
 ) {
     fun observeGrace(): Flow<GraceStats> = dao.observeGrace()
     fun observeBlocked(): Flow<List<String>> = dao.observeBlocked()
@@ -129,10 +130,19 @@ class CompressionRepository @Inject constructor(
     suspend fun enqueue(mediaUuid: String, level: CompressionLevel, confirmed: Boolean): Boolean =
         scheduler.enqueueCompress(CompressionParams(mediaUuid, level, confirmed))
 
-    /** Löscht alle Originale, deren Schonfrist abgelaufen ist. */
-    suspend fun purgeDue(): Int = purge(dao.graceExpired(System.currentTimeMillis()))
+    /** Löscht alle Originale, deren Frist abgelaufen ist, außer die Originale sollen dauerhaft bleiben (Standard). */
+    suspend fun purgeDue(): Int {
+        if (settings.keepOriginals()) return 0
+        return purge(dao.graceExpired(System.currentTimeMillis()))
+    }
 
-    /** "Alte Originale jetzt endgültig löschen": ohne die Schonfrist abzuwarten. */
+    /** Löscht das aufbewahrte Original eines einzelnen Videos. false, wenn es keins (mehr) gibt oder die Karte fehlt. */
+    suspend fun deleteOriginalOf(mediaUuid: String): Boolean {
+        val record = dao.originalFor(mediaUuid) ?: return false
+        return purge(listOf(record)) == 1
+    }
+
+    /** "Alle Originale jetzt endgültig löschen": ohne Frist abzuwarten. */
     suspend fun purgeAllNow(): Int = purge(dao.inGrace())
 
     private suspend fun purge(records: List<de.hr.mediathek.data.db.CompressionRecordEntity>): Int =

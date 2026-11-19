@@ -7,6 +7,7 @@ import android.provider.DocumentsContract
 import dagger.hilt.android.qualifiers.ApplicationContext
 import de.hr.mediathek.core.log.ErrorLogger
 import de.hr.mediathek.core.log.ErrorType
+import de.hr.mediathek.data.db.CompressionDao
 import de.hr.mediathek.data.db.JobDao
 import de.hr.mediathek.data.db.JobEntity
 import de.hr.mediathek.data.db.MediaFileDao
@@ -28,6 +29,13 @@ sealed interface AddSourceResult {
     data class Failed(val message: String) : AddSourceResult
 }
 
+sealed interface RemoveSourceResult {
+    data object Removed : RemoveSourceResult
+    /** Es läuft gerade eine Komprimierung in diesem Ordner. */
+    data object Busy : RemoveSourceResult
+    data class Failed(val message: String) : RemoveSourceResult
+}
+
 sealed interface WorkFolderResult {
     data object Set : WorkFolderResult
     /** Ordner liegt unter Android/data und wäre für den Nutzer nicht erreichbar. */
@@ -42,6 +50,7 @@ class StorageRepository @Inject constructor(
     private val mediaDao: MediaFileDao,
     private val jobDao: JobDao,
     private val settingDao: SettingDao,
+    private val compressionDao: CompressionDao,
     private val errorLogger: ErrorLogger,
 ) {
     fun observeSources(): Flow<List<SourceEntity>> = sourceDao.observeAll()
@@ -73,6 +82,35 @@ class StorageRepository @Inject constructor(
         } catch (e: Exception) {
             errorLogger.logNow(ErrorType.SAF, "Quelle einbinden fehlgeschlagen: $e")
             AddSourceResult.Failed(e.message ?: e.toString())
+        }
+    }
+
+    /**
+     * Entkoppelt einen eingebundenen Ordner. Die Dateien auf der Karte bleiben immer unberührt.
+     * [removeEntries] = true: die Einträge (samt Bewertungen, Favoriten, Kategorien) verschwinden aus der App.
+     * false: sie bleiben als "offline" erhalten und kommen beim erneuten Einbinden über den Fingerabdruck zurück.
+     */
+    suspend fun removeSource(sourceUuid: String, removeEntries: Boolean): RemoveSourceResult = withContext(Dispatchers.IO) {
+        try {
+            val source = sourceDao.getByUuid(sourceUuid) ?: return@withContext RemoveSourceResult.Failed("Ordner nicht gefunden")
+            if (compressionDao.allUnfinished().any { it.sourceUuid == sourceUuid }) return@withContext RemoveSourceResult.Busy
+            val now = System.currentTimeMillis()
+            if (removeEntries) mediaDao.tombstoneBySource(sourceUuid, now) else mediaDao.markSourceOffline(sourceUuid, now)
+            sourceDao.tombstone(sourceUuid, now)
+            releasePermission(Uri.parse(source.treeUri))
+            RemoveSourceResult.Removed
+        } catch (e: Exception) {
+            errorLogger.logNow(ErrorType.SAF, "Ordner entkoppeln fehlgeschlagen: $e")
+            RemoveSourceResult.Failed(e.message ?: e.toString())
+        }
+    }
+
+    /** Gibt die dauerhafte Berechtigung frei, sofern der Arbeitsordner nicht denselben Ordner nutzt. */
+    private suspend fun releasePermission(treeUri: Uri) {
+        if (settingDao.get(KEY_WORK_FOLDER_URI) == treeUri.toString()) return
+        runCatching {
+            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            context.contentResolver.releasePersistableUriPermission(treeUri, flags)
         }
     }
 

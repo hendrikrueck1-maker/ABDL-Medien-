@@ -70,6 +70,13 @@ class CompressionViewModel @Inject constructor(
     val onlyCharging: StateFlow<Boolean> = settings.observeOnlyCharging()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
+    val keepOriginals: StateFlow<Boolean> = settings.observeKeepOriginals()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun setKeepOriginals(value: Boolean) {
+        viewModelScope.launch { settings.setKeepOriginals(value) }
+    }
+
     val queue: StateFlow<List<QueueItem>> = jobDao.observeCompressQueue().map { jobs ->
         jobs.map { j ->
             val uuid = runCatching { de.hr.mediathek.data.compress.CompressionParams.parse(j.paramsJson).mediaUuid }.getOrNull()

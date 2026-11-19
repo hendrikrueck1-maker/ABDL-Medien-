@@ -46,6 +46,7 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
     val backup by viewModel.backup.collectAsStateWithLifecycle()
     val restore by viewModel.restore.collectAsStateWithLifecycle()
     var rebindTarget by remember { mutableStateOf<String?>(null) }
+    var removeTarget by remember { mutableStateOf<SourceItem?>(null) }
     var confirmRestore by remember { mutableStateOf<de.hr.mediathek.data.backup.BackupFileInfo?>(null) }
     val rebindPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         val target = rebindTarget
@@ -78,6 +79,28 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
         ) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
+
+    removeTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { removeTarget = null },
+            title = { Text(stringResource(R.string.storage_remove_title, target.source.label)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(stringResource(R.string.storage_remove_text))
+                    OutlinedButton(
+                        onClick = { viewModel.removeSource(target.source.uuid, false); removeTarget = null },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.storage_remove_keep)) }
+                    OutlinedButton(
+                        onClick = { viewModel.removeSource(target.source.uuid, true); removeTarget = null },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text(stringResource(R.string.storage_remove_purge)) }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { removeTarget = null }) { Text(stringResource(R.string.diag_cancel)) } },
+        )
     }
 
     if (showOnboarding) {
@@ -160,6 +183,7 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
                             rebindTarget = item.source.uuid
                             rebindPicker.launch(null)
                         },
+                        onRemove = { removeTarget = item },
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -269,6 +293,9 @@ private fun StorageMessage.textRes(): Int = when (this) {
     StorageMessage.WORK_FOLDER_REJECTED -> R.string.storage_msg_work_rejected
     StorageMessage.WORK_FOLDER_FAILED -> R.string.storage_msg_work_failed
     StorageMessage.SCAN_ALREADY_ACTIVE -> R.string.storage_msg_scan_active
+    StorageMessage.SOURCE_REMOVED -> R.string.storage_msg_removed
+    StorageMessage.SOURCE_REMOVE_BUSY -> R.string.storage_msg_remove_busy
+    StorageMessage.SOURCE_REMOVE_FAILED -> R.string.storage_msg_remove_failed
 }
 
 @Composable
@@ -279,6 +306,7 @@ private fun SourceBlock(
     onConfirm: (ConfirmInfo) -> Unit,
     onDismiss: (ConfirmInfo) -> Unit,
     onRebind: () -> Unit,
+    onRemove: () -> Unit,
 ) {
     val textColor = MaterialTheme.colorScheme.onSecondaryContainer
     val job = item.job
@@ -359,6 +387,7 @@ private fun SourceBlock(
                     OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.storage_scan_cancel)) }
                 }
             }
+            TextButton(onClick = onRemove, enabled = !busy) { Text(stringResource(R.string.storage_remove)) }
         }
     }
 }

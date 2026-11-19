@@ -138,14 +138,14 @@
     <string name="compress_low_space">Der freie Speicher könnte knapp werden.</string>
     <string name="compress_confirm">Ich akzeptiere die genannten Hinweise</string>
     <string name="compress_start">Starten</string>
-    <string name="compress_info">Das Ergebnis wird geprüft (Dauer, Ton, vollständiger Dekodiertest). Das Original bleibt danach 7 Tage im Ordner „_alt“ und wird dann gelöscht.</string>
+    <string name="compress_info">Das Ergebnis wird geprüft (Dauer, Ton, vollständiger Dekodiertest). Das Original bleibt danach im Ordner „_alt“ und kann weiter abgespielt werden.</string>
     <string name="compress_queued">Komprimierung eingereiht. Den Fortschritt siehst du in der Benachrichtigung und unter „Speicher“.</string>
     <string name="compress_exists">Für dieses Video läuft oder wartet schon eine Komprimierung.</string>
     <string name="compress_card_title">Komprimierung</string>
     <string name="compress_waiting">Wartet</string>
     <string name="compress_last_job">Zuletzt: %1$s</string>
-    <string name="compress_grace">Originale in der Schonfrist: %1$d (%2$s belegt)</string>
-    <string name="compress_grace_none">Keine Originale in der Schonfrist.</string>
+    <string name="compress_grace">Aufbewahrte Originale: %1$d (%2$s belegt)</string>
+    <string name="compress_grace_none">Keine Originale aufbewahrt.</string>
     <string name="compress_blocked">Als nicht komprimierbar markiert: %1$d</string>
     <string name="compress_purge">Alte Originale jetzt endgültig löschen</string>
     <string name="compress_purge_text">Die Originale im Ordner „_alt“ werden unwiderruflich gelöscht. Die komprimierten Videos bleiben erhalten.</string>
@@ -284,4 +284,15 @@
     <string name="update_allow_install">Installation erlauben</string>
     <string name="update_error">Fehler: %1$s</string>
     <string name="update_debug_hint">In der Debug-Variante ist das Update abgeschaltet.</string>
+    <string name="storage_remove">Entkoppeln</string>
+    <string name="storage_remove_title">„%1$s“ entkoppeln?</string>
+    <string name="storage_remove_text">Die Dateien auf der Karte bleiben immer unverändert. Wähle, was mit den Einträgen in der App passiert.</string>
+    <string name="storage_remove_keep">Einträge behalten (offline)</string>
+    <string name="storage_remove_purge">Einträge samt Bewertungen entfernen</string>
+    <string name="storage_msg_removed">Ordner entkoppelt.</string>
+    <string name="storage_msg_remove_busy">In diesem Ordner läuft gerade eine Komprimierung.</string>
+    <string name="storage_msg_remove_failed">Entkoppeln fehlgeschlagen.</string>
+    <string name="compress_keep_originals">Originale behalten</string>
+    <string name="compress_keep_hint_on">Originale bleiben im Ordner „_alt“ und sind im Player abrufbar.</string>
+    <string name="compress_keep_hint_off">Originale werden nach der Schonfrist automatisch gelöscht.</string>
 </resources>

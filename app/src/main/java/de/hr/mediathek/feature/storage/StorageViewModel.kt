@@ -11,6 +11,7 @@ import de.hr.mediathek.data.db.JobStatus
 import de.hr.mediathek.data.db.SourceCount
 import de.hr.mediathek.data.db.SourceEntity
 import de.hr.mediathek.data.storage.AddSourceResult
+import de.hr.mediathek.data.storage.RemoveSourceResult
 import de.hr.mediathek.data.storage.StorageRepository
 import de.hr.mediathek.data.storage.WorkFolderResult
 import de.hr.mediathek.data.backup.BackupStatus
@@ -35,6 +36,7 @@ enum class StorageMessage {
     SOURCE_ADDED, SOURCE_EXISTS, SOURCE_FAILED,
     WORK_FOLDER_SET, WORK_FOLDER_REJECTED, WORK_FOLDER_FAILED,
     SCAN_ALREADY_ACTIVE,
+    SOURCE_REMOVED, SOURCE_REMOVE_BUSY, SOURCE_REMOVE_FAILED,
 }
 
 /** Der Scan wartet auf die Entscheidung des Nutzers, weil auffällig viele Dateien fehlen. */
@@ -215,6 +217,18 @@ class StorageViewModel @Inject constructor(
                 is AddSourceResult.Added -> StorageMessage.SOURCE_ADDED
                 AddSourceResult.AlreadyExists -> StorageMessage.SOURCE_EXISTS
                 is AddSourceResult.Failed -> StorageMessage.SOURCE_FAILED
+            }
+            refreshStatus()
+        }
+    }
+
+    /** Entkoppelt einen Ordner; die Dateien auf der Karte bleiben immer unberührt. */
+    fun removeSource(sourceUuid: String, removeEntries: Boolean) {
+        viewModelScope.launch {
+            message.value = when (repository.removeSource(sourceUuid, removeEntries)) {
+                RemoveSourceResult.Removed -> StorageMessage.SOURCE_REMOVED
+                RemoveSourceResult.Busy -> StorageMessage.SOURCE_REMOVE_BUSY
+                is RemoveSourceResult.Failed -> StorageMessage.SOURCE_REMOVE_FAILED
             }
             refreshStatus()
         }

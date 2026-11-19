@@ -33,6 +33,9 @@ interface SourceDao {
 
     @Query("UPDATE source SET treeUri = :treeUri, volumeUuid = :volumeUuid, lastMountedAt = :time, updatedAt = :time WHERE uuid = :uuid")
     suspend fun rebind(uuid: String, treeUri: String, volumeUuid: String?, time: Long)
+
+    @Query("UPDATE source SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun tombstone(uuid: String, now: Long)
 }
 
 @Dao
@@ -111,6 +114,9 @@ data class HashStats(val total: Int, val done: Int)
 data class PerceptualRow(val uuid: String, val hash: Long)
 
 data class SourceCount(val sourceUuid: String, val total: Int, val offline: Int)
+
+/** Ein Unterordner mit der Zahl der Dateien darin (für die Ordneransicht). */
+data class FolderRow(val name: String, val cnt: Int)
 
 @Dao
 interface MediaFileDao {
@@ -215,6 +221,24 @@ interface MediaFileDao {
 
     @Query("SELECT * FROM media_file WHERE uuid = :uuid AND deletedAt IS NULL")
     fun observeByUuid(uuid: String): Flow<MediaFileEntity?>
+
+    /** Unterordner der aktuellen Ebene samt Dateizahl; Abfrage kommt aus [de.hr.mediathek.feature.videos.VideoQuery.buildFolderRows]. */
+    @RawQuery(observedEntities = [MediaFileEntity::class])
+    fun observeFolderRows(query: SupportSQLiteQuery): Flow<List<FolderRow>>
+
+    /** Quelle entkoppeln, Einträge behalten: sie werden offline und kommen beim erneuten Einbinden über den Fingerabdruck zurück. */
+    @Query(
+        "UPDATE media_file SET status = 'OFFLINE', updatedAt = :now WHERE sourceUuid = :sourceUuid " +
+            "AND deletedAt IS NULL AND status IN ('ONLINE', 'DEFECT')",
+    )
+    suspend fun markSourceOffline(sourceUuid: String, now: Long)
+
+    /** Quelle entkoppeln und Einträge entfernen (Tombstone); die Dateien selbst bleiben unberührt. */
+    @Query(
+        "UPDATE media_file SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now " +
+            "WHERE sourceUuid = :sourceUuid AND deletedAt IS NULL",
+    )
+    suspend fun tombstoneBySource(sourceUuid: String, now: Long): Int
 
     /** Oberste Ordner der Bilder (für den Ordnerfilter). */
     @Query(
@@ -660,4 +684,15 @@ interface CompressionDao {
 
     @Query("DELETE FROM compression_record WHERE mediaUuid = :mediaUuid AND phase IN ('BLOCKED', 'FAILED')")
     suspend fun clearMarks(mediaUuid: String)
+
+    /** Videos, die komprimiert wurden (auch wenn das Original schon gelöscht ist). */
+    @Query("SELECT DISTINCT mediaUuid FROM compression_record WHERE phase IN ('DB_UPDATED', 'ORIGINAL_DELETED')")
+    fun observeCompressedUuids(): Flow<List<String>>
+
+    /** Das aufbewahrte Original eines komprimierten Videos (liegt im Ordner _alt); null, wenn es keins (mehr) gibt. */
+    @Query(
+        "SELECT * FROM compression_record WHERE mediaUuid = :mediaUuid AND phase = 'DB_UPDATED' " +
+            "AND altPath IS NOT NULL ORDER BY id DESC LIMIT 1",
+    )
+    suspend fun originalFor(mediaUuid: String): CompressionRecordEntity?
 }

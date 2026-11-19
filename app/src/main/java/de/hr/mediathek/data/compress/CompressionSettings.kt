@@ -21,6 +21,14 @@ class CompressionSettings @Inject constructor(
     /** Standard: nur beim Laden. */
     fun observeOnlyCharging(): Flow<Boolean> = settings.observe(KEY_ONLY_CHARGING).map { it != "0" }
 
+    /** Standard: Originale bleiben im Ordner _alt und lassen sich weiter abspielen, bis du sie löschst. */
+    fun observeKeepOriginals(): Flow<Boolean> = settings.observe(KEY_KEEP_ORIGINALS).map { it != "0" }
+
+    suspend fun keepOriginals(): Boolean = settings.get(KEY_KEEP_ORIGINALS) != "0"
+
+    suspend fun setKeepOriginals(value: Boolean) =
+        settings.set(SettingEntity(KEY_KEEP_ORIGINALS, if (value) "1" else "0"))
+
     suspend fun setPaused(value: Boolean) = settings.set(SettingEntity(KEY_PAUSED, if (value) "1" else "0"))
     suspend fun setOnlyCharging(value: Boolean) = settings.set(SettingEntity(KEY_ONLY_CHARGING, if (value) "1" else "0"))
 
@@ -36,5 +44,6 @@ class CompressionSettings @Inject constructor(
     private companion object {
         const val KEY_PAUSED = "compress_paused"
         const val KEY_ONLY_CHARGING = "compress_only_charging"
+        const val KEY_KEEP_ORIGINALS = "compress_keep_originals"
     }
 }
