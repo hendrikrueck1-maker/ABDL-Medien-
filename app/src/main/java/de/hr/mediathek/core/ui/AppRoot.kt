@@ -55,17 +55,20 @@ object AppRoutes {
 fun AppRoot() {
     val navController = rememberNavController()
     val isWide = LocalConfiguration.current.screenWidthDp >= WIDE_LAYOUT_MIN_WIDTH_DP
+    // Player, Bildansicht und Diashow brauchen den ganzen Bildschirm; sie haben eigene Zurück-Knöpfe.
+    val route = navController.currentRoute().orEmpty()
+    val fullScreenRoute = route.startsWith("player/") || route.startsWith("image/{") || route == "slideshow"
 
     if (isWide) {
         Row(Modifier.fillMaxSize()) {
-            AppNavigationRail(navController)
+            if (!fullScreenRoute) AppNavigationRail(navController)
             Scaffold(Modifier.weight(1f)) { padding ->
                 AppNavHost(navController, Modifier.padding(padding))
             }
         }
     } else {
         Scaffold(
-            bottomBar = { AppBottomBar(navController) },
+            bottomBar = { if (!fullScreenRoute) AppBottomBar(navController) },
         ) { padding ->
             AppNavHost(navController, Modifier.padding(padding))
         }
@@ -124,10 +127,17 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         composable("trash") { TrashScreen(onBack = { navController.popBackStack() }) }
         composable("duplicates") { DuplicatesScreen(onBack = { navController.popBackStack() }) }
         composable(
-            route = "player/{uuid}",
-            arguments = listOf(navArgument("uuid") { type = NavType.StringType }),
+            route = "player/{uuid}?original={original}",
+            arguments = listOf(
+                navArgument("uuid") { type = NavType.StringType },
+                navArgument("original") { type = NavType.BoolType; defaultValue = false },
+            ),
         ) {
             PlayerScreen(
+                onSwitchVersion = { id, original ->
+                    navController.popBackStack()
+                    navController.navigate("player/$id?original=$original")
+                },
                 onBack = { navController.popBackStack() },
                 onNext = { next ->
                     // Das aktuelle Video wird durch das nächste ersetzt, damit "Zurück" zur Liste führt.

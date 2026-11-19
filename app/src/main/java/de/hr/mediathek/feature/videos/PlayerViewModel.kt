@@ -24,12 +24,18 @@ sealed interface PlayerState {
     data object Loading : PlayerState
     data object Offline : PlayerState
     data object NotFound : PlayerState
+    /** Das Original gibt es nicht mehr (gelöscht oder nicht auffindbar). */
+    data object OriginalGone : PlayerState
     data class Ready(
         val media: MediaFileEntity,
         val uri: Uri,
         val startPositionMs: Long,
         val rating: Int,
         val favorite: Boolean,
+        /** Es wird das Original vor der Komprimierung abgespielt (Position und Gesehen-Status bleiben unberührt). */
+        val isOriginal: Boolean = false,
+        /** Zu diesem komprimierten Video gibt es noch ein aufbewahrtes Original. */
+        val hasOriginal: Boolean = false,
     ) : PlayerState
 }
 
@@ -40,9 +46,12 @@ class PlayerViewModel @Inject constructor(
     private val mediaDao: MediaFileDao,
     private val sourceDao: SourceDao,
     private val playback: PlaybackContext,
+    private val compressionDao: de.hr.mediathek.data.db.CompressionDao,
+    private val compression: de.hr.mediathek.data.compress.CompressionRepository,
 ) : ViewModel() {
 
     private val uuid: String = checkNotNull(savedStateHandle["uuid"])
+    private val playOriginal: Boolean = savedStateHandle.get<Boolean>("original") ?: false
     private val _state = MutableStateFlow<PlayerState>(PlayerState.Loading)
     val state: StateFlow<PlayerState> = _state
 
@@ -62,7 +71,13 @@ class PlayerViewModel @Inject constructor(
             _state.value = PlayerState.Offline
             return
         }
-        val uri = DocumentsContract.buildDocumentUriUsingTree(tree, docId)
+        val originalRecord = compressionDao.originalFor(uuid)
+        val playDocId = if (playOriginal) originalRecord?.altPath else docId
+        if (playDocId == null) {
+            _state.value = PlayerState.OriginalGone
+            return
+        }
+        val uri = DocumentsContract.buildDocumentUriUsingTree(tree, playDocId)
         // Beim Öffnen wird die Existenz geprüft; fehlt die Datei, wird der Eintrag offline.
         val exists = withContext(Dispatchers.IO) {
             try {
@@ -74,18 +89,37 @@ class PlayerViewModel @Inject constructor(
             }
         }
         if (!exists) {
-            mediaDao.markOffline(uuid, System.currentTimeMillis())
-            _state.value = PlayerState.Offline
+            if (playOriginal) {
+                _state.value = PlayerState.OriginalGone
+            } else {
+                mediaDao.markOffline(uuid, System.currentTimeMillis())
+                _state.value = PlayerState.Offline
+            }
             return
         }
-        // Bereits gesehene Videos starten von vorn.
-        val start = if (media.seenState == SeenState.SEEN) 0L else media.resumePositionMs
-        _state.value = PlayerState.Ready(media, uri, start, media.rating, media.favorite)
+        // Bereits gesehene Videos starten von vorn; das Original startet immer von vorn.
+        val start = if (playOriginal || media.seenState == SeenState.SEEN) 0L else media.resumePositionMs
+        _state.value = PlayerState.Ready(
+            media, uri, start, media.rating, media.favorite,
+            isOriginal = playOriginal, hasOriginal = originalRecord != null,
+        )
+    }
+
+    /** Löscht das aufbewahrte Original dieses Videos; die komprimierte Version bleibt. */
+    fun deleteOriginal(onDone: (wasOriginal: Boolean) -> Unit) {
+        val wasOriginal = playOriginal
+        viewModelScope.launch {
+            val ok = compression.deleteOriginalOf(uuid)
+            if (ok) {
+                (_state.value as? PlayerState.Ready)?.let { _state.value = it.copy(hasOriginal = false) }
+                onDone(wasOriginal)
+            }
+        }
     }
 
     /** Speichert Position und Gesehen-Status; ab 90 % Wiedergabe gilt das Video als gesehen. */
     fun saveProgress(positionMs: Long, durationMs: Long) {
-        if (durationMs <= 0 || positionMs < 0) return
+        if (playOriginal || durationMs <= 0 || positionMs < 0) return
         val seen = when {
             positionMs >= durationMs * SEEN_THRESHOLD -> SeenState.SEEN
             positionMs > 0 -> SeenState.IN_PROGRESS

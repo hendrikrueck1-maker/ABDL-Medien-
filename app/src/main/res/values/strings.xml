@@ -345,4 +345,16 @@
     <string name="media_empty">Keine Medien gefunden. Binde unter Einstellungen einen Ordner ein und lies ihn ein.</string>
     <string name="media_type_video">Video</string>
     <string name="media_type_image">Bild</string>
+    <string name="player_original_gone">Das Original ist nicht mehr vorhanden.</string>
+    <string name="player_original_title">Original</string>
+    <string name="player_original_text">Von diesem Video wurde das Original vor der Komprimierung aufbewahrt. Du kannst es abspielen oder löschen.</string>
+    <string name="player_original_playing">Du siehst gerade das Original. Position und Gesehen-Status werden dabei nicht verändert.</string>
+    <string name="player_play_original">Original abspielen</string>
+    <string name="player_play_compressed">Komprimierte Version</string>
+    <string name="player_original_delete">Original löschen</string>
+    <string name="player_original_delete_title">Original endgültig löschen?</string>
+    <string name="player_original_delete_text">Das Original wird von der Karte gelöscht. Die komprimierte Version bleibt erhalten.</string>
+    <string name="player_original_badge">Original</string>
+    <string name="player_original_button">Original</string>
+    <string name="player_fullscreen">Vollbild</string>
 </resources>

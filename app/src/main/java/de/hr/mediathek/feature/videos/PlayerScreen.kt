@@ -27,6 +27,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.activity.compose.BackHandler
+import androidx.compose.material3.AlertDialog
+import de.hr.mediathek.core.ui.ImmersiveMode
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -55,14 +59,20 @@ private val SPEEDS = listOf(1f, 1.25f, 1.5f, 2f, 0.5f, 0.75f)
 
 @OptIn(UnstableApi::class)
 @Composable
-fun PlayerScreen(onBack: () -> Unit, onNext: (String) -> Unit, viewModel: PlayerViewModel = hiltViewModel()) {
+fun PlayerScreen(
+    onBack: () -> Unit,
+    onNext: (String) -> Unit,
+    onSwitchVersion: (uuid: String, original: Boolean) -> Unit,
+    viewModel: PlayerViewModel = hiltViewModel(),
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     when (val s = state) {
         PlayerState.Loading -> CenterText(stringResource(R.string.player_loading), onBack)
         PlayerState.Offline -> CenterText(stringResource(R.string.player_offline), onBack)
         PlayerState.NotFound -> CenterText(stringResource(R.string.player_not_found), onBack)
-        is PlayerState.Ready -> ReadyPlayer(s, viewModel, onBack, onNext)
+        PlayerState.OriginalGone -> CenterText(stringResource(R.string.player_original_gone), onBack)
+        is PlayerState.Ready -> ReadyPlayer(s, viewModel, onBack, onNext, onSwitchVersion)
     }
 }
 
@@ -80,12 +90,23 @@ private fun CenterText(text: String, onBack: () -> Unit) {
 
 @OptIn(UnstableApi::class)
 @Composable
-private fun ReadyPlayer(state: PlayerState.Ready, viewModel: PlayerViewModel, onBack: () -> Unit, onNext: (String) -> Unit) {
+private fun ReadyPlayer(
+    state: PlayerState.Ready,
+    viewModel: PlayerViewModel,
+    onBack: () -> Unit,
+    onNext: (String) -> Unit,
+    onSwitchVersion: (String, Boolean) -> Unit,
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var error by remember { mutableStateOf<String?>(null) }
     var speedIndex by remember { mutableIntStateOf(0) }
     var showTracks by remember { mutableStateOf(false) }
+    var fullscreen by rememberSaveable { mutableStateOf(false) }
+    var showOriginal by remember { mutableStateOf(false) }
+    var confirmDeleteOriginal by remember { mutableStateOf(false) }
+    ImmersiveMode(fullscreen)
+    BackHandler(enabled = fullscreen) { fullscreen = false }
 
     val player = remember(state.uri) {
         ExoPlayer.Builder(context)
@@ -155,6 +176,41 @@ private fun ReadyPlayer(state: PlayerState.Ready, viewModel: PlayerViewModel, on
     }
 
     if (showTracks) TrackDialog(player, tracks) { showTracks = false }
+    if (showOriginal) {
+        AlertDialog(
+            onDismissRequest = { showOriginal = false },
+            title = { Text(stringResource(R.string.player_original_title)) },
+            text = { Text(stringResource(if (state.isOriginal) R.string.player_original_playing else R.string.player_original_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showOriginal = false
+                    onSwitchVersion(state.media.uuid, !state.isOriginal)
+                }) { Text(stringResource(if (state.isOriginal) R.string.player_play_compressed else R.string.player_play_original)) }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { showOriginal = false; confirmDeleteOriginal = true }) {
+                        Text(stringResource(R.string.player_original_delete), color = MaterialTheme.colorScheme.error)
+                    }
+                    TextButton(onClick = { showOriginal = false }) { Text(stringResource(R.string.diag_cancel)) }
+                }
+            },
+        )
+    }
+    if (confirmDeleteOriginal) {
+        AlertDialog(
+            onDismissRequest = { confirmDeleteOriginal = false },
+            title = { Text(stringResource(R.string.player_original_delete_title)) },
+            text = { Text(stringResource(R.string.player_original_delete_text)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDeleteOriginal = false
+                    viewModel.deleteOriginal { wasOriginal -> if (wasOriginal) onSwitchVersion(state.media.uuid, false) }
+                }) { Text(stringResource(R.string.player_original_delete), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDeleteOriginal = false }) { Text(stringResource(R.string.diag_cancel)) } },
+        )
+    }
 
     Column(Modifier.fillMaxSize().background(Color.Black)) {
         Box(Modifier.weight(1f, fill = true).fillMaxWidth()) {
@@ -168,10 +224,20 @@ private fun ReadyPlayer(state: PlayerState.Ready, viewModel: PlayerViewModel, on
                         this.player = player
                         useController = true
                         keepScreenOn = true
+                        setFullscreenButtonClickListener { isFullscreen -> fullscreen = isFullscreen }
                     }
                 },
                 update = { it.player = player },
             )
+            if (state.isOriginal) {
+                Text(
+                    stringResource(R.string.player_original_badge),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                        .background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
             error?.let {
                 Text(
                     it,
@@ -181,7 +247,7 @@ private fun ReadyPlayer(state: PlayerState.Ready, viewModel: PlayerViewModel, on
                 )
             }
         }
-        Row(
+        if (!fullscreen) Row(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -195,6 +261,10 @@ private fun ReadyPlayer(state: PlayerState.Ready, viewModel: PlayerViewModel, on
                 OutlinedButton(onClick = { viewModel.next(onNext) }) { Text(stringResource(R.string.player_next)) }
             }
             OutlinedButton(onClick = { showTracks = true }) { Text(stringResource(R.string.player_tracks)) }
+            OutlinedButton(onClick = { fullscreen = true }) { Text(stringResource(R.string.player_fullscreen)) }
+            if (state.hasOriginal || state.isOriginal) {
+                OutlinedButton(onClick = { showOriginal = true }) { Text(stringResource(R.string.player_original_button)) }
+            }
             IconButton(onClick = viewModel::toggleFavorite) {
                 Icon(
                     Icons.Filled.Favorite,
