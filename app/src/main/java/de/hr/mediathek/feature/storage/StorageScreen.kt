@@ -43,6 +43,7 @@ import de.hr.mediathek.R
 @Composable
 fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val thumbs by viewModel.thumbs.collectAsStateWithLifecycle()
     val onboardingSeen by viewModel.onboardingSeen.collectAsStateWithLifecycle()
     var showOnboarding by remember { mutableStateOf(false) }
 
@@ -149,6 +150,34 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
                     OutlinedButton(onClick = viewModel::refreshStatus) {
                         Text(stringResource(R.string.storage_refresh))
                     }
+                }
+            }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val onColor = MaterialTheme.colorScheme.onPrimaryContainer
+                Text(
+                    stringResource(R.string.thumbs_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = onColor,
+                )
+                Text(
+                    stringResource(R.string.thumbs_stats, thumbs.count, thumbs.bytes / (1024 * 1024)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = onColor,
+                )
+                if (thumbs.lowSpace) {
+                    Text(stringResource(R.string.thumbs_low_space), color = MaterialTheme.colorScheme.error)
+                } else if (thumbs.full) {
+                    Text(stringResource(R.string.thumbs_full), color = MaterialTheme.colorScheme.error)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = viewModel::generateThumbnails) { Text(stringResource(R.string.thumbs_generate)) }
+                    OutlinedButton(onClick = viewModel::clearThumbnails) { Text(stringResource(R.string.thumbs_clear)) }
                 }
             }
         }

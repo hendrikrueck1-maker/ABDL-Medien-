@@ -188,6 +188,15 @@ interface MediaFileDao {
             "FROM media_file WHERE deletedAt IS NULL AND status != 'TRASHED' GROUP BY sourceUuid",
     )
     fun observeCounts(): Flow<List<SourceCount>>
+
+    @Query("UPDATE media_file SET status = 'DEFECT', updatedAt = :now WHERE uuid = :uuid")
+    suspend fun markDefect(uuid: String, now: Long)
+
+    @Query(
+        "UPDATE media_file SET durationMs = COALESCE(durationMs, :duration), width = COALESCE(width, :width), " +
+            "height = COALESCE(height, :height), updatedAt = :now WHERE uuid = :uuid",
+    )
+    suspend fun setVideoMeta(uuid: String, duration: Long?, width: Int?, height: Int?, now: Long)
 }
 
 @Dao
@@ -228,4 +237,76 @@ interface JobDao {
 
     @Query("DELETE FROM job WHERE status IN ('COMPLETED', 'CANCELLED', 'FAILED') AND finishedAt < :before")
     suspend fun deleteFinishedBefore(before: Long)
+}
+
+data class PendingThumb(
+    val uuid: String,
+    val type: MediaType,
+    val documentIdCache: String,
+    val fingerprint: String?,
+    val sourceUuid: String,
+)
+
+data class ThumbStats(val count: Int, val bytes: Long)
+
+@Dao
+interface ThumbnailDao {
+    @Upsert
+    suspend fun upsert(thumb: ThumbnailEntity)
+
+    @Query("SELECT * FROM thumbnail WHERE mediaUuid = :uuid")
+    suspend fun get(uuid: String): ThumbnailEntity?
+
+    @Query("DELETE FROM thumbnail WHERE mediaUuid IN (:uuids)")
+    suspend fun delete(uuids: List<String>)
+
+    @Query("DELETE FROM thumbnail")
+    suspend fun deleteAll()
+
+    @Query("SELECT COALESCE(SUM(sizeBytes), 0) FROM thumbnail")
+    suspend fun totalBytes(): Long
+
+    @Query("SELECT COUNT(*) AS count, COALESCE(SUM(sizeBytes), 0) AS bytes FROM thumbnail")
+    fun observeStats(): Flow<ThumbStats>
+
+    @Query("UPDATE thumbnail SET lastAccess = :time WHERE mediaUuid IN (:uuids)")
+    suspend fun touch(uuids: List<String>, time: Long)
+
+    /** Bilder online verfügbarer Dateien, am längsten ungenutzt zuerst: diese dürfen verdrängt werden. */
+    @Query(
+        "SELECT t.* FROM thumbnail t INNER JOIN media_file m ON m.uuid = t.mediaUuid " +
+            "WHERE m.status != 'OFFLINE' ORDER BY t.lastAccess ASC LIMIT :limit",
+    )
+    suspend fun evictableOnline(limit: Int): List<ThumbnailEntity>
+
+    /** Offline-Dateien behalten ihr Bild, aber nur im Kleinformat. */
+    @Query(
+        "SELECT t.* FROM thumbnail t INNER JOIN media_file m ON m.uuid = t.mediaUuid " +
+            "WHERE m.status = 'OFFLINE' AND t.variant = 'NORMAL' LIMIT :limit",
+    )
+    suspend fun offlineNormal(limit: Int): List<ThumbnailEntity>
+
+    /** Bilder zu Einträgen, die es nicht mehr gibt oder die im Papierkorb liegen. */
+    @Query(
+        "SELECT t.mediaUuid FROM thumbnail t LEFT JOIN media_file m ON m.uuid = t.mediaUuid " +
+            "WHERE m.uuid IS NULL OR m.deletedAt IS NOT NULL OR m.status = 'TRASHED' LIMIT :limit",
+    )
+    suspend fun orphans(limit: Int): List<String>
+
+    @Query(
+        "SELECT m.uuid AS uuid, m.type AS type, m.documentIdCache AS documentIdCache, " +
+            "m.fingerprint AS fingerprint, m.sourceUuid AS sourceUuid " +
+            "FROM media_file m LEFT JOIN thumbnail t ON t.mediaUuid = m.uuid " +
+            "WHERE m.deletedAt IS NULL AND m.status = 'ONLINE' AND m.documentIdCache IS NOT NULL " +
+            "AND (t.mediaUuid IS NULL OR t.fingerprint IS NOT m.fingerprint OR t.variant != 'NORMAL') " +
+            "ORDER BY m.id LIMIT :limit",
+    )
+    suspend fun pending(limit: Int): List<PendingThumb>
+
+    @Query(
+        "SELECT COUNT(*) FROM media_file m LEFT JOIN thumbnail t ON t.mediaUuid = m.uuid " +
+            "WHERE m.deletedAt IS NULL AND m.status = 'ONLINE' AND m.documentIdCache IS NOT NULL " +
+            "AND (t.mediaUuid IS NULL OR t.fingerprint IS NOT m.fingerprint OR t.variant != 'NORMAL')",
+    )
+    suspend fun countPending(): Int
 }

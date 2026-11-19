@@ -29,6 +29,7 @@ import androidx.room.RoomDatabase
         TrashItemEntity::class,
         ErrorLogEntity::class,
         SettingEntity::class,
+        ThumbnailEntity::class,
     ],
     version = MediathekDatabase.VERSION,
     exportSchema = true,
@@ -39,9 +40,10 @@ abstract class MediathekDatabase : RoomDatabase() {
     abstract fun errorLogDao(): ErrorLogDao
     abstract fun mediaFileDao(): MediaFileDao
     abstract fun jobDao(): JobDao
+    abstract fun thumbnailDao(): ThumbnailDao
 
     companion object {
-        const val VERSION = 2
+        const val VERSION = 3
         const val NAME = "mediathek.db"
     }
 }

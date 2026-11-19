@@ -31,6 +31,14 @@ class JobScheduler @Inject constructor(
         return true
     }
 
+    /** Vorschaubilder nachziehen (läuft sonst automatisch nach jedem Scan). */
+    suspend fun enqueueThumbnails(): Boolean {
+        if (jobDao.findActive(JobType.THUMBNAILS, "%") != null) return false
+        jobDao.insert(JobEntity(type = JobType.THUMBNAILS, priority = JobPriority.LOW))
+        trigger()
+        return true
+    }
+
     /** Eingereihte Jobs werden sofort beendet, ein laufender Job bricht an der nächsten Prüfstelle ab. */
     suspend fun cancel(jobUuid: String) {
         val job = jobDao.get(jobUuid) ?: return

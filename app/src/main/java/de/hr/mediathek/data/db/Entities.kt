@@ -397,3 +397,15 @@ data class SettingEntity(
     val key: String,
     val value: String,
 )
+
+/** Ein Eintrag je Vorschaubild im Cache (Datei liegt in filesDir/thumbs). Rein technisch, nie Nutzerdaten. */
+@Entity(tableName = "thumbnail")
+data class ThumbnailEntity(
+    @PrimaryKey val mediaUuid: String,
+    /** Fingerabdruck der Quelldatei zum Zeitpunkt der Erzeugung; weicht er ab, ist das Bild veraltet. */
+    val fingerprint: String?,
+    val variant: ThumbVariant,
+    val sizeBytes: Long,
+    val createdAt: Long,
+    val lastAccess: Long,
+)

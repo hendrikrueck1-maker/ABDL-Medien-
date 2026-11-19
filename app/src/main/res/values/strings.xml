@@ -35,6 +35,12 @@
     <string name="storage_work_current">Aktuell: %1$s</string>
     <string name="storage_work_none">Noch kein Arbeitsordner gewählt.</string>
     <string name="storage_work_choose">Arbeitsordner wählen</string>
+    <string name="thumbs_title">Vorschaubilder</string>
+    <string name="thumbs_stats">%1$d Bilder, %2$d MB belegt (Obergrenze 2 GB)</string>
+    <string name="thumbs_full">Der Speicher für Vorschaubilder ist voll. Es werden keine neuen erzeugt, bis du Platz schaffst.</string>
+    <string name="thumbs_low_space">Im Gerät ist wenig Speicher frei. Der Vorschaubild-Speicher wird verkleinert und es werden keine neuen erzeugt.</string>
+    <string name="thumbs_generate">Jetzt erzeugen</string>
+    <string name="thumbs_clear">Alle löschen</string>
     <string name="storage_scan_now">Jetzt einlesen</string>
     <string name="storage_scan_cancel">Abbrechen</string>
     <string name="storage_scan_queued">Wartet auf den Start …</string>

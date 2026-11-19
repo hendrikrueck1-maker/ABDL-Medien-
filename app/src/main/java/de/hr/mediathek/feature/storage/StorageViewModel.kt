@@ -13,6 +13,7 @@ import de.hr.mediathek.data.db.SourceEntity
 import de.hr.mediathek.data.storage.AddSourceResult
 import de.hr.mediathek.data.storage.StorageRepository
 import de.hr.mediathek.data.storage.WorkFolderResult
+import de.hr.mediathek.data.thumb.ThumbnailCache
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -42,6 +43,13 @@ data class SourceItem(
     val confirm: ConfirmInfo?,
 )
 
+data class ThumbUiState(
+    val count: Int = 0,
+    val bytes: Long = 0,
+    val full: Boolean = false,
+    val lowSpace: Boolean = false,
+)
+
 data class StorageUiState(
     val sources: List<SourceItem> = emptyList(),
     val workFolderLabel: String? = null,
@@ -52,6 +60,7 @@ data class StorageUiState(
 class StorageViewModel @Inject constructor(
     private val repository: StorageRepository,
     private val scheduler: JobScheduler,
+    private val thumbCache: ThumbnailCache,
 ) : ViewModel() {
 
     private val reachability = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -80,6 +89,21 @@ class StorageViewModel @Inject constructor(
             message = b.message,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StorageUiState())
+
+    val thumbs: StateFlow<ThumbUiState> = combine(
+        thumbCache.observeStats(),
+        thumbCache.observeFull(),
+        thumbCache.observeLowSpace(),
+    ) { stats, full, low -> ThumbUiState(stats.count, stats.bytes, full, low) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThumbUiState())
+
+    fun generateThumbnails() {
+        viewModelScope.launch { scheduler.enqueueThumbnails() }
+    }
+
+    fun clearThumbnails() {
+        viewModelScope.launch { thumbCache.clearAll() }
+    }
 
     init {
         refreshStatus()
