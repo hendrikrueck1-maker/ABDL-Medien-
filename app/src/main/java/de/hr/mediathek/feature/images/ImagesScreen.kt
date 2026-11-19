@@ -18,6 +18,7 @@ import de.hr.mediathek.feature.library.ViewSettingsDialog
 import de.hr.mediathek.feature.library.activeFilterCount
 import de.hr.mediathek.feature.library.clearedFilters
 import androidx.compose.foundation.layout.width
+import de.hr.mediathek.feature.videos.VideoFilter
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
 import androidx.compose.foundation.layout.height
