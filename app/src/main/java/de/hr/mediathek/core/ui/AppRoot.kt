@@ -24,6 +24,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import de.hr.mediathek.feature.home.HomeScreen
 import de.hr.mediathek.feature.placeholder.PlaceholderScreen
+import de.hr.mediathek.feature.settings.SettingsScreen
 
 private const val WIDE_LAYOUT_MIN_WIDTH_DP = 600
 
@@ -58,8 +59,11 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         composable(Destination.Home.route) {
             HomeScreen(onOpen = { navController.navigateTopLevel(it) })
         }
+        composable(Destination.Settings.route) {
+            SettingsScreen()
+        }
         Destination.entries
-            .filter { it != Destination.Home }
+            .filter { it != Destination.Home && it != Destination.Settings }
             .forEach { destination ->
                 composable(destination.route) {
                     PlaceholderScreen(title = stringResource(destination.label))

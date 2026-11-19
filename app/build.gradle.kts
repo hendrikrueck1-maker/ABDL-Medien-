@@ -22,6 +22,8 @@ android {
         versionCode = runNumber + versionCodeOffset
         versionName = "0.1.$runNumber"
         manifestPlaceholders["appLabel"] = "ABDL Medien"
+        buildConfigField("int", "RUN_NUMBER", "$runNumber")
+        buildConfigField("String", "UPDATE_REPO", "\"hendrikrueck1-maker/ABDL-Medien-\"")
     }
 
     signingConfigs {

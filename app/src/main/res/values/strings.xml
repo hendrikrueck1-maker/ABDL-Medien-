@@ -13,4 +13,17 @@
     <string name="home_subtitle">Bereich wählen</string>
     <string name="placeholder_coming_soon">Dieser Bereich wird in einer späteren Etappe gebaut.</string>
     <string name="version_label">Version %1$s</string>
+
+    <string name="update_title">App-Update</string>
+    <string name="update_check">Nach Update suchen</string>
+    <string name="update_checking">Suche nach Update …</string>
+    <string name="update_up_to_date">Die App ist auf dem neuesten Stand.</string>
+    <string name="update_available">Neue Version verfügbar: Build %1$d</string>
+    <string name="update_download">Herunterladen</string>
+    <string name="update_downloading">Lade herunter … %1$d %%</string>
+    <string name="update_ready">Download fertig. Zum Installieren tippen.</string>
+    <string name="update_install">Installieren</string>
+    <string name="update_allow_install">Installation erlauben</string>
+    <string name="update_error">Fehler: %1$s</string>
+    <string name="update_debug_hint">In der Debug-Variante ist das Update abgeschaltet.</string>
 </resources>
