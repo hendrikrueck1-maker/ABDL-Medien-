@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -146,17 +148,29 @@ private fun Playing(state: SlideshowState, viewModel: SlideshowViewModel, onClos
             }
         }
         if (controls || state.paused) {
+            // Dunkle, fast deckende Leiste mit hellen Knöpfen: auf jedem Bild gut lesbar.
             Row(
-                Modifier.align(Alignment.BottomCenter).padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+                    .background(Color.Black.copy(alpha = 0.82f), RoundedCornerShape(28.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedButton(onClick = viewModel::previous) { Text("◀") }
-                OutlinedButton(onClick = viewModel::togglePause) {
-                    Text(stringResource(if (state.paused) R.string.slideshow_resume else R.string.slideshow_pause))
+                val colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                Button(onClick = viewModel::previous, colors = colors) { Text("◀", style = MaterialTheme.typography.titleMedium) }
+                Button(onClick = viewModel::togglePause, colors = colors) {
+                    Text(
+                        stringResource(if (state.paused) R.string.slideshow_resume else R.string.slideshow_pause),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                 }
-                OutlinedButton(onClick = viewModel::next) { Text("▶") }
-                OutlinedButton(onClick = onClose) { Text(stringResource(R.string.slideshow_end)) }
+                Button(onClick = viewModel::next, colors = colors) { Text("▶", style = MaterialTheme.typography.titleMedium) }
+                Button(
+                    onClick = onClose,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6FA8), contentColor = Color.Black),
+                ) { Text(stringResource(R.string.slideshow_end), style = MaterialTheme.typography.titleMedium) }
             }
         }
     }

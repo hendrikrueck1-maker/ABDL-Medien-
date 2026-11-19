@@ -138,6 +138,10 @@ fun ImagesScreen(
                 )
                 OutlinedButton(onClick = { viewModel.favoriteSelected(true) }) { Text(stringResource(R.string.video_fav_set)) }
                 OutlinedButton(onClick = { viewModel.favoriteSelected(false) }) { Text(stringResource(R.string.video_fav_unset)) }
+                OutlinedButton(onClick = { viewModel.markDeleteSelected(true) }) { Text(stringResource(R.string.mark_delete_set)) }
+                OutlinedButton(onClick = { viewModel.markDeleteSelected(false) }) { Text(stringResource(R.string.mark_delete_unset)) }
+                OutlinedButton(onClick = { viewModel.markPeeSelected(true) }) { Text(stringResource(R.string.mark_pee_set)) }
+                OutlinedButton(onClick = { viewModel.markPeeSelected(false) }) { Text(stringResource(R.string.mark_pee_unset)) }
                 androidx.compose.foundation.layout.Box {
                     OutlinedButton(onClick = { rateMenu = true }) { Text(stringResource(R.string.video_rate_action)) }
                     DropdownMenu(expanded = rateMenu, onDismissRequest = { rateMenu = false }) {
@@ -161,7 +165,11 @@ fun ImagesScreen(
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             OutlinedTextField(
                 value = filter.search,
                 onValueChange = { text -> viewModel.update { it.copy(search = text) } },
@@ -189,6 +197,8 @@ fun ImagesScreen(
                 onLayout = viewModel.browser::setLayout,
                 onDetails = viewModel.browser::setShowDetails,
                 onFavoritesOnly = { v -> viewModel.update { it.copy(favoriteOnly = v) } },
+                onMarkedDeleteOnly = { v -> viewModel.update { it.copy(markedDeleteOnly = v) } },
+                onPeeOnly = { v -> viewModel.update { it.copy(peeOnly = v) } },
                 onSort = { sort ->
                     if (sort == VideoSort.RANDOM && filter.sort == VideoSort.RANDOM) viewModel.reshuffle()
                     viewModel.update { it.copy(sort = sort) }

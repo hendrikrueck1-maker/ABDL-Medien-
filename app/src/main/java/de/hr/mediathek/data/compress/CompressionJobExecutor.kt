@@ -135,16 +135,29 @@ class CompressionJobExecutor @Inject constructor(
         record = record.copy(id = dao.insert(record))
 
         try {
-            ctx.report("Komprimiere", 0f, force = true)
-            engine.encode(srcUri, local, target.toInt()) { fraction ->
-                ctx.checkpoint()
-                ctx.report("Komprimiere", fraction * ENCODE_SHARE)
-            }
+            // Hardware-Encoder überschreiten die Zielrate manchmal deutlich. Wird das Ergebnis nicht klein genug,
+            // gibt es einen zweiten Versuch mit niedrigerer Rate, bevor das Video als nicht komprimierbar gilt.
+            var attemptTarget = target
+            var failure: VerifyFailure? = null
+            for (attempt in 0..1) {
+                ctx.report(if (attempt == 0) "Komprimiere" else "Komprimiere (zweiter Versuch)", 0f, force = true)
+                engine.encode(srcUri, local, attemptTarget.toInt()) { fraction ->
+                    ctx.checkpoint()
+                    ctx.report(if (attempt == 0) "Komprimiere" else "Komprimiere (zweiter Versuch)", fraction * ENCODE_SHARE)
+                }
 
-            ctx.report("Prüfe Ergebnis", ENCODE_SHARE, force = true)
-            val outFacts = probe.probe(Uri.fromFile(local), local.length())
-            if (outFacts == null) return rejected(job, record, "UNREADABLE", "Ergebnis nicht lesbar")
-            CompressionPolicy.verify(facts, outFacts)?.let {
+                ctx.report("Prüfe Ergebnis", ENCODE_SHARE, force = true)
+                val outFacts = probe.probe(Uri.fromFile(local), local.length())
+                if (outFacts == null) return rejected(job, record, "UNREADABLE", "Ergebnis nicht lesbar")
+                failure = CompressionPolicy.verify(facts, outFacts)
+                val lower = attemptTarget * RETRY_FACTOR_PERCENT / 100
+                if (failure == VerifyFailure.NOT_SMALLER && attempt == 0 && lower >= CompressionPolicy.MIN_TARGET_BPS) {
+                    attemptTarget = lower
+                    continue
+                }
+                break
+            }
+            failure?.let {
                 return rejected(job, record, "VERIFY_$it", "Ergebnis abgelehnt (${describe(it)}), Original unverändert")
             }
             val decodedOk = decoder.decodesCompletely(local, duration) { f ->
@@ -161,14 +174,22 @@ class CompressionJobExecutor @Inject constructor(
             withContext(NonCancellable) { discard(record) }
             throw e
         } catch (e: Exception) {
-            errorLogger.logNow(ErrorType.COMPRESSION, "Komprimierung fehlgeschlagen: ${e::class.java.simpleName}")
+            val reason = failureReason(e)
+            errorLogger.logNow(ErrorType.COMPRESSION, "Komprimierung fehlgeschlagen: $reason")
             withContext(NonCancellable) {
                 discard(record)
                 mark(job, media.uuid, p.level, "ENCODE_ERROR")
             }
-            return JobOutcome.Failed("Komprimierung fehlgeschlagen (${e::class.java.simpleName})")
+            return JobOutcome.Failed("Komprimierung fehlgeschlagen ($reason)")
         }
         return finish(record, ctx)
+    }
+
+    /** Kurze, inhaltsfreie Fehlerursache; bei Media3-Fehlern mit dem Fehlercode (z. B. ENCODER_INIT_FAILED). */
+    private fun failureReason(e: Throwable): String {
+        val code = (e as? androidx.media3.transformer.ExportException)?.errorCodeName
+        val cause = e.cause?.let { it::class.java.simpleName }
+        return listOfNotNull(e::class.java.simpleName, code, cause?.takeIf { code == null }).joinToString(" / ")
     }
 
     private suspend fun rejected(job: JobEntity, record: CompressionRecordEntity, note: String, message: String): JobOutcome {
@@ -350,6 +371,7 @@ class CompressionJobExecutor @Inject constructor(
     companion object {
         const val ALT_DIR = "_alt"
         private const val COPY_BUFFER = 1 shl 20
+        private const val RETRY_FACTOR_PERCENT = 65L
         private const val ENCODE_SHARE = 0.80f
         private const val DECODE_SHARE = 0.10f
         private const val COPY_SHARE = 0.10f

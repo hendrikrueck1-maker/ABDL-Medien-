@@ -1,6 +1,16 @@
 package de.hr.mediathek.feature.videos
 
+import android.os.Handler
+import android.os.Looper
+import android.view.View
 import android.view.ViewGroup
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.unit.sp
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -105,6 +115,7 @@ private fun ReadyPlayer(
     var fullscreen by rememberSaveable { mutableStateOf(false) }
     var showOriginal by remember { mutableStateOf(false) }
     var confirmDeleteOriginal by remember { mutableStateOf(false) }
+    var controlsVisible by remember { mutableStateOf(true) }
     ImmersiveMode(fullscreen)
     BackHandler(enabled = fullscreen) { fullscreen = false }
 
@@ -163,7 +174,9 @@ private fun ReadyPlayer(
             lifecycleOwner.lifecycle.removeObserver(observer)
             player.removeListener(listener)
             viewModel.saveProgress(player.currentPosition, player.duration)
-            player.release()
+            // Erst anhalten, das Freigeben der Decoder kurz verzögern: so ruckelt der Wechsel zurück zur Liste nicht.
+            player.playWhenReady = false
+            Handler(Looper.getMainLooper()).postDelayed({ player.release() }, 450)
         }
     }
 
@@ -212,73 +225,93 @@ private fun ReadyPlayer(
         )
     }
 
-    Column(Modifier.fillMaxSize().background(Color.Black)) {
-        Box(Modifier.weight(1f, fill = true).fillMaxWidth()) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { ctx ->
-                    PlayerView(ctx).apply {
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
-                        )
-                        this.player = player
-                        useController = true
-                        keepScreenOn = true
-                        setFullscreenButtonClickListener { isFullscreen -> fullscreen = isFullscreen }
-                    }
-                },
-                update = { it.player = player },
-            )
-            if (state.isOriginal) {
-                Text(
-                    stringResource(R.string.player_original_badge),
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
-                        .background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 8.dp, vertical = 2.dp),
-                )
-            }
-            error?.let {
-                Text(
-                    it,
-                    color = Color.White,
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-            }
-        }
-        if (!fullscreen) Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            TextButton(onClick = onBack) { Text(stringResource(R.string.diag_back), color = Color.White) }
-            OutlinedButton(onClick = {
-                speedIndex = (speedIndex + 1) % SPEEDS.size
-                player.setPlaybackSpeed(SPEEDS[speedIndex])
-            }) { Text("${SPEEDS[speedIndex]}x") }
-            if (viewModel.hasContext) {
-                OutlinedButton(onClick = { viewModel.next(onNext) }) { Text(stringResource(R.string.player_next)) }
-            }
-            OutlinedButton(onClick = { showTracks = true }) { Text(stringResource(R.string.player_tracks)) }
-            OutlinedButton(onClick = { fullscreen = true }) { Text(stringResource(R.string.player_fullscreen)) }
-            if (state.hasOriginal || state.isOriginal) {
-                OutlinedButton(onClick = { showOriginal = true }) { Text(stringResource(R.string.player_original_button)) }
-            }
-            IconButton(onClick = viewModel::toggleFavorite) {
-                Icon(
-                    Icons.Filled.Favorite,
-                    contentDescription = stringResource(R.string.video_favorite),
-                    tint = if (state.favorite) MaterialTheme.colorScheme.primary else Color.Gray,
-                )
-            }
-            (1..5).forEach { star ->
-                IconButton(onClick = { viewModel.setRating(star) }, modifier = Modifier.size(48.dp)) {
-                    Icon(
-                        Icons.Filled.Star,
-                        contentDescription = stringResource(R.string.video_rate, star),
-                        tint = if (star <= state.rating) Color(0xFFFFC107) else Color.Gray,
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                     )
+                    this.player = player
+                    useController = true
+                    keepScreenOn = true
+                    // Die Knopfleiste oben blendet gemeinsam mit der Zeitleiste ein und aus.
+                    setControllerVisibilityListener(
+                        PlayerView.ControllerVisibilityListener { visibility -> controlsVisible = visibility == View.VISIBLE },
+                    )
+                    setFullscreenButtonClickListener { isFullscreen -> fullscreen = isFullscreen }
+                }
+            },
+            update = { it.player = player },
+            onRelease = { it.player = null },
+        )
+        if (state.isOriginal) {
+            Text(
+                stringResource(R.string.player_original_badge),
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)
+                    .background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 8.dp, vertical = 2.dp),
+            )
+        }
+        error?.let {
+            Text(
+                it,
+                color = Color.White,
+                modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+        }
+        AnimatedVisibility(
+            visible = controlsVisible || error != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.65f))
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                TextButton(onClick = onBack) { Text(stringResource(R.string.diag_back), color = Color.White) }
+                OutlinedButton(onClick = {
+                    speedIndex = (speedIndex + 1) % SPEEDS.size
+                    player.setPlaybackSpeed(SPEEDS[speedIndex])
+                }) { Text("${SPEEDS[speedIndex]}x", color = Color.White) }
+                if (viewModel.hasContext) {
+                    OutlinedButton(onClick = { viewModel.next(onNext) }) { Text(stringResource(R.string.player_next), color = Color.White) }
+                }
+                OutlinedButton(onClick = { showTracks = true }) { Text(stringResource(R.string.player_tracks), color = Color.White) }
+                OutlinedButton(onClick = { fullscreen = !fullscreen }) { Text(stringResource(R.string.player_fullscreen), color = Color.White) }
+                if (state.hasOriginal || state.isOriginal) {
+                    OutlinedButton(onClick = { showOriginal = true }) { Text(stringResource(R.string.player_original_button), color = Color.White) }
+                }
+                IconButton(onClick = viewModel::toggleFavorite) {
+                    Icon(
+                        Icons.Filled.Favorite,
+                        contentDescription = stringResource(R.string.video_favorite),
+                        tint = if (state.favorite) Color(0xFFFF6FA8) else Color.Gray,
+                    )
+                }
+                IconButton(onClick = viewModel::toggleMarkedPee) {
+                    Text("💧", fontSize = 22.sp, modifier = Modifier.alpha(if (state.markedPee) 1f else 0.3f))
+                }
+                IconButton(onClick = viewModel::toggleMarkedDelete) {
+                    Text("🗑", fontSize = 22.sp, modifier = Modifier.alpha(if (state.markedDelete) 1f else 0.3f))
+                }
+                (1..5).forEach { star ->
+                    IconButton(onClick = { viewModel.setRating(star) }, modifier = Modifier.size(48.dp)) {
+                        Icon(
+                            Icons.Filled.Star,
+                            contentDescription = stringResource(R.string.video_rate, star),
+                            tint = if (star <= state.rating) Color(0xFFFFC107) else Color.Gray,
+                        )
+                    }
                 }
             }
         }

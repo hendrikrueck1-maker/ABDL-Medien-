@@ -92,6 +92,8 @@ class ImagesViewModel @Inject constructor(
     fun selectAll(uuids: Collection<String>) { _selected.value = uuids.toSet() }
 
     fun favoriteSelected(favorite: Boolean) = withSelection { dao.setFavoriteBulk(it, favorite, now()) }
+    fun markDeleteSelected(marked: Boolean) = withSelection { dao.setMarkedDeleteBulk(it, marked, now()) }
+    fun markPeeSelected(marked: Boolean) = withSelection { dao.setMarkedPeeBulk(it, marked, now()) }
     fun rateSelected(rating: Int) = withSelection { dao.setRatingBulk(it, rating.coerceIn(0, 5), now()) }
     fun assignCategory(uuid: String) = withSelection { categories.assign(it, uuid) }
     fun unassignCategory(uuid: String) = withSelection { categories.unassign(it, uuid) }

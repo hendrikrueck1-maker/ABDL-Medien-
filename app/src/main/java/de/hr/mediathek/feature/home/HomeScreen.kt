@@ -22,6 +22,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,7 +38,6 @@ import de.hr.mediathek.core.ui.theme.TileColors
 import de.hr.mediathek.core.ui.theme.TilePalette
 
 private val moduleTiles = listOf(
-    Destination.Media,
     Destination.Stories,
     Destination.Images,
     Destination.Videos,
@@ -47,7 +49,6 @@ private fun tileColors(destination: Destination): TileColors {
     val dark = isSystemInDarkTheme()
     val scheme = MaterialTheme.colorScheme
     return when (destination) {
-        Destination.Media -> if (dark) TilePalette.lavenderDark else TilePalette.lavenderLight
         Destination.Stories -> TileColors(scheme.primaryContainer, scheme.onPrimaryContainer)
         Destination.Images -> TileColors(scheme.secondaryContainer, scheme.onSecondaryContainer)
         Destination.Videos -> TileColors(scheme.tertiaryContainer, scheme.onTertiaryContainer)
@@ -56,7 +57,51 @@ private fun tileColors(destination: Destination): TileColors {
 }
 
 @Composable
-fun HomeScreen(onOpen: (Destination) -> Unit) {
+private fun SuggestionCard(
+    suggestion: de.hr.mediathek.data.suggest.Suggestion<de.hr.mediathek.data.db.MediaFileEntity>,
+    viewModel: HomeViewModel,
+    onClick: () -> Unit,
+) {
+    val video = suggestion.item
+    val bitmap = de.hr.mediathek.feature.library.rememberThumbBitmap(viewModel.thumbnailOf(video.uuid))
+    val (label, color) = when (suggestion.kind) {
+        de.hr.mediathek.data.suggest.SuggestionKind.OFTEN -> stringResource(R.string.suggest_often) to MaterialTheme.colorScheme.primaryContainer
+        de.hr.mediathek.data.suggest.SuggestionKind.RARE -> stringResource(R.string.suggest_rare) to MaterialTheme.colorScheme.secondaryContainer
+        de.hr.mediathek.data.suggest.SuggestionKind.NEVER -> stringResource(R.string.suggest_never) to MaterialTheme.colorScheme.tertiaryContainer
+    }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = color),
+        modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).clickable(onClick = onClick),
+    ) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black.copy(alpha = 0.25f))) {
+            bitmap?.let {
+                androidx.compose.foundation.Image(
+                    it.asImageBitmap(),
+                    contentDescription = video.displayName,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        Text(label, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = 12.dp, top = 8.dp, end = 12.dp))
+        Text(
+            video.displayName,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
+        )
+    }
+}
+
+@Composable
+fun HomeScreen(
+    onOpen: (Destination) -> Unit,
+    onOpenVideo: (String) -> Unit = {},
+    viewModel: HomeViewModel = androidx.hilt.navigation.compose.hiltViewModel(),
+) {
+    val suggestions by viewModel.suggestions.collectAsStateWithLifecycle()
+    // Beim Zurückkehren zur Übersicht neu mischen.
+    androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refresh() }
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Text(
             text = stringResource(R.string.home_title),
@@ -114,6 +159,19 @@ fun HomeScreen(onOpen: (Destination) -> Unit) {
                             modifier = Modifier.padding(top = 10.dp),
                         )
                     }
+                }
+            }
+            if (suggestions.isNotEmpty()) {
+                item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        stringResource(R.string.home_suggestions),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                items(suggestions, key = { "s:" + it.item.uuid }) { suggestion ->
+                    SuggestionCard(suggestion, viewModel) { onOpenVideo(suggestion.item.uuid) }
                 }
             }
         }

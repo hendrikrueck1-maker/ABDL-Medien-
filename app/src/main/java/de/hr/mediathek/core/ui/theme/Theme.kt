@@ -12,17 +12,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 
 // Pastell-Palette: Rosé, Hellblau, Mint, Flieder, Pfirsich.
 private val LightColors = lightColorScheme(
-    primary = Color(0xFFD96B94),
+    primary = Color(0xFFE8458B),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFFFD6E4),
+    primaryContainer = Color(0xFFFFBCD9),
     onPrimaryContainer = Color(0xFF5A1F38),
-    secondary = Color(0xFF5B9BD5),
+    secondary = Color(0xFF3D8BFD),
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFD3EAFF),
+    secondaryContainer = Color(0xFFB8DAFF),
     onSecondaryContainer = Color(0xFF123B5E),
-    tertiary = Color(0xFF55B58A),
+    tertiary = Color(0xFF22B77F),
     onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFCFF3E0),
+    tertiaryContainer = Color(0xFFB0F0D2),
     onTertiaryContainer = Color(0xFF0F4630),
     background = Color(0xFFFFF7FA),
     onBackground = Color(0xFF3A2E34),
@@ -39,17 +39,17 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFF4A9C3),
+    primary = Color(0xFFFF8FBE),
     onPrimary = Color(0xFF4A1830),
-    primaryContainer = Color(0xFF7A3E58),
+    primaryContainer = Color(0xFF99306A),
     onPrimaryContainer = Color(0xFFFFD6E4),
-    secondary = Color(0xFF9CCBF0),
+    secondary = Color(0xFF7DBBFF),
     onSecondary = Color(0xFF0E3150),
-    secondaryContainer = Color(0xFF35597A),
+    secondaryContainer = Color(0xFF2B63A0),
     onSecondaryContainer = Color(0xFFD3EAFF),
-    tertiary = Color(0xFF98DDBB),
+    tertiary = Color(0xFF6FE0B0),
     onTertiary = Color(0xFF0B3A27),
-    tertiaryContainer = Color(0xFF2F6049),
+    tertiaryContainer = Color(0xFF217553),
     onTertiaryContainer = Color(0xFFCFF3E0),
     background = Color(0xFF1E1A24),
     onBackground = Color(0xFFEDE3EC),
@@ -66,9 +66,9 @@ private val DarkColors = darkColorScheme(
 )
 
 private val PlayfulShapes = Shapes(
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(20.dp),
-    large = RoundedCornerShape(28.dp),
+    small = RoundedCornerShape(16.dp),
+    medium = RoundedCornerShape(24.dp),
+    large = RoundedCornerShape(32.dp),
     extraLarge = RoundedCornerShape(36.dp),
 )
 

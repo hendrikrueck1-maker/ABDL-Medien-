@@ -32,6 +32,8 @@ sealed interface PlayerState {
         val startPositionMs: Long,
         val rating: Int,
         val favorite: Boolean,
+        val markedDelete: Boolean = false,
+        val markedPee: Boolean = false,
         /** Es wird das Original vor der Komprimierung abgespielt (Position und Gesehen-Status bleiben unberührt). */
         val isOriginal: Boolean = false,
         /** Zu diesem komprimierten Video gibt es noch ein aufbewahrtes Original. */
@@ -101,8 +103,10 @@ class PlayerViewModel @Inject constructor(
         val start = if (playOriginal || media.seenState == SeenState.SEEN) 0L else media.resumePositionMs
         _state.value = PlayerState.Ready(
             media, uri, start, media.rating, media.favorite,
+            markedDelete = media.markedDelete, markedPee = media.markedPee,
             isOriginal = playOriginal, hasOriginal = originalRecord != null,
         )
+        if (!playOriginal) mediaDao.incrementPlayCount(uuid, System.currentTimeMillis())
     }
 
     /** Löscht das aufbewahrte Original dieses Videos; die komprimierte Version bleibt. */
@@ -155,6 +159,18 @@ class PlayerViewModel @Inject constructor(
         val current = _state.value as? PlayerState.Ready ?: return
         _state.value = current.copy(favorite = !current.favorite)
         viewModelScope.launch { mediaDao.setFavorite(uuid, !current.favorite, System.currentTimeMillis()) }
+    }
+
+    fun toggleMarkedDelete() {
+        val current = _state.value as? PlayerState.Ready ?: return
+        _state.value = current.copy(markedDelete = !current.markedDelete)
+        viewModelScope.launch { mediaDao.setMarkedDelete(uuid, !current.markedDelete, System.currentTimeMillis()) }
+    }
+
+    fun toggleMarkedPee() {
+        val current = _state.value as? PlayerState.Ready ?: return
+        _state.value = current.copy(markedPee = !current.markedPee)
+        viewModelScope.launch { mediaDao.setMarkedPee(uuid, !current.markedPee, System.currentTimeMillis()) }
     }
 
     private companion object {

@@ -23,6 +23,8 @@ data class VideoFilter(
     val sort: VideoSort = VideoSort.ADDED_DESC,
     val search: String = "",
     val favoriteOnly: Boolean = false,
+    val markedDeleteOnly: Boolean = false,
+    val peeOnly: Boolean = false,
     val minRating: Int = 0,
     val seen: SeenFilter = SeenFilter.ALL,
     val onlineOnly: Boolean = false,
@@ -66,6 +68,8 @@ object VideoQuery {
         val where = StringBuilder("${typeClause(type)} AND deletedAt IS NULL AND status != 'TRASHED'")
         val args = ArrayList<Any>()
         if (filter.favoriteOnly) where.append(" AND favorite = 1")
+        if (filter.markedDeleteOnly) where.append(" AND markedDelete = 1")
+        if (filter.peeOnly) where.append(" AND markedPee = 1")
         if (filter.minRating > 0) {
             where.append(" AND rating >= ?")
             args += filter.minRating.coerceIn(1, 5)

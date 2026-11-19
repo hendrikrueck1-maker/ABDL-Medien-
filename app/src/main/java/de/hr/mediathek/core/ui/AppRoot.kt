@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
@@ -19,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
@@ -62,19 +64,22 @@ fun AppRoot() {
     val route = navController.currentRoute().orEmpty()
     val fullScreenRoute = route.startsWith("player/") || route.startsWith("image/{") || route == "slideshow"
 
+    AppBackground {
     if (isWide) {
         Row(Modifier.fillMaxSize()) {
             if (!fullScreenRoute) AppNavigationRail(navController)
-            Scaffold(Modifier.weight(1f)) { padding ->
+            Scaffold(Modifier.weight(1f), containerColor = Color.Transparent) { padding ->
                 AppNavHost(navController, Modifier.padding(padding))
             }
         }
     } else {
         Scaffold(
+            containerColor = Color.Transparent,
             bottomBar = { if (!fullScreenRoute) AppBottomBar(navController) },
         ) { padding ->
             AppNavHost(navController, Modifier.padding(padding))
         }
+    }
     }
 }
 
@@ -86,7 +91,10 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         modifier = modifier,
     ) {
         composable(Destination.Home.route) {
-            HomeScreen(onOpen = { navController.navigateTopLevel(it) })
+            HomeScreen(
+                onOpen = { navController.navigateTopLevel(it) },
+                onOpenVideo = { navController.navigate("player/$it") },
+            )
         }
         composable(Destination.Settings.route) {
             SettingsScreen(onOpenRoute = { navController.navigate(it) })
@@ -109,12 +117,6 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
                 onOpen = { navController.navigate("player/$it") },
                 onOpenTrash = { navController.navigate("trash") },
                 onOpenDuplicates = { navController.navigate("duplicates") },
-            )
-        }
-        composable(Destination.Media.route) {
-            de.hr.mediathek.feature.media.MediaAllScreen(
-                onOpenVideo = { navController.navigate("player/$it") },
-                onOpenImage = { navController.navigate("image/$it") },
             )
         }
         composable(Destination.Images.route) {
@@ -160,7 +162,7 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         Destination.entries
             .filter {
                 it != Destination.Home && it != Destination.Settings && it != Destination.Videos &&
-                    it != Destination.Images && it != Destination.Media
+                    it != Destination.Images
             }
             .forEach { destination ->
                 composable(destination.route) {
@@ -173,7 +175,7 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
 @Composable
 private fun AppBottomBar(navController: NavHostController) {
     val currentRoute = navController.currentRoute()
-    NavigationBar {
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f)) {
         Destination.entries.filter { it.inCompactBar }.forEach { destination ->
             NavigationBarItem(
                 selected = currentRoute == destination.route,
@@ -189,7 +191,7 @@ private fun AppBottomBar(navController: NavHostController) {
 private fun AppNavigationRail(navController: NavHostController) {
     val currentRoute = navController.currentRoute()
     // Feste Breite: die Trennlinien füllen sonst die ganze Zeile und der Inhalt daneben hat keinen Platz mehr.
-    NavigationRail(modifier = Modifier.width(80.dp)) {
+    NavigationRail(modifier = Modifier.width(80.dp), containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f)) {
         Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             var previousGroup = Destination.entries.first().group
             Destination.entries.forEach { destination ->

@@ -48,7 +48,7 @@ abstract class MediathekDatabase : RoomDatabase() {
     abstract fun compressionDao(): CompressionDao
 
     companion object {
-        const val VERSION = 5
+        const val VERSION = 6
         const val NAME = "mediathek.db"
     }
 }

@@ -254,6 +254,37 @@ interface MediaFileDao {
     @Query("UPDATE media_file SET favorite = :favorite, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
     suspend fun setFavorite(uuid: String, favorite: Boolean, now: Long)
 
+    @Query("UPDATE media_file SET markedDelete = :marked, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun setMarkedDelete(uuid: String, marked: Boolean, now: Long)
+
+    @Query("UPDATE media_file SET markedPee = :marked, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun setMarkedPee(uuid: String, marked: Boolean, now: Long)
+
+    @Query("UPDATE media_file SET markedDelete = :marked, updatedAt = :now, userUpdatedAt = :now WHERE uuid IN (:uuids)")
+    suspend fun setMarkedDeleteBulk(uuids: List<String>, marked: Boolean, now: Long)
+
+    @Query("UPDATE media_file SET markedPee = :marked, updatedAt = :now, userUpdatedAt = :now WHERE uuid IN (:uuids)")
+    suspend fun setMarkedPeeBulk(uuids: List<String>, marked: Boolean, now: Long)
+
+    @Query("UPDATE media_file SET playCount = playCount + 1, lastPlayedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun incrementPlayCount(uuid: String, now: Long)
+
+    // --- Vorschläge für die Übersicht ---
+
+    /** Am häufigsten geöffnete Videos (nur solche, die schon mindestens einmal geöffnet wurden). */
+    @Query("SELECT * FROM media_file WHERE type = 'VIDEO' AND status = 'ONLINE' AND deletedAt IS NULL AND playCount >= 1 ORDER BY playCount DESC, RANDOM() LIMIT :limit")
+    suspend fun suggestFrequent(limit: Int): List<MediaFileEntity>
+
+    /** Schon einmal angesehene Videos, nach seltenster Nutzung zuerst. */
+    @Query("SELECT * FROM media_file WHERE type = 'VIDEO' AND status = 'ONLINE' AND deletedAt IS NULL AND (playCount >= 1 OR seenState != 'UNSEEN') ORDER BY playCount ASC, COALESCE(lastPlayedAt, 0) ASC, RANDOM() LIMIT :limit")
+    suspend fun suggestRare(limit: Int): List<MediaFileEntity>
+
+    @Query("SELECT * FROM media_file WHERE type = 'VIDEO' AND status = 'ONLINE' AND deletedAt IS NULL AND playCount = 0 AND seenState = 'UNSEEN' ORDER BY RANDOM() LIMIT :limit")
+    suspend fun suggestNeverWatched(limit: Int): List<MediaFileEntity>
+
+    @Query("SELECT uuid FROM media_file WHERE type = 'IMAGE' AND status = 'ONLINE' AND deletedAt IS NULL ORDER BY RANDOM() LIMIT 1")
+    suspend fun randomImageUuid(): String?
+
     @Query(
         "UPDATE media_file SET resumePositionMs = :position, seenState = :seen, updatedAt = :now, userUpdatedAt = :now " +
             "WHERE uuid = :uuid",

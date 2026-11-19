@@ -96,6 +96,8 @@ class VideosViewModel @Inject constructor(
     }
 
     fun favoriteSelected(favorite: Boolean) = withSelection { dao.setFavoriteBulk(it, favorite, now()) }
+    fun markDeleteSelected(marked: Boolean) = withSelection { dao.setMarkedDeleteBulk(it, marked, now()) }
+    fun markPeeSelected(marked: Boolean) = withSelection { dao.setMarkedPeeBulk(it, marked, now()) }
     fun rateSelected(rating: Int) = withSelection { dao.setRatingBulk(it, rating.coerceIn(0, 5), now()) }
     fun assignSelected(categoryUuid: String) = withSelection { categories.assign(it, categoryUuid) }
     fun unassignSelected(categoryUuid: String) = withSelection { categories.unassign(it, categoryUuid) }

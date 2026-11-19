@@ -91,6 +91,8 @@ private val IMAGE_SORTS = listOf(
 fun activeFilterCount(f: VideoFilter): Int {
     var n = 0
     if (f.favoriteOnly) n++
+    if (f.markedDeleteOnly) n++
+    if (f.peeOnly) n++
     if (f.minRating > 0) n++
     if (f.seen != SeenFilter.ALL) n++
     if (f.onlineOnly) n++
@@ -237,6 +239,8 @@ fun ViewSettingsDialog(
     onLayout: (CardLayout) -> Unit,
     onDetails: (Boolean) -> Unit,
     onFavoritesOnly: (Boolean) -> Unit,
+    onMarkedDeleteOnly: (Boolean) -> Unit = {},
+    onPeeOnly: (Boolean) -> Unit = {},
     onSort: (VideoSort) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -253,6 +257,8 @@ fun ViewSettingsDialog(
                 }
                 SwitchRow(stringResource(R.string.view_details), settings.showDetails, onDetails)
                 SwitchRow(stringResource(R.string.view_favorites_only), filter.favoriteOnly, onFavoritesOnly)
+                SwitchRow(stringResource(R.string.view_marked_delete_only), filter.markedDeleteOnly, onMarkedDeleteOnly)
+                SwitchRow(stringResource(R.string.view_pee_only), filter.peeOnly, onPeeOnly)
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 Text(stringResource(R.string.view_sort), style = MaterialTheme.typography.titleSmall)
                 (if (isVideo) VIDEO_SORTS else IMAGE_SORTS).forEach { sort ->

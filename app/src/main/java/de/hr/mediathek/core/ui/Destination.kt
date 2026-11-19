@@ -6,7 +6,6 @@ import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -29,7 +28,6 @@ enum class Destination(
     val group: Int,
 ) {
     Home("home", R.string.nav_home, Icons.Filled.Home, true, 0),
-    Media("media", R.string.nav_media, Icons.Filled.List, true, 1),
     Videos("videos", R.string.nav_videos, Icons.Filled.PlayArrow, true, 1),
     Images("images", R.string.nav_images, Icons.Filled.AccountBox, true, 1),
     Stories("stories", R.string.nav_stories, Icons.Filled.Create, false, 2),

@@ -138,7 +138,7 @@ class BackupWriter @Inject constructor(
 
         /** Medien-Einträge werden nur gesichert, wenn sie Nutzerdaten tragen; der Rest entsteht beim Scan neu. */
         const val MEDIA_WITH_USER_DATA =
-            "(rating > 0 OR favorite = 1 OR seenState != 'UNSEEN' OR resumePositionMs > 0 OR deletedAt IS NOT NULL " +
+            "(rating > 0 OR favorite = 1 OR markedDelete = 1 OR markedPee = 1 OR playCount > 0 OR seenState != 'UNSEEN' OR resumePositionMs > 0 OR deletedAt IS NOT NULL " +
                 "OR uuid IN (SELECT entityUuid FROM category_assignment WHERE entityType = 'MEDIA') " +
                 "OR uuid IN (SELECT entityUuid FROM tag_assignment WHERE entityType = 'MEDIA') " +
                 "OR uuid IN (SELECT mediaUuid FROM playlist_item))"

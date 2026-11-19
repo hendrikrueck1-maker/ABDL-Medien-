@@ -41,5 +41,15 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+/** 5 -> 6: Markierungen (zum Löschen, 💧) und Abspielzähler. */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE media_file ADD COLUMN markedDelete INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE media_file ADD COLUMN markedPee INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE media_file ADD COLUMN playCount INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE media_file ADD COLUMN lastPlayedAt INTEGER")
+    }
+}
+
 /** Alle Schema-Migrationen in Reihenfolge. */
-val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)

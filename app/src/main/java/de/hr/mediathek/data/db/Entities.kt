@@ -1,5 +1,6 @@
 package de.hr.mediathek.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -64,6 +65,13 @@ data class MediaFileEntity(
     val lastSeenScanUuid: String? = null,
     val rating: Int = 0,
     val favorite: Boolean = false,
+    /** Vom Nutzer zum Löschen vorgemerkt (nur eine Markierung, gelöscht wird nichts). */
+    @ColumnInfo(defaultValue = "0") val markedDelete: Boolean = false,
+    /** Eigene Markierung 💧. */
+    @ColumnInfo(defaultValue = "0") val markedPee: Boolean = false,
+    /** Wie oft das Video geöffnet wurde (für die Vorschläge in der Übersicht). */
+    @ColumnInfo(defaultValue = "0") val playCount: Int = 0,
+    val lastPlayedAt: Long? = null,
     // Video
     val durationMs: Long? = null,
     val width: Int? = null,
