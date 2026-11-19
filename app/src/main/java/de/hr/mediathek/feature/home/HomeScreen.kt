@@ -1,7 +1,10 @@
 package de.hr.mediathek.feature.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
@@ -12,18 +15,24 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import de.hr.mediathek.BuildConfig
 import de.hr.mediathek.R
 import de.hr.mediathek.core.ui.Destination
+import de.hr.mediathek.core.ui.theme.TileColors
+import de.hr.mediathek.core.ui.theme.TilePalette
 
 private val moduleTiles = listOf(
     Destination.Stories,
@@ -33,11 +42,24 @@ private val moduleTiles = listOf(
 )
 
 @Composable
+private fun tileColors(destination: Destination): TileColors {
+    val dark = isSystemInDarkTheme()
+    val scheme = MaterialTheme.colorScheme
+    return when (destination) {
+        Destination.Stories -> TileColors(scheme.primaryContainer, scheme.onPrimaryContainer)
+        Destination.Images -> TileColors(scheme.secondaryContainer, scheme.onSecondaryContainer)
+        Destination.Videos -> TileColors(scheme.tertiaryContainer, scheme.onTertiaryContainer)
+        else -> if (dark) TilePalette.peachDark else TilePalette.peachLight
+    }
+}
+
+@Composable
 fun HomeScreen(onOpen: (Destination) -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Text(
             text = stringResource(R.string.home_title),
             style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(top = 16.dp),
         )
         Text(
@@ -48,16 +70,22 @@ fun HomeScreen(onOpen: (Destination) -> Unit) {
         )
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 160.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
             contentPadding = PaddingValues(bottom = 16.dp),
             modifier = Modifier.weight(1f),
         ) {
             items(moduleTiles) { destination ->
+                val colors = tileColors(destination)
                 Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = colors.container,
+                        contentColor = colors.content,
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(1.3f)
+                        .aspectRatio(1.2f)
+                        .clip(MaterialTheme.shapes.large)
                         .clickable { onOpen(destination) },
                 ) {
                     Column(
@@ -65,15 +93,23 @@ fun HomeScreen(onOpen: (Destination) -> Unit) {
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Icon(
-                            imageVector = destination.icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(40.dp),
-                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.45f)),
+                        ) {
+                            Icon(
+                                imageVector = destination.icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(34.dp),
+                            )
+                        }
                         Text(
                             text = stringResource(destination.label),
                             style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(top = 8.dp),
+                            modifier = Modifier.padding(top = 10.dp),
                         )
                     }
                 }
