@@ -555,6 +555,11 @@ private fun sortLabel(sort: VideoSort): Int = when (sort) {
     VideoSort.SIZE_DESC -> R.string.sort_size
     VideoSort.DURATION_DESC -> R.string.sort_duration
     VideoSort.RANDOM -> R.string.sort_random
+    VideoSort.ADDED_ASC -> R.string.sort_added_asc
+    VideoSort.DATE_ASC -> R.string.sort_date_asc
+    VideoSort.RATING_ASC -> R.string.sort_rating_asc
+    VideoSort.SIZE_ASC -> R.string.sort_size_asc
+    VideoSort.DURATION_ASC -> R.string.sort_duration_asc
 }
 
 @Composable

@@ -179,7 +179,7 @@ object VideoQuery {
         val w = where(filter.copy(folder = null, directFolder = null), type)
         val args = ArrayList<Any>()
         args += restStart(parent)
-        args += w.args
+        args.addAll(w.args)
         val sql = StringBuilder()
         sql.append("SELECT name, COUNT(*) AS cnt FROM (")
         sql.append("SELECT CASE WHEN instr(rest, '/') > 0 THEN substr(rest, 1, instr(rest, '/') - 1) END AS name FROM (")
