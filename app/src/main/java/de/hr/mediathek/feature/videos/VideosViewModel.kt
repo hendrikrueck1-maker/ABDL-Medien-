@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -37,10 +38,25 @@ class VideosViewModel @Inject constructor(
     private val tags: de.hr.mediathek.data.tag.TagRepository,
     private val playlistRepo: de.hr.mediathek.data.playlist.PlaylistRepository,
     private val playback: PlaybackContext,
+    prefs: de.hr.mediathek.data.prefs.ViewPrefsRepository,
+    compressionDao: de.hr.mediathek.data.db.CompressionDao,
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow(VideoFilter())
     val filter: StateFlow<VideoFilter> = _filter
+
+    val browser = de.hr.mediathek.feature.library.LibraryBrowser(
+        scope = viewModelScope, dao = dao, thumbs = thumbs, prefs = prefs, type = "VIDEO", module = "videos",
+    )
+
+    /** Videos, die komprimiert wurden (auch wenn das Original schon gelöscht ist); für die Kennzeichnung. */
+    val compressedUuids: StateFlow<Set<String>> = compressionDao.observeCompressedUuids()
+        .map { it.toSet() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    private val debouncedFilter = _filter.debounce(250)
+    val folders = browser.folders(debouncedFilter)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Seed für "Zufall": bleibt während der Sitzung gleich, damit beim Blättern nichts doppelt oder fehlt. */
     private var randomSeed = System.currentTimeMillis() % 1_000_000_000L
@@ -51,8 +67,7 @@ class VideosViewModel @Inject constructor(
     val playlists: StateFlow<List<de.hr.mediathek.data.db.PlaylistEntity>> = playlistRepo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val videos: Flow<PagingData<MediaFileEntity>> = _filter
-        .debounce(250)
+    val videos: Flow<PagingData<MediaFileEntity>> = browser.effective(debouncedFilter)
         .flatMapLatest { f ->
             val built = VideoQuery.build(f, randomSeed)
             Pager(PagingConfig(pageSize = 60, prefetchDistance = 60, enablePlaceholders = false)) {
@@ -166,20 +181,21 @@ class VideosViewModel @Inject constructor(
 
     /** Merkt die Liste, aus der geöffnet wird, damit der Player "Nächstes" kennt. */
     fun rememberContext() {
-        playback.filter = _filter.value
+        playback.filter = browser.effectiveNow(_filter.value)
         playback.seed = randomSeed
     }
 
     /** Ein zufälliges verfügbares Video aus dem aktuellen Filter; danach läuft der Player zufällig weiter. */
     fun openRandom(onFound: (String) -> Unit, onNone: () -> Unit) {
         viewModelScope.launch {
-            val built = VideoQuery.buildRandomPick(_filter.value)
+            val scope = browser.scopeNow(_filter.value)
+            val built = VideoQuery.buildRandomPick(scope)
             val id = dao.uuids(SimpleSQLiteQuery(built.sql, built.args.toTypedArray())).firstOrNull()
             if (id == null) {
                 onNone()
             } else {
                 randomSeed = System.currentTimeMillis() % 1_000_000_000L
-                playback.filter = _filter.value.copy(sort = VideoSort.RANDOM)
+                playback.filter = scope.copy(sort = VideoSort.RANDOM)
                 playback.seed = randomSeed
                 onFound(id)
             }

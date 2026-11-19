@@ -55,6 +55,25 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import de.hr.mediathek.R
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import de.hr.mediathek.data.prefs.CardLayout
+import de.hr.mediathek.data.prefs.BrowseMode
+import de.hr.mediathek.feature.library.Badge
+import de.hr.mediathek.feature.library.FilterDialog
+import de.hr.mediathek.feature.library.FilterLabel
+import de.hr.mediathek.feature.library.FolderCard
+import de.hr.mediathek.feature.library.FolderItem
+import de.hr.mediathek.feature.library.PathBar
+import de.hr.mediathek.feature.library.ViewSettingsDialog
+import de.hr.mediathek.feature.library.activeFilterCount
+import de.hr.mediathek.feature.library.clearedFilters
+import java.io.File
 import de.hr.mediathek.data.db.MediaFileEntity
 import de.hr.mediathek.data.db.MediaStatus
 import de.hr.mediathek.data.db.SeenState
@@ -89,6 +108,16 @@ fun VideosScreen(
     val series by compression.series.collectAsStateWithLifecycle()
     var compressTarget by remember { mutableStateOf<String?>(null) }
     var rateMenu by remember { mutableStateOf(false) }
+    var moreMenu by remember { mutableStateOf(false) }
+    var showViewSettings by remember { mutableStateOf(false) }
+    var showFilter by remember { mutableStateOf(false) }
+    val viewSettings by viewModel.browser.settings.collectAsStateWithLifecycle()
+    val path by viewModel.browser.path.collectAsStateWithLifecycle()
+    val folders by viewModel.folders.collectAsStateWithLifecycle()
+    val compressedUuids by viewModel.compressedUuids.collectAsStateWithLifecycle()
+    val foldersOn = viewSettings.mode == BrowseMode.FOLDERS && filter.search.isBlank() && filter.playlistUuid == null
+    BackHandler(enabled = foldersOn && path.isNotEmpty()) { viewModel.browser.up() }
+    BackHandler(enabled = selected.isNotEmpty()) { viewModel.clearSelection() }
     val trashResult by viewModel.trashResult.collectAsStateWithLifecycle()
     var confirmTrash by remember { mutableStateOf(0) } // 0 = zu, 1 = erste Rückfrage, 2 = zweite ab 10 Dateien
 
@@ -106,9 +135,16 @@ fun VideosScreen(
                     modifier = Modifier.weight(1f),
                 )
                 Button(onClick = { viewModel.openRandom(onOpen) { noRandom = true } }) { Text(stringResource(R.string.video_random)) }
-                OutlinedButton(onClick = { showPlaylistDialog = true }) { Text(stringResource(R.string.playlist_title)) }
-                OutlinedButton(onClick = onOpenDuplicates) { Text(stringResource(R.string.dup_title)) }
-                OutlinedButton(onClick = onOpenTrash) { Text(stringResource(R.string.trash_title)) }
+                Box {
+                    IconButton(onClick = { moreMenu = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.menu_more))
+                    }
+                    DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.playlist_title)) }, onClick = { moreMenu = false; showPlaylistDialog = true })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.dup_title)) }, onClick = { moreMenu = false; onOpenDuplicates() })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.trash_title)) }, onClick = { moreMenu = false; onOpenTrash() })
+                    }
+                }
             }
         } else {
             Row(
@@ -170,83 +206,53 @@ fun VideosScreen(
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
-            Box {
-                OutlinedButton(onClick = { sortMenu = true }) { Text(stringResource(sortLabel(filter.sort))) }
-                DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
-                    VideoSort.entries.filter { it != VideoSort.PLAYLIST_ORDER }.forEach { sort ->
-                        DropdownMenuItem(
-                            text = { Text(stringResource(sortLabel(sort))) },
-                            onClick = {
-                                sortMenu = false
-                                if (sort == VideoSort.RANDOM && filter.sort == VideoSort.RANDOM) viewModel.reshuffle()
-                                viewModel.update { it.copy(sort = sort) }
-                            },
-                        )
-                    }
-                }
+            OutlinedButton(onClick = { showViewSettings = true }) { Text(stringResource(R.string.view_button)) }
+            val activeCount = activeFilterCount(filter)
+            if (activeCount > 0) {
+                Button(onClick = { showFilter = true }) { Text(stringResource(R.string.filter_button_active, activeCount)) }
+            } else {
+                OutlinedButton(onClick = { showFilter = true }) { Text(stringResource(R.string.filter_button)) }
             }
         }
-        Row(
-            Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FilterChip(
-                selected = filter.favoriteOnly,
-                onClick = { viewModel.update { it.copy(favoriteOnly = !it.favoriteOnly) } },
-                label = { Text(stringResource(R.string.video_filter_favorites)) },
-            )
-            FilterChip(
-                selected = filter.minRating >= 4,
-                onClick = { viewModel.update { it.copy(minRating = if (it.minRating >= 4) 0 else 4) } },
-                label = { Text(stringResource(R.string.video_filter_rating)) },
-            )
-            FilterChip(
-                selected = filter.seen == SeenFilter.UNSEEN,
-                onClick = { viewModel.update { it.copy(seen = if (it.seen == SeenFilter.UNSEEN) SeenFilter.ALL else SeenFilter.UNSEEN) } },
-                label = { Text(stringResource(R.string.video_filter_unseen)) },
-            )
-            FilterChip(
-                selected = filter.seen == SeenFilter.IN_PROGRESS,
-                onClick = { viewModel.update { it.copy(seen = if (it.seen == SeenFilter.IN_PROGRESS) SeenFilter.ALL else SeenFilter.IN_PROGRESS) } },
-                label = { Text(stringResource(R.string.video_filter_in_progress)) },
-            )
-            FilterChip(
-                selected = filter.onlineOnly,
-                onClick = { viewModel.update { it.copy(onlineOnly = !it.onlineOnly) } },
-                label = { Text(stringResource(R.string.video_filter_online)) },
-            )
-            filter.playlistUuid?.let { pl ->
+        if (foldersOn && path.isNotEmpty()) {
+            PathBar(path = path, onGoTo = viewModel.browser::goTo)
+        }
+        filter.playlistUuid?.let { pl ->
+            Row(Modifier.padding(vertical = 4.dp)) {
                 FilterChip(
                     selected = true,
                     onClick = { viewModel.update { it.copy(playlistUuid = null, sort = VideoSort.ADDED_DESC) } },
                     label = { Text("▶ " + (playlists.firstOrNull { it.uuid == pl }?.name ?: "") + " ✕") },
                 )
             }
-            tags.forEach { tag ->
-                FilterChip(
-                    selected = filter.tagUuid == tag.uuid,
-                    onClick = { viewModel.update { it.copy(tagUuid = if (it.tagUuid == tag.uuid) null else tag.uuid) } },
-                    label = { Text("#" + tag.name) },
-                )
-            }
-            categories.forEach { category ->
-                FilterChip(
-                    selected = filter.categoryUuid == category.uuid,
-                    onClick = {
-                        viewModel.update {
-                            it.copy(categoryUuid = if (it.categoryUuid == category.uuid) null else category.uuid)
-                        }
-                    },
-                    label = { Text(category.name) },
-                )
-            }
-            listOf("mp4", "mkv", "avi", "mov").forEach { ext ->
-                FilterChip(
-                    selected = filter.format == ext,
-                    onClick = { viewModel.update { it.copy(format = if (it.format == ext) null else ext) } },
-                    label = { Text(ext) },
-                )
-            }
+        }
+        if (showViewSettings) {
+            ViewSettingsDialog(
+                settings = viewSettings,
+                filter = filter,
+                isVideo = true,
+                onMode = viewModel.browser::setMode,
+                onLayout = viewModel.browser::setLayout,
+                onDetails = viewModel.browser::setShowDetails,
+                onFavoritesOnly = { v -> viewModel.update { it.copy(favoriteOnly = v) } },
+                onSort = { sort ->
+                    if (sort == VideoSort.RANDOM && filter.sort == VideoSort.RANDOM) viewModel.reshuffle()
+                    viewModel.update { it.copy(sort = sort) }
+                },
+                onDismiss = { showViewSettings = false },
+            )
+        }
+        if (showFilter) {
+            FilterDialog(
+                filter = filter,
+                isVideo = true,
+                showCategoryAndTags = true,
+                categories = categories.map { FilterLabel(it.uuid, it.name) },
+                tags = tags.map { FilterLabel(it.uuid, it.name) },
+                onChange = { change -> viewModel.update(change) },
+                onReset = { viewModel.update { it.clearedFilters() } },
+                onDismiss = { showFilter = false },
+            )
         }
 
         trashResult?.let { r ->
@@ -372,19 +378,23 @@ fun VideosScreen(
             )
         }
 
-        if (items.itemCount == 0) {
+        if (items.itemCount == 0 && folders.isEmpty()) {
             Text(
-                stringResource(R.string.video_empty),
+                stringResource(if (foldersOn && path.isNotEmpty()) R.string.lib_empty_folder else R.string.video_empty),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(top = 24.dp),
             )
         }
+        val tiles = viewSettings.layout == CardLayout.TILES
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 320.dp),
+            columns = GridCells.Adaptive(minSize = if (tiles) 200.dp else 320.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
+            items(folders, key = { "f:" + it.path }) { folder ->
+                VideoFolderCard(folder, filter, tiles, viewModel)
+            }
             items(count = items.itemCount, key = { index -> items.peek(index)?.uuid ?: index }) { index ->
                 val video = items[index]
                 if (video != null) {
@@ -392,6 +402,9 @@ fun VideosScreen(
                         video = video,
                         viewModel = viewModel,
                         selected = video.uuid in selected,
+                        tiles = tiles,
+                        showDetails = viewSettings.showDetails,
+                        compressed = video.uuid in compressedUuids,
                         onClick = {
                             if (selected.isNotEmpty()) {
                                 viewModel.toggleSelected(video.uuid)
@@ -406,6 +419,20 @@ fun VideosScreen(
             }
         }
     }
+}
+
+@Composable
+private fun VideoFolderCard(folder: FolderItem, filter: VideoFilter, tiles: Boolean, viewModel: VideosViewModel) {
+    val previews by produceState<List<File>>(initialValue = emptyList(), folder.path, folder.count, filter.copy(search = "")) {
+        value = viewModel.browser.preview(filter, folder.path)
+    }
+    FolderCard(
+        item = folder,
+        previews = previews,
+        tiles = tiles,
+        countLabel = stringResource(R.string.lib_count_videos, folder.count),
+        onClick = { viewModel.browser.enter(folder.name) },
+    )
 }
 
 @Composable
@@ -545,33 +572,20 @@ private fun PlaylistDialog(
     }
 }
 
-private fun sortLabel(sort: VideoSort): Int = when (sort) {
-    VideoSort.PLAYLIST_ORDER -> R.string.sort_playlist
-    VideoSort.ADDED_DESC -> R.string.sort_added
-    VideoSort.NAME_ASC -> R.string.sort_name_asc
-    VideoSort.NAME_DESC -> R.string.sort_name_desc
-    VideoSort.DATE_DESC -> R.string.sort_date
-    VideoSort.RATING_DESC -> R.string.sort_rating
-    VideoSort.SIZE_DESC -> R.string.sort_size
-    VideoSort.DURATION_DESC -> R.string.sort_duration
-    VideoSort.RANDOM -> R.string.sort_random
-    VideoSort.ADDED_ASC -> R.string.sort_added_asc
-    VideoSort.DATE_ASC -> R.string.sort_date_asc
-    VideoSort.RATING_ASC -> R.string.sort_rating_asc
-    VideoSort.SIZE_ASC -> R.string.sort_size_asc
-    VideoSort.DURATION_ASC -> R.string.sort_duration_asc
-}
-
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 private fun VideoCard(
     video: MediaFileEntity,
     viewModel: VideosViewModel,
     selected: Boolean,
+    tiles: Boolean,
+    showDetails: Boolean,
+    compressed: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
     val offline = video.status != MediaStatus.ONLINE
+    val progress = watchProgress(video)
     Card(
         colors = CardDefaults.cardColors(
             containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
@@ -585,33 +599,63 @@ private fun VideoCard(
                 onLongClick = onLongClick,
             ),
     ) {
-        Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Thumbnail(video.uuid, viewModel)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    video.displayName,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 2,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    metaLine(video),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    repeat(video.rating.coerceIn(0, 5)) {
-                        Icon(Icons.Filled.Star, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFFFFC107), modifier = Modifier.height(16.dp))
-                    }
-                    if (video.favorite) {
-                        Icon(Icons.Filled.Favorite, contentDescription = stringResource(R.string.video_favorite), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.height(16.dp))
-                    }
-                    if (offline) Text(stringResource(R.string.video_offline), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 4.dp))
-                    if (video.seenState == SeenState.SEEN) Text(stringResource(R.string.video_seen), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(start = 4.dp))
+        if (tiles) {
+            Column {
+                Thumbnail(video.uuid, viewModel, progress, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+                Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    VideoTexts(video, offline, showDetails, compressed, progress)
+                }
+            }
+        } else {
+            Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Thumbnail(video.uuid, viewModel, progress, Modifier.width(128.dp).height(72.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    VideoTexts(video, offline, showDetails, compressed, progress)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun VideoTexts(video: MediaFileEntity, offline: Boolean, showDetails: Boolean, compressed: Boolean, progress: Float?) {
+    Text(
+        video.displayName,
+        style = MaterialTheme.typography.titleSmall,
+        maxLines = 2,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    if (showDetails) {
+        Text(
+            metaLine(video),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        repeat(video.rating.coerceIn(0, 5)) {
+            Icon(Icons.Filled.Star, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFFFFC107), modifier = Modifier.height(16.dp))
+        }
+        if (video.favorite) {
+            Icon(Icons.Filled.Favorite, contentDescription = stringResource(R.string.video_favorite), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.height(16.dp))
+        }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (compressed) Badge(stringResource(R.string.badge_compressed))
+        if (video.seenState == SeenState.SEEN) {
+            Badge(stringResource(R.string.badge_seen))
+        } else if (progress != null) {
+            Badge(stringResource(R.string.badge_progress, (progress * 100).toInt().coerceIn(1, 99)))
+        }
+        if (offline) Badge(stringResource(R.string.badge_offline))
+    }
+}
+
+/** Fortschritt 0..1, nur für angefangene, noch nicht fertig gesehene Videos mit bekannter Dauer. */
+private fun watchProgress(video: MediaFileEntity): Float? {
+    val duration = video.durationMs ?: return null
+    if (duration <= 0 || video.seenState == SeenState.SEEN || video.resumePositionMs <= 0) return null
+    return (video.resumePositionMs.toFloat() / duration).coerceIn(0f, 1f)
 }
 
 private fun metaLine(video: MediaFileEntity): String {
@@ -619,6 +663,7 @@ private fun metaLine(video: MediaFileEntity): String {
     video.durationMs?.let { parts += formatDuration(it) }
     if (video.width != null && video.height != null) parts += "${video.width}×${video.height}"
     parts += formatSize(video.size)
+    video.displayName.substringAfterLast('.', "").takeIf { it.isNotEmpty() && it.length <= 5 }?.let { parts += it.uppercase() }
     return parts.joinToString(" · ")
 }
 
@@ -637,21 +682,24 @@ private fun formatSize(bytes: Long): String = when {
 }
 
 @Composable
-private fun Thumbnail(uuid: String, viewModel: VideosViewModel) {
+private fun Thumbnail(uuid: String, viewModel: VideosViewModel, progress: Float?, modifier: Modifier) {
     val bitmap by produceState<Bitmap?>(initialValue = null, uuid) {
         value = withContext(Dispatchers.IO) {
             viewModel.thumbnailOf(uuid)?.let { BitmapFactory.decodeFile(it.path) }
         }
     }
-    Box(
-        Modifier.width(128.dp).height(72.dp).alpha(1f),
-        contentAlignment = Alignment.Center,
-    ) {
+    Box(modifier, contentAlignment = Alignment.Center) {
         val b = bitmap
         if (b != null) {
             Image(b.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
             Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+        }
+        if (progress != null) {
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(4.dp),
+            )
         }
     }
 }
