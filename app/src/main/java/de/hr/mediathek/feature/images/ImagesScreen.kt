@@ -62,6 +62,7 @@ import kotlinx.coroutines.withContext
 fun ImagesScreen(
     onOpen: (String) -> Unit,
     onOpenDuplicates: () -> Unit = {},
+    onOpenSlideshow: () -> Unit = {},
     viewModel: ImagesViewModel = hiltViewModel(),
 ) {
     val filter by viewModel.filter.collectAsStateWithLifecycle()
@@ -88,6 +89,7 @@ fun ImagesScreen(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f),
                 )
+                TextButton(onClick = { viewModel.rememberContext(); onOpenSlideshow() }) { Text(stringResource(R.string.slideshow_open)) }
                 TextButton(onClick = onOpenDuplicates) { Text(stringResource(R.string.image_dup_open)) }
             }
         } else {

@@ -96,12 +96,14 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
             de.hr.mediathek.feature.images.ImagesScreen(
                 onOpen = { navController.navigate("image/$it") },
                 onOpenDuplicates = { navController.navigate("image-duplicates") },
+                onOpenSlideshow = { navController.navigate("slideshow") },
             )
         }
         composable(
             route = "image/{uuid}",
             arguments = listOf(navArgument("uuid") { type = NavType.StringType }),
         ) { de.hr.mediathek.feature.images.ImageViewerScreen(onBack = { navController.popBackStack() }) }
+        composable("slideshow") { de.hr.mediathek.feature.images.SlideshowScreen(onBack = { navController.popBackStack() }) }
         composable("image-duplicates") {
             de.hr.mediathek.feature.images.ImageDuplicatesScreen(
                 onBack = { navController.popBackStack() },
