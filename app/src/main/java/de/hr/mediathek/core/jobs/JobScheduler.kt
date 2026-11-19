@@ -102,8 +102,6 @@ class JobScheduler @Inject constructor(
         jobDao.setCreatedAt(b.uuid, a.createdAt)
     }
 
-    /** Eingereihte Jobs werden sofort beendet,
-
     /** Eingereihte Jobs werden sofort beendet, ein laufender Job bricht an der nächsten Prüfstelle ab. */
     suspend fun cancel(jobUuid: String) {
         val job = jobDao.get(jobUuid) ?: return
