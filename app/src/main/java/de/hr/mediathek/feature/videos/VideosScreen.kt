@@ -62,7 +62,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
-fun VideosScreen(onOpen: (String) -> Unit, viewModel: VideosViewModel = hiltViewModel()) {
+fun VideosScreen(
+    onOpen: (String) -> Unit,
+    onOpenTrash: () -> Unit,
+    onOpenDuplicates: () -> Unit,
+    viewModel: VideosViewModel = hiltViewModel(),
+) {
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val items = viewModel.videos.collectAsLazyPagingItems()
     var sortMenu by remember { mutableStateOf(false) }
@@ -71,15 +76,25 @@ fun VideosScreen(onOpen: (String) -> Unit, viewModel: VideosViewModel = hiltView
     val usedCategories by viewModel.usedCategories.collectAsStateWithLifecycle()
     var showCategoryDialog by remember { mutableStateOf(false) }
     var rateMenu by remember { mutableStateOf(false) }
+    val trashResult by viewModel.trashResult.collectAsStateWithLifecycle()
+    var confirmTrash by remember { mutableStateOf(0) } // 0 = zu, 1 = erste Rückfrage, 2 = zweite ab 10 Dateien
 
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
         if (selected.isEmpty()) {
-            Text(
-                stringResource(R.string.nav_videos),
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
-            )
+            Row(
+                Modifier.padding(top = 12.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.nav_videos),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedButton(onClick = onOpenDuplicates) { Text(stringResource(R.string.dup_title)) }
+                OutlinedButton(onClick = onOpenTrash) { Text(stringResource(R.string.trash_title)) }
+            }
         } else {
             Row(
                 Modifier.padding(top = 8.dp, bottom = 4.dp).horizontalScroll(rememberScrollState()),
@@ -111,6 +126,7 @@ fun VideosScreen(onOpen: (String) -> Unit, viewModel: VideosViewModel = hiltView
                     viewModel.loadUsedCategories()
                     showCategoryDialog = true
                 }) { Text(stringResource(R.string.video_category_action)) }
+                OutlinedButton(onClick = { confirmTrash = 1 }) { Text(stringResource(R.string.trash_action)) }
                 TextButton(onClick = viewModel::clearSelection) { Text(stringResource(R.string.video_clear_selection)) }
             }
         }
@@ -187,6 +203,35 @@ fun VideosScreen(onOpen: (String) -> Unit, viewModel: VideosViewModel = hiltView
             }
         }
 
+        trashResult?.let { r ->
+            AlertDialog(
+                onDismissRequest = viewModel::dismissTrashResult,
+                title = { Text(stringResource(R.string.trash_title)) },
+                text = { Text(stringResource(R.string.trash_result, r.done, r.failed)) },
+                confirmButton = { TextButton(onClick = viewModel::dismissTrashResult) { Text(stringResource(R.string.storage_message_ok)) } },
+            )
+        }
+        if (confirmTrash > 0) {
+            val count = selected.size
+            val second = confirmTrash == 2
+            AlertDialog(
+                onDismissRequest = { confirmTrash = 0 },
+                title = { Text(stringResource(if (second) R.string.trash_confirm_title_many else R.string.trash_confirm_title, count)) },
+                text = { Text(stringResource(if (second) R.string.trash_confirm_text_many else R.string.trash_confirm_text)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        // Ab 10 Dateien kommt eine zweite, deutlichere Rückfrage.
+                        if (count >= 10 && !second) {
+                            confirmTrash = 2
+                        } else {
+                            confirmTrash = 0
+                            viewModel.trashSelected()
+                        }
+                    }) { Text(stringResource(R.string.trash_action)) }
+                },
+                dismissButton = { TextButton(onClick = { confirmTrash = 0 }) { Text(stringResource(R.string.diag_cancel)) } },
+            )
+        }
         if (showCategoryDialog) {
             CategoryDialog(
                 categories = categories,

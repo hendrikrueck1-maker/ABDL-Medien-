@@ -31,7 +31,9 @@ import de.hr.mediathek.feature.home.HomeScreen
 import de.hr.mediathek.feature.placeholder.PlaceholderScreen
 import de.hr.mediathek.feature.settings.SettingsScreen
 import de.hr.mediathek.feature.storage.StorageScreen
+import de.hr.mediathek.feature.videos.DuplicatesScreen
 import de.hr.mediathek.feature.videos.PlayerScreen
+import de.hr.mediathek.feature.videos.TrashScreen
 import de.hr.mediathek.feature.videos.VideosScreen
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
@@ -84,8 +86,14 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         composable(DiagRoutes.TRANSCODE) { TranscodeDiagScreen(onBack = { navController.popBackStack() }) }
         composable(DiagRoutes.PDF) { PdfDiagScreen(onBack = { navController.popBackStack() }) }
         composable(Destination.Videos.route) {
-            VideosScreen(onOpen = { navController.navigate("player/$it") })
+            VideosScreen(
+                onOpen = { navController.navigate("player/$it") },
+                onOpenTrash = { navController.navigate("trash") },
+                onOpenDuplicates = { navController.navigate("duplicates") },
+            )
         }
+        composable("trash") { TrashScreen(onBack = { navController.popBackStack() }) }
+        composable("duplicates") { DuplicatesScreen(onBack = { navController.popBackStack() }) }
         composable(
             route = "player/{uuid}",
             arguments = listOf(navArgument("uuid") { type = NavType.StringType }),

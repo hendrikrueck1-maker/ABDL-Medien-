@@ -22,6 +22,7 @@ class MediathekApp : Application() {
 
     @Inject lateinit var errorLogger: ErrorLogger
     @Inject lateinit var jobScheduler: JobScheduler
+    @Inject lateinit var trashRepository: de.hr.mediathek.data.trash.TrashRepository
 
     private fun scheduleDailyBackupCheck() {
         val request = PeriodicWorkRequestBuilder<BackupTriggerWorker>(1, TimeUnit.DAYS)
@@ -40,5 +41,7 @@ class MediathekApp : Application() {
         // Jobs eines früheren Prozesses (z. B. nach Absturz) wieder einreihen.
         appScope.launch { jobScheduler.recover() }
         scheduleDailyBackupCheck()
+        // Abgelaufene Papierkorb-Dateien (30 Tage) endgültig entfernen.
+        appScope.launch { trashRepository.purgeExpired() }
     }
 }

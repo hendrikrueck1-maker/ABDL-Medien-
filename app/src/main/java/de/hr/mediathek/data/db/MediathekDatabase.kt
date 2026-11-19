@@ -42,6 +42,7 @@ abstract class MediathekDatabase : RoomDatabase() {
     abstract fun jobDao(): JobDao
     abstract fun thumbnailDao(): ThumbnailDao
     abstract fun categoryDao(): CategoryDao
+    abstract fun trashDao(): TrashDao
 
     companion object {
         const val VERSION = 3

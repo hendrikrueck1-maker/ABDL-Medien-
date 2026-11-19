@@ -222,6 +222,30 @@ interface MediaFileDao {
     @Query("UPDATE media_file SET rating = :rating, updatedAt = :now, userUpdatedAt = :now WHERE uuid IN (:uuids)")
     suspend fun setRatingBulk(uuids: List<String>, rating: Int, now: Long)
 
+    @Query(
+        "UPDATE media_file SET status = 'TRASHED', documentIdCache = :docId, updatedAt = :now, userUpdatedAt = :now " +
+            "WHERE uuid = :uuid",
+    )
+    suspend fun markTrashed(uuid: String, docId: String, now: Long)
+
+    @Query(
+        "UPDATE media_file SET status = 'ONLINE', documentIdCache = :docId, lastModified = NULL, " +
+            "updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid",
+    )
+    suspend fun markRestored(uuid: String, docId: String, now: Long)
+
+    @Query("UPDATE media_file SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun tombstone(uuid: String, now: Long)
+
+    /** Exakte Duplikate: gleicher Fingerabdruck (enthält die Größe), nur eigene Videos ohne Gelöschte. */
+    @Query(
+        "SELECT * FROM media_file WHERE type = 'VIDEO' AND deletedAt IS NULL AND status IN ('ONLINE', 'OFFLINE') " +
+            "AND fingerprint IN (SELECT fingerprint FROM media_file WHERE type = 'VIDEO' AND deletedAt IS NULL " +
+            "AND status IN ('ONLINE', 'OFFLINE') AND fingerprint IS NOT NULL GROUP BY fingerprint HAVING COUNT(*) > 1) " +
+            "ORDER BY fingerprint, relativePath",
+    )
+    fun observeDuplicates(): Flow<List<MediaFileEntity>>
+
     @Query("UPDATE media_file SET status = 'OFFLINE', updatedAt = :now WHERE uuid = :uuid AND status = 'ONLINE'")
     suspend fun markOffline(uuid: String, now: Long)
 
@@ -391,4 +415,44 @@ interface CategoryDao {
             "AND entityUuid IN (:mediaUuids)",
     )
     suspend fun usedCategories(mediaUuids: List<String>): List<String>
+}
+
+data class TrashRow(
+    val id: Long,
+    val uuid: String,
+    val entityUuid: String,
+    val originalPath: String?,
+    val trashPath: String?,
+    val deletedAt: Long,
+    val expiresAt: Long,
+    val displayName: String,
+    val size: Long,
+    val sourceUuid: String,
+)
+
+@Dao
+interface TrashDao {
+    @Insert
+    suspend fun insert(item: TrashItemEntity): Long
+
+    @Query("DELETE FROM trash_item WHERE uuid = :uuid")
+    suspend fun delete(uuid: String)
+
+    @Query(
+        "SELECT t.id AS id, t.uuid AS uuid, t.entityUuid AS entityUuid, t.originalPath AS originalPath, " +
+            "t.trashPath AS trashPath, t.deletedAt AS deletedAt, t.expiresAt AS expiresAt, " +
+            "m.displayName AS displayName, m.size AS size, m.sourceUuid AS sourceUuid " +
+            "FROM trash_item t INNER JOIN media_file m ON m.uuid = t.entityUuid " +
+            "WHERE t.entityType = 'MEDIA' ORDER BY t.deletedAt DESC",
+    )
+    fun observeMedia(): Flow<List<TrashRow>>
+
+    @Query(
+        "SELECT t.id AS id, t.uuid AS uuid, t.entityUuid AS entityUuid, t.originalPath AS originalPath, " +
+            "t.trashPath AS trashPath, t.deletedAt AS deletedAt, t.expiresAt AS expiresAt, " +
+            "m.displayName AS displayName, m.size AS size, m.sourceUuid AS sourceUuid " +
+            "FROM trash_item t INNER JOIN media_file m ON m.uuid = t.entityUuid " +
+            "WHERE t.entityType = 'MEDIA' AND t.expiresAt < :now",
+    )
+    suspend fun expired(now: Long): List<TrashRow>
 }

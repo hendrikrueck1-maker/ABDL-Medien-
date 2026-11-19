@@ -33,6 +33,7 @@ class VideosViewModel @Inject constructor(
     private val dao: MediaFileDao,
     private val thumbs: ThumbnailCache,
     private val categories: CategoryRepository,
+    private val trash: de.hr.mediathek.data.trash.TrashRepository,
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow(VideoFilter())
@@ -78,6 +79,22 @@ class VideosViewModel @Inject constructor(
     fun loadUsedCategories() {
         val ids = _selected.value.toList()
         viewModelScope.launch { _usedCategories.value = categories.usedBy(ids) }
+    }
+
+    private val _trashResult = MutableStateFlow<de.hr.mediathek.data.trash.TrashResult?>(null)
+    val trashResult: StateFlow<de.hr.mediathek.data.trash.TrashResult?> = _trashResult
+
+    fun trashSelected() {
+        val ids = _selected.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            _trashResult.value = trash.trash(ids)
+            _selected.value = emptySet()
+        }
+    }
+
+    fun dismissTrashResult() {
+        _trashResult.value = null
     }
 
     fun createCategory(name: String) {
