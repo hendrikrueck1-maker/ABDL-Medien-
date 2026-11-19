@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -187,7 +188,8 @@ private fun AppBottomBar(navController: NavHostController) {
 @Composable
 private fun AppNavigationRail(navController: NavHostController) {
     val currentRoute = navController.currentRoute()
-    NavigationRail {
+    // Feste Breite: die Trennlinien füllen sonst die ganze Zeile und der Inhalt daneben hat keinen Platz mehr.
+    NavigationRail(modifier = Modifier.width(80.dp)) {
         Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             var previousGroup = Destination.entries.first().group
             Destination.entries.forEach { destination ->
