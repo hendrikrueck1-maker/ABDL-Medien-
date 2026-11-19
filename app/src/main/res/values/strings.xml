@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nav_home">Übersicht</string>
+    <string name="nav_stories">Geschichten</string>
+    <string name="nav_images">Bilder</string>
+    <string name="nav_videos">Videos</string>
+    <string name="nav_products">Produkte</string>
+    <string name="nav_tracker">Tracker</string>
+    <string name="nav_search">Suche</string>
+    <string name="nav_settings">Einstellungen</string>
+
+    <string name="home_title">Übersicht</string>
+    <string name="home_subtitle">Bereich wählen</string>
+    <string name="placeholder_coming_soon">Dieser Bereich wird in einer späteren Etappe gebaut.</string>
+    <string name="version_label">Version %1$s</string>
+</resources>

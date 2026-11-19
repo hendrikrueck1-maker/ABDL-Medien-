@@ -1,0 +1,77 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RUN_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      - name: Keystore bereitstellen
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "KEYSTORE_BASE64 fehlt" >&2
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Debug und Release bauen
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle assembleDebug assembleRelease --stacktrace
+
+      - name: Signatur des Release-APK prüfen
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --verbose app/build/outputs/apk/release/app-release.apk
+
+      - name: APK umbenennen
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/mediathek-build-${RUN_NUMBER}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/mediathek-build-${RUN_NUMBER}-debug.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ github.run_number }}
+          path: dist/*.apk
+          retention-days: 14
+
+      - name: Release veröffentlichen
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "build-${RUN_NUMBER}" \
+            "dist/mediathek-build-${RUN_NUMBER}.apk" \
+            --title "Build ${RUN_NUMBER}" \
+            --notes "Automatischer Build ${RUN_NUMBER}" \
+            --target "${GITHUB_SHA}"
