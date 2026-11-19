@@ -1,6 +1,12 @@
 package de.hr.mediathek.feature.settings
 
+import androidx.annotation.StringRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import de.hr.mediathek.feature.storage.StorageSection
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,6 +48,23 @@ fun SettingsScreen(onOpenRoute: (String) -> Unit, viewModel: UpdateViewModel = h
             color = MaterialTheme.colorScheme.primary,
         )
 
+        GroupTitle(stringResource(R.string.settings_group_media))
+        SettingsRow(R.string.settings_row_sources, R.string.settings_row_sources_hint) {
+            onOpenRoute(AppRoutes.storage(StorageSection.SOURCES))
+        }
+        SettingsRow(R.string.settings_row_compression, R.string.settings_row_compression_hint) {
+            onOpenRoute(AppRoutes.storage(StorageSection.COMPRESSION))
+        }
+
+        GroupTitle(stringResource(R.string.settings_group_data))
+        SettingsRow(R.string.settings_row_backup, R.string.settings_row_backup_hint) {
+            onOpenRoute(AppRoutes.storage(StorageSection.BACKUP))
+        }
+        SettingsRow(R.string.settings_open_errorlog, R.string.settings_row_errorlog_hint) {
+            onOpenRoute(AppRoutes.ERROR_LOG)
+        }
+
+        GroupTitle(stringResource(R.string.settings_group_app))
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
             modifier = Modifier.fillMaxWidth(),
@@ -126,50 +149,39 @@ fun SettingsScreen(onOpenRoute: (String) -> Unit, viewModel: UpdateViewModel = h
             }
         }
 
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = stringResource(R.string.settings_storage_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                Button(onClick = { onOpenRoute(AppRoutes.STORAGE) }) {
-                    Text(stringResource(R.string.settings_open_storage))
-                }
-                Button(onClick = { onOpenRoute(AppRoutes.ERROR_LOG) }) {
-                    Text(stringResource(R.string.settings_open_errorlog))
-                }
-            }
-        }
+        SettingsRow(R.string.diag_open_scan, R.string.diag_section_hint) { onOpenRoute(DiagRoutes.SCAN) }
+        SettingsRow(R.string.diag_open_transcode, null) { onOpenRoute(DiagRoutes.TRANSCODE) }
+        SettingsRow(R.string.diag_open_pdf, null) { onOpenRoute(DiagRoutes.PDF) }
+    }
+}
 
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = stringResource(R.string.diag_section_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                )
-                Text(
-                    text = stringResource(R.string.diag_section_hint),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                )
-                Button(onClick = { onOpenRoute(DiagRoutes.SCAN) }) {
-                    Text(stringResource(R.string.diag_open_scan))
-                }
-                Button(onClick = { onOpenRoute(DiagRoutes.TRANSCODE) }) {
-                    Text(stringResource(R.string.diag_open_transcode))
-                }
-                Button(onClick = { onOpenRoute(DiagRoutes.PDF) }) {
-                    Text(stringResource(R.string.diag_open_pdf))
-                }
+@Composable
+private fun GroupTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+}
+
+/** Eine Zeile der Einstellungsliste: Titel, kurzer Hinweis, Pfeil. */
+@Composable
+private fun SettingsRow(@StringRes title: Int, @StringRes hint: Int?, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
+            if (hint != null) {
+                Text(stringResource(hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        Text("›", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.outline)
     }
 }

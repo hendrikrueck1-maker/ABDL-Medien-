@@ -48,7 +48,8 @@ private const val WIDE_LAYOUT_MIN_WIDTH_DP = 600
 
 /** Routen außerhalb der Hauptbereiche. */
 object AppRoutes {
-    const val STORAGE = "storage"
+    const val STORAGE_PATTERN = "storage/{section}"
+    fun storage(section: String) = "storage/$section"
     const val ERROR_LOG = "errorlog"
 }
 
@@ -89,7 +90,15 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         composable(Destination.Settings.route) {
             SettingsScreen(onOpenRoute = { navController.navigate(it) })
         }
-        composable(AppRoutes.STORAGE) { StorageScreen(onBack = { navController.popBackStack() }) }
+        composable(
+            route = AppRoutes.STORAGE_PATTERN,
+            arguments = listOf(navArgument("section") { type = NavType.StringType }),
+        ) { entry ->
+            StorageScreen(
+                onBack = { navController.popBackStack() },
+                section = entry.arguments?.getString("section") ?: de.hr.mediathek.feature.storage.StorageSection.SOURCES,
+            )
+        }
         composable(AppRoutes.ERROR_LOG) { ErrorLogScreen(onBack = { navController.popBackStack() }) }
         composable(DiagRoutes.SCAN) { ScanDiagScreen(onBack = { navController.popBackStack() }) }
         composable(DiagRoutes.TRANSCODE) { TranscodeDiagScreen(onBack = { navController.popBackStack() }) }

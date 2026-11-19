@@ -357,4 +357,18 @@
     <string name="player_original_badge">Original</string>
     <string name="player_original_button">Original</string>
     <string name="player_fullscreen">Vollbild</string>
+    <string name="storage_section_backup">Sicherung und Arbeitsordner</string>
+    <string name="storage_section_compression">Komprimierung</string>
+    <string name="settings_group_media">Medien</string>
+    <string name="settings_group_data">Daten</string>
+    <string name="settings_group_app">App</string>
+    <string name="settings_row_sources">Medienquellen und Vorschaubilder</string>
+    <string name="settings_row_sources_hint">Ordner einbinden, entkoppeln, einlesen</string>
+    <string name="settings_row_compression">Komprimierung und Originale</string>
+    <string name="settings_row_compression_hint">Videos verkleinern, Originale behalten oder löschen</string>
+    <string name="settings_row_backup">Sicherung und Arbeitsordner</string>
+    <string name="settings_row_backup_hint">Automatische Sicherung, Export und Import</string>
+    <string name="settings_row_errorlog_hint">Zeigt aufgetretene Fehler</string>
+    <string name="settings_row_diag">Diagnose</string>
+    <string name="settings_row_diag_hint">Prüfungen für Einlesen, Umwandeln und PDF</string>
 </resources>

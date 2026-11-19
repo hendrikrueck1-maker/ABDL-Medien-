@@ -40,8 +40,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hr.mediathek.R
 
+/** Bereiche der Speicher-Einstellungen; jeder hat einen eigenen Menüpunkt unter Einstellungen. */
+object StorageSection {
+    const val SOURCES = "sources"
+    const val BACKUP = "backup"
+    const val COMPRESSION = "compression"
+}
+
 @Composable
-fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewModel()) {
+fun StorageScreen(onBack: () -> Unit, section: String = StorageSection.SOURCES, viewModel: StorageViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val backup by viewModel.backup.collectAsStateWithLifecycle()
     val restore by viewModel.restore.collectAsStateWithLifecycle()
@@ -128,7 +135,13 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) { Text(stringResource(R.string.diag_back)) }
             Text(
-                text = stringResource(R.string.storage_title),
+                text = stringResource(
+                    when (section) {
+                        StorageSection.BACKUP -> R.string.storage_section_backup
+                        StorageSection.COMPRESSION -> R.string.storage_section_compression
+                        else -> R.string.storage_title
+                    },
+                ),
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -153,6 +166,7 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
             }
         }
 
+        if (section == StorageSection.SOURCES) {
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
             modifier = Modifier.fillMaxWidth(),
@@ -196,8 +210,9 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
                 }
             }
         }
+        }
 
-        BackupCard(
+        if (section == StorageSection.BACKUP) BackupCard(
             status = backup,
             restore = restore,
             hasWorkFolder = state.workFolderLabel != null,
@@ -209,7 +224,7 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
             onDismissMessage = viewModel::dismissRestoreMessage,
         )
 
-        CompressionCard()
+        if (section == StorageSection.COMPRESSION) CompressionCard()
 
         confirmRestore?.let { file ->
             AlertDialog(
@@ -228,6 +243,7 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
             )
         }
 
+        if (section == StorageSection.SOURCES) {
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
             modifier = Modifier.fillMaxWidth(),
@@ -255,7 +271,9 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
                 }
             }
         }
+        }
 
+        if (section == StorageSection.BACKUP) {
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
             modifier = Modifier.fillMaxWidth(),
@@ -281,6 +299,7 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
                     Text(stringResource(R.string.storage_work_choose))
                 }
             }
+        }
         }
     }
 }
