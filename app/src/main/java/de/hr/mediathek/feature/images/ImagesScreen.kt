@@ -4,6 +4,24 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.IconButton
+import de.hr.mediathek.data.prefs.BrowseMode
+import de.hr.mediathek.data.prefs.CardLayout
+import de.hr.mediathek.feature.library.FilterDialog
+import de.hr.mediathek.feature.library.FilterLabel
+import de.hr.mediathek.feature.library.FolderCard
+import de.hr.mediathek.feature.library.FolderItem
+import de.hr.mediathek.feature.library.PathBar
+import de.hr.mediathek.feature.library.ViewSettingsDialog
+import de.hr.mediathek.feature.library.activeFilterCount
+import de.hr.mediathek.feature.library.clearedFilters
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.height
+import java.io.File
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -74,7 +92,14 @@ fun ImagesScreen(
     val usedCategories by viewModel.usedCategories.collectAsStateWithLifecycle()
     val usedTags by viewModel.usedTags.collectAsStateWithLifecycle()
     val trashResult by viewModel.trashResult.collectAsStateWithLifecycle()
-    var sortMenu by remember { mutableStateOf(false) }
+    var moreMenu by remember { mutableStateOf(false) }
+    var showViewSettings by remember { mutableStateOf(false) }
+    var showFilter by remember { mutableStateOf(false) }
+    val viewSettings by viewModel.browser.settings.collectAsStateWithLifecycle()
+    val path by viewModel.browser.path.collectAsStateWithLifecycle()
+    val foldersOn = viewSettings.mode == BrowseMode.FOLDERS && filter.search.isBlank()
+    BackHandler(enabled = foldersOn && path.isNotEmpty()) { viewModel.browser.up() }
+    BackHandler(enabled = selected.isNotEmpty()) { viewModel.clearSelection() }
     var rateMenu by remember { mutableStateOf(false) }
     var showCategories by remember { mutableStateOf(false) }
     var showTags by remember { mutableStateOf(false) }
@@ -89,8 +114,15 @@ fun ImagesScreen(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = { viewModel.rememberContext(); onOpenSlideshow() }) { Text(stringResource(R.string.slideshow_open)) }
-                TextButton(onClick = onOpenDuplicates) { Text(stringResource(R.string.image_dup_open)) }
+                TextButton(onClick = { viewModel.rememberSlideshowContext(); onOpenSlideshow() }) { Text(stringResource(R.string.slideshow_open)) }
+                androidx.compose.foundation.layout.Box {
+                    IconButton(onClick = { moreMenu = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.menu_more))
+                    }
+                    DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.image_dup_open)) }, onClick = { moreMenu = false; onOpenDuplicates() })
+                    }
+                }
             }
         } else {
             Row(
@@ -136,64 +168,44 @@ fun ImagesScreen(
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
-            androidx.compose.foundation.layout.Box {
-                OutlinedButton(onClick = { sortMenu = true }) { Text(stringResource(sortLabel(filter.sort))) }
-                DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
-                    IMAGE_SORTS.forEach { sort ->
-                        DropdownMenuItem(
-                            text = { Text(stringResource(sortLabel(sort))) },
-                            onClick = {
-                                sortMenu = false
-                                if (sort == VideoSort.RANDOM && filter.sort == VideoSort.RANDOM) viewModel.reshuffle()
-                                viewModel.update { it.copy(sort = sort) }
-                            },
-                        )
-                    }
-                }
+            OutlinedButton(onClick = { showViewSettings = true }) { Text(stringResource(R.string.view_button)) }
+            val activeCount = activeFilterCount(filter)
+            if (activeCount > 0) {
+                Button(onClick = { showFilter = true }) { Text(stringResource(R.string.filter_button_active, activeCount)) }
+            } else {
+                OutlinedButton(onClick = { showFilter = true }) { Text(stringResource(R.string.filter_button)) }
             }
         }
-        Row(
-            Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FilterChip(
-                selected = filter.favoriteOnly,
-                onClick = { viewModel.update { it.copy(favoriteOnly = !it.favoriteOnly) } },
-                label = { Text(stringResource(R.string.video_filter_favorites)) },
+        if (foldersOn && path.isNotEmpty()) {
+            PathBar(path = path, onGoTo = viewModel.browser::goTo)
+        }
+        if (showViewSettings) {
+            ViewSettingsDialog(
+                settings = viewSettings,
+                filter = filter,
+                isVideo = false,
+                onMode = viewModel.browser::setMode,
+                onLayout = viewModel.browser::setLayout,
+                onDetails = viewModel.browser::setShowDetails,
+                onFavoritesOnly = { v -> viewModel.update { it.copy(favoriteOnly = v) } },
+                onSort = { sort ->
+                    if (sort == VideoSort.RANDOM && filter.sort == VideoSort.RANDOM) viewModel.reshuffle()
+                    viewModel.update { it.copy(sort = sort) }
+                },
+                onDismiss = { showViewSettings = false },
             )
-            FilterChip(
-                selected = filter.minRating >= 4,
-                onClick = { viewModel.update { it.copy(minRating = if (it.minRating >= 4) 0 else 4) } },
-                label = { Text(stringResource(R.string.video_filter_rating)) },
+        }
+        if (showFilter) {
+            FilterDialog(
+                filter = filter,
+                isVideo = false,
+                showCategoryAndTags = true,
+                categories = categories.map { FilterLabel(it.uuid, it.name) },
+                tags = tags.map { FilterLabel(it.uuid, it.name) },
+                onChange = { change -> viewModel.update(change) },
+                onReset = { viewModel.update { it.clearedFilters() } },
+                onDismiss = { showFilter = false },
             )
-            FilterChip(
-                selected = filter.onlineOnly,
-                onClick = { viewModel.update { it.copy(onlineOnly = !it.onlineOnly) } },
-                label = { Text(stringResource(R.string.video_filter_online)) },
-            )
-            folders.forEach { folder ->
-                FilterChip(
-                    selected = filter.folder == folder,
-                    onClick = { viewModel.update { it.copy(folder = if (it.folder == folder) null else folder) } },
-                    label = { Text("📁 $folder") },
-                )
-            }
-            tags.forEach { tag ->
-                FilterChip(
-                    selected = filter.tagUuid == tag.uuid,
-                    onClick = { viewModel.update { it.copy(tagUuid = if (it.tagUuid == tag.uuid) null else tag.uuid) } },
-                    label = { Text("#" + tag.name) },
-                )
-            }
-            categories.forEach { category ->
-                FilterChip(
-                    selected = filter.categoryUuid == category.uuid,
-                    onClick = {
-                        viewModel.update { it.copy(categoryUuid = if (it.categoryUuid == category.uuid) null else category.uuid) }
-                    },
-                    label = { Text(category.name) },
-                )
-            }
         }
 
         trashResult?.let { r ->
@@ -249,15 +261,23 @@ fun ImagesScreen(
             )
         }
 
-        if (items.itemCount == 0) {
-            Text(stringResource(R.string.image_empty), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 24.dp))
+        if (items.itemCount == 0 && folders.isEmpty()) {
+            Text(
+                stringResource(if (foldersOn && path.isNotEmpty()) R.string.lib_empty_folder else R.string.image_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 24.dp),
+            )
         }
+        val listLayout = viewSettings.layout == CardLayout.LIST
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 130.dp),
+            columns = GridCells.Adaptive(minSize = if (listLayout) 320.dp else 130.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
+            items(folders, key = { "f:" + it.path }) { folder ->
+                ImageFolderCard(folder, filter, listLayout, viewModel)
+            }
             items(count = items.itemCount, key = { index -> items.peek(index)?.uuid ?: index }) { index ->
                 val image = items[index]
                 if (image != null) {
@@ -265,6 +285,8 @@ fun ImagesScreen(
                         image = image,
                         viewModel = viewModel,
                         selected = image.uuid in selected,
+                        listLayout = listLayout,
+                        showDetails = viewSettings.showDetails,
                         onClick = {
                             when {
                                 selected.isNotEmpty() -> viewModel.toggleSelected(image.uuid)
@@ -282,19 +304,18 @@ fun ImagesScreen(
     }
 }
 
-private val IMAGE_SORTS = listOf(
-    VideoSort.ADDED_DESC, VideoSort.NAME_ASC, VideoSort.NAME_DESC, VideoSort.DATE_DESC,
-    VideoSort.RATING_DESC, VideoSort.SIZE_DESC, VideoSort.RANDOM,
-)
-
-private fun sortLabel(sort: VideoSort): Int = when (sort) {
-    VideoSort.NAME_ASC -> R.string.sort_name_asc
-    VideoSort.NAME_DESC -> R.string.sort_name_desc
-    VideoSort.DATE_DESC -> R.string.sort_date
-    VideoSort.RATING_DESC -> R.string.sort_rating
-    VideoSort.SIZE_DESC -> R.string.sort_size
-    VideoSort.RANDOM -> R.string.sort_random
-    else -> R.string.sort_added
+@Composable
+private fun ImageFolderCard(folder: FolderItem, filter: VideoFilter, listLayout: Boolean, viewModel: ImagesViewModel) {
+    val previews by produceState<List<File>>(initialValue = emptyList(), folder.path, folder.count, filter.copy(search = "")) {
+        value = viewModel.browser.preview(filter, folder.path)
+    }
+    FolderCard(
+        item = folder,
+        previews = previews,
+        tiles = !listLayout,
+        countLabel = stringResource(R.string.lib_count_images, folder.count),
+        onClick = { viewModel.browser.enter(folder.name) },
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -303,12 +324,43 @@ private fun ImageCell(
     image: MediaFileEntity,
     viewModel: ImagesViewModel,
     selected: Boolean,
+    listLayout: Boolean,
+    showDetails: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
     val offline = image.status != MediaStatus.ONLINE
     val bitmap by produceState<Bitmap?>(initialValue = null, image.uuid) {
         value = withContext(Dispatchers.IO) { viewModel.thumbnailOf(image.uuid)?.let { BitmapFactory.decodeFile(it.path) } }
+    }
+    if (listLayout) {
+        androidx.compose.material3.Card(
+            colors = androidx.compose.material3.CardDefaults.cardColors(
+                containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+            ),
+            modifier = Modifier.fillMaxWidth().alpha(if (offline) 0.5f else 1f).combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        ) {
+            Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.width(96.dp).height(72.dp)) {
+                    bitmap?.let {
+                        Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                    }
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(image.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 2)
+                    if (showDetails) Text(imageMeta(image), style = MaterialTheme.typography.bodySmall)
+                    Row {
+                        repeat(image.rating.coerceIn(0, 5)) {
+                            Icon(Icons.Filled.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.height(16.dp))
+                        }
+                        if (image.favorite) {
+                            Icon(Icons.Filled.Favorite, contentDescription = stringResource(R.string.video_favorite), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.height(16.dp))
+                        }
+                    }
+                }
+            }
+        }
+        return
     }
     Box(
         Modifier
@@ -317,6 +369,15 @@ private fun ImageCell(
             .alpha(if (offline) 0.5f else 1f)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
+        if (showDetails) {
+            Text(
+                imageMeta(image),
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 4.dp, vertical = 2.dp),
+            )
+        }
         bitmap?.let {
             Image(it.asImageBitmap(), contentDescription = image.displayName, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
@@ -342,4 +403,15 @@ private fun ImageCell(
             Text("✓", color = Color.White, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.align(Alignment.Center))
         }
     }
+}
+
+private fun imageMeta(image: MediaFileEntity): String {
+    val parts = ArrayList<String>()
+    if (image.width != null && image.height != null) parts += "${image.width}×${image.height}"
+    parts += when {
+        image.size >= 1L shl 20 -> "%.1f MB".format(image.size / (1L shl 20).toDouble())
+        else -> "%d KB".format(image.size shr 10)
+    }
+    image.displayName.substringAfterLast('.', "").takeIf { it.isNotEmpty() && it.length <= 5 }?.let { parts += it.uppercase() }
+    return parts.joinToString(" · ")
 }

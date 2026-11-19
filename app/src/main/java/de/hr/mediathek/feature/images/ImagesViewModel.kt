@@ -44,15 +44,25 @@ class ImagesViewModel @Inject constructor(
     private val tags: TagRepository,
     private val trash: TrashRepository,
     private val context: ImageContext,
+    prefs: de.hr.mediathek.data.prefs.ViewPrefsRepository,
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow(VideoFilter())
     val filter: StateFlow<VideoFilter> = _filter
 
+    val browser = de.hr.mediathek.feature.library.LibraryBrowser(
+        scope = viewModelScope, dao = dao, thumbs = thumbs, prefs = prefs, type = "IMAGE", module = "images",
+        defaults = de.hr.mediathek.data.prefs.ViewSettings(
+            mode = de.hr.mediathek.data.prefs.BrowseMode.FOLDERS,
+            layout = de.hr.mediathek.data.prefs.CardLayout.TILES,
+            showDetails = false,
+        ),
+    )
+    private val debouncedFilter = _filter.debounce(250)
+
     private var randomSeed = System.currentTimeMillis() % 1_000_000_000L
 
-    val images: Flow<PagingData<MediaFileEntity>> = _filter
-        .debounce(250)
+    val images: Flow<PagingData<MediaFileEntity>> = browser.effective(debouncedFilter)
         .flatMapLatest { f ->
             val built = VideoQuery.build(f, randomSeed, type = "IMAGE")
             Pager(PagingConfig(pageSize = 90, prefetchDistance = 90, enablePlaceholders = false)) {
@@ -65,7 +75,7 @@ class ImagesViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val tagList: StateFlow<List<TagEntity>> = tags.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-    val folders: StateFlow<List<String>> = dao.observeImageFolders()
+    val folders: StateFlow<List<de.hr.mediathek.feature.library.FolderItem>> = browser.folders(debouncedFilter)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _selected = MutableStateFlow<Set<String>>(emptySet())
@@ -131,7 +141,13 @@ class ImagesViewModel @Inject constructor(
 
     /** Vor dem Öffnen: Liste für Vollbild-Blättern und Diashow merken. */
     fun rememberContext() {
-        context.filter = _filter.value
+        context.filter = browser.effectiveNow(_filter.value)
+        context.seed = randomSeed
+    }
+
+    /** Diashow: der aktuelle Ordner samt Unterordnern (im Ordnerstamm alles). */
+    fun rememberSlideshowContext() {
+        context.filter = browser.scopeNow(_filter.value)
         context.seed = randomSeed
     }
 
