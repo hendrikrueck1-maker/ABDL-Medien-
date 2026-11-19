@@ -14,7 +14,11 @@ import de.hr.mediathek.data.storage.AddSourceResult
 import de.hr.mediathek.data.storage.StorageRepository
 import de.hr.mediathek.data.storage.WorkFolderResult
 import de.hr.mediathek.data.backup.BackupStatus
+import de.hr.mediathek.data.backup.BackupFileInfo
+import de.hr.mediathek.data.backup.BackupService
 import de.hr.mediathek.data.backup.BackupStore
+import de.hr.mediathek.data.backup.ImportRejected
+import de.hr.mediathek.data.backup.ImportResult
 import de.hr.mediathek.data.thumb.ThumbnailCache
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -45,6 +49,18 @@ data class SourceItem(
     val confirm: ConfirmInfo?,
 )
 
+sealed interface RestoreMessage {
+    data class Imported(val result: ImportResult) : RestoreMessage
+    data class Exported(val records: Int) : RestoreMessage
+    data class Failed(val reason: String) : RestoreMessage
+}
+
+data class RestoreUiState(
+    val backups: List<BackupFileInfo>? = null,
+    val busy: Boolean = false,
+    val message: RestoreMessage? = null,
+)
+
 data class ThumbUiState(
     val count: Int = 0,
     val bytes: Long = 0,
@@ -64,6 +80,7 @@ class StorageViewModel @Inject constructor(
     private val scheduler: JobScheduler,
     private val thumbCache: ThumbnailCache,
     private val backupStore: BackupStore,
+    private val backupService: BackupService,
 ) : ViewModel() {
 
     private val reachability = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -102,6 +119,63 @@ class StorageViewModel @Inject constructor(
 
     val backup: StateFlow<BackupStatus> = backupStore.observeStatus()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BackupStatus(null, null, null))
+
+    private val _restore = MutableStateFlow(RestoreUiState())
+    val restore: StateFlow<RestoreUiState> = _restore
+
+    fun toggleBackupList() {
+        if (_restore.value.backups != null) {
+            _restore.update { it.copy(backups = null) }
+        } else {
+            viewModelScope.launch { _restore.update { it.copy(backups = backupService.listBackups()) } }
+        }
+    }
+
+    fun restore(file: BackupFileInfo) = runRestore { backupService.restore(file) }
+    fun importFrom(uri: Uri) = runRestore { backupService.importFrom(uri) }
+
+    private fun runRestore(block: suspend () -> Result<ImportResult>) {
+        viewModelScope.launch {
+            _restore.update { it.copy(busy = true, message = null) }
+            val result = block()
+            _restore.update {
+                it.copy(
+                    busy = false,
+                    message = result.fold(
+                        onSuccess = { r -> RestoreMessage.Imported(r) },
+                        onFailure = { e -> RestoreMessage.Failed(if (e is ImportRejected) e.message ?: "" else "Das Backup konnte nicht gelesen werden.") },
+                    ),
+                )
+            }
+        }
+    }
+
+    fun exportTo(uri: Uri) {
+        viewModelScope.launch {
+            _restore.update { it.copy(busy = true, message = null) }
+            val result = backupService.exportTo(uri)
+            _restore.update {
+                it.copy(
+                    busy = false,
+                    message = result.fold(
+                        onSuccess = { n -> RestoreMessage.Exported(n) },
+                        onFailure = { RestoreMessage.Failed("Der Export ist fehlgeschlagen.") },
+                    ),
+                )
+            }
+        }
+    }
+
+    fun dismissRestoreMessage() {
+        _restore.update { it.copy(message = null) }
+    }
+
+    fun rebindSource(sourceUuid: String, uri: Uri) {
+        viewModelScope.launch {
+            message.value = if (repository.rebindSource(sourceUuid, uri)) StorageMessage.SOURCE_ADDED else StorageMessage.SOURCE_FAILED
+            refreshStatus()
+        }
+    }
 
     fun backupNow() {
         viewModelScope.launch { scheduler.enqueueBackup() }

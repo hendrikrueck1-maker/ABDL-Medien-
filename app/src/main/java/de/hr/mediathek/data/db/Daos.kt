@@ -27,6 +27,9 @@ interface SourceDao {
 
     @Query("UPDATE source SET lastMountedAt = :time, updatedAt = :time WHERE uuid = :uuid")
     suspend fun markMounted(uuid: String, time: Long)
+
+    @Query("UPDATE source SET treeUri = :treeUri, volumeUuid = :volumeUuid, lastMountedAt = :time, updatedAt = :time WHERE uuid = :uuid")
+    suspend fun rebind(uuid: String, treeUri: String, volumeUuid: String?, time: Long)
 }
 
 @Dao

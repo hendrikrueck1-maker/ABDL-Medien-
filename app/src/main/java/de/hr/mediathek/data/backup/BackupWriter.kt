@@ -150,6 +150,15 @@ class BackupWriter @Inject constructor(
          * Gibt die Gesamtzahl der Datensätze zurück oder wirft eine Exception mit neutraler Meldung.
          */
         fun verify(input: java.io.InputStream, expectedSchema: Int): Int {
+            val info = inspect(input)
+            check(info.schemaVersion == expectedSchema) { "Schema-Version stimmt nicht" }
+            return info.totalRecords
+        }
+
+        class Info(val schemaVersion: Int, val totalRecords: Int, val createdAt: Long?)
+
+        /** Wie [verify], lässt aber jede Schema-Version zu und liefert die Kopfdaten. */
+        fun inspect(input: java.io.InputStream): Info {
             val sums = HashMap<String, String>()
             val counts = HashMap<String, Int>()
             var manifest: String? = null
@@ -177,7 +186,6 @@ class BackupWriter @Inject constructor(
             }
             val m = manifest ?: error("Kopfdatei fehlt")
             val schema = Regex("\"schemaVersion\":(\\d+)").find(m)?.groupValues?.get(1)?.toInt() ?: error("Schema fehlt")
-            check(schema == expectedSchema) { "Schema-Version stimmt nicht" }
             var total = 0
             val tablePattern = Regex("\"([a-z_]+)\":\\{\"count\":(\\d+),\"sha256\":\"([0-9a-f]+)\"\\}")
             val found = tablePattern.findAll(m).toList()
@@ -188,7 +196,8 @@ class BackupWriter @Inject constructor(
                 check(counts[name] == count.toInt()) { "Zeilenzahl stimmt nicht" }
                 total += count.toInt()
             }
-            return total
+            val created = Regex("\"createdAt\":(\\d+)").find(m)?.groupValues?.get(1)?.toLongOrNull()
+            return Info(schema, total, created)
         }
     }
 }

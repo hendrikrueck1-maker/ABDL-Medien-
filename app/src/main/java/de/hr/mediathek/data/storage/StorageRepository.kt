@@ -113,6 +113,25 @@ class StorageRepository @Inject constructor(
         }
     }
 
+    /** Hängt eine vorhandene Quelle (z. B. aus einem Backup) an einen neu gewählten Ordner, ohne Daten zu verlieren. */
+    suspend fun rebindSource(sourceUuid: String, treeUri: Uri): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val existing = sourceDao.findByTreeUri(treeUri.toString())
+            if (existing != null && existing.uuid != sourceUuid) return@withContext false
+            persistPermission(treeUri)
+            val docId = DocumentsContract.getTreeDocumentId(treeUri)
+            sourceDao.rebind(
+                sourceUuid, treeUri.toString(),
+                docId.substringBefore(':', missingDelimiterValue = "").ifBlank { null },
+                System.currentTimeMillis(),
+            )
+            true
+        } catch (e: Exception) {
+            errorLogger.logNow(ErrorType.SAF, "Quelle neu verbinden fehlgeschlagen: $e")
+            false
+        }
+    }
+
     suspend fun getWorkFolderUri(): Uri? = settingDao.get(KEY_WORK_FOLDER_URI)?.let { Uri.parse(it) }
 
     private fun persistPermission(treeUri: Uri) {

@@ -44,6 +44,20 @@ import de.hr.mediathek.R
 fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val backup by viewModel.backup.collectAsStateWithLifecycle()
+    val restore by viewModel.restore.collectAsStateWithLifecycle()
+    var rebindTarget by remember { mutableStateOf<String?>(null) }
+    var confirmRestore by remember { mutableStateOf<de.hr.mediathek.data.backup.BackupFileInfo?>(null) }
+    val rebindPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        val target = rebindTarget
+        if (uri != null && target != null) viewModel.rebindSource(target, uri)
+        rebindTarget = null
+    }
+    val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) viewModel.exportTo(uri)
+    }
+    val importPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.importFrom(uri)
+    }
     val thumbs by viewModel.thumbs.collectAsStateWithLifecycle()
     val onboardingSeen by viewModel.onboardingSeen.collectAsStateWithLifecycle()
     var showOnboarding by remember { mutableStateOf(false) }
@@ -142,6 +156,10 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
                         onCancel = { item.job?.let { viewModel.cancelJob(it.uuid) } },
                         onConfirm = { info -> viewModel.confirmMissing(info.jobUuid) },
                         onDismiss = { info -> viewModel.dismissConfirmation(info.jobUuid) },
+                        onRebind = {
+                            rebindTarget = item.source.uuid
+                            rebindPicker.launch(null)
+                        },
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -155,7 +173,34 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
             }
         }
 
-        BackupCard(backup, hasWorkFolder = state.workFolderLabel != null, onBackup = viewModel::backupNow)
+        BackupCard(
+            status = backup,
+            restore = restore,
+            hasWorkFolder = state.workFolderLabel != null,
+            onBackup = viewModel::backupNow,
+            onToggleList = viewModel::toggleBackupList,
+            onPick = { confirmRestore = it },
+            onExport = { exportPicker.launch("mediathek-backup.zip") },
+            onImport = { importPicker.launch(arrayOf("application/zip", "application/octet-stream")) },
+            onDismissMessage = viewModel::dismissRestoreMessage,
+        )
+
+        confirmRestore?.let { file ->
+            AlertDialog(
+                onDismissRequest = { confirmRestore = null },
+                title = { Text(stringResource(R.string.restore_confirm_title)) },
+                text = { Text(stringResource(R.string.restore_confirm_text)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirmRestore = null
+                        viewModel.restore(file)
+                    }) { Text(stringResource(R.string.restore_confirm_yes)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmRestore = null }) { Text(stringResource(R.string.diag_cancel)) }
+                },
+            )
+        }
 
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
@@ -231,6 +276,7 @@ private fun SourceBlock(
     onCancel: () -> Unit,
     onConfirm: (ConfirmInfo) -> Unit,
     onDismiss: (ConfirmInfo) -> Unit,
+    onRebind: () -> Unit,
 ) {
     val textColor = MaterialTheme.colorScheme.onSecondaryContainer
     val job = item.job
@@ -301,6 +347,9 @@ private fun SourceBlock(
 
         if (item.confirm == null) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (item.reachable == false) {
+                    OutlinedButton(onClick = onRebind) { Text(stringResource(R.string.storage_rebind)) }
+                }
                 Button(onClick = onScan, enabled = item.reachable == true && !busy) {
                     Text(stringResource(R.string.storage_scan_now))
                 }
@@ -313,7 +362,17 @@ private fun SourceBlock(
 }
 
 @Composable
-private fun BackupCard(status: de.hr.mediathek.data.backup.BackupStatus, hasWorkFolder: Boolean, onBackup: () -> Unit) {
+private fun BackupCard(
+    status: de.hr.mediathek.data.backup.BackupStatus,
+    restore: RestoreUiState,
+    hasWorkFolder: Boolean,
+    onBackup: () -> Unit,
+    onToggleList: () -> Unit,
+    onPick: (de.hr.mediathek.data.backup.BackupFileInfo) -> Unit,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
+    onDismissMessage: () -> Unit,
+) {
     val onColor = MaterialTheme.colorScheme.onSecondaryContainer
     val job = status.latestJob
     val running = job != null && (job.status == JobStatus.QUEUED || job.status == JobStatus.RUNNING)
@@ -351,6 +410,42 @@ private fun BackupCard(status: de.hr.mediathek.data.backup.BackupStatus, hasWork
                 Text(job.phase ?: "", style = MaterialTheme.typography.bodySmall, color = onColor)
             }
             Button(onClick = onBackup, enabled = hasWorkFolder && !running) { Text(stringResource(R.string.backup_now)) }
+
+            restore.message?.let { msg ->
+                Text(
+                    when (msg) {
+                        is RestoreMessage.Imported -> stringResource(
+                            R.string.restore_done,
+                            msg.result.inserted, msg.result.updated, msg.result.kept, msg.result.conflicts,
+                        ) + if (msg.result.olderThanTombstoneRetention) "\n" + stringResource(R.string.restore_old_backup) else ""
+                        is RestoreMessage.Exported -> stringResource(R.string.export_done, msg.records)
+                        is RestoreMessage.Failed -> stringResource(R.string.restore_failed, msg.reason)
+                    },
+                    color = if (msg is RestoreMessage.Failed) MaterialTheme.colorScheme.error else onColor,
+                )
+                TextButton(onClick = onDismissMessage) { Text(stringResource(R.string.storage_message_ok)) }
+            }
+            if (restore.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onToggleList, enabled = hasWorkFolder && !restore.busy) {
+                    Text(stringResource(R.string.restore_show))
+                }
+                OutlinedButton(onClick = onExport, enabled = !restore.busy) { Text(stringResource(R.string.export_button)) }
+                OutlinedButton(onClick = onImport, enabled = !restore.busy) { Text(stringResource(R.string.import_button)) }
+            }
+            restore.backups?.let { list ->
+                if (list.isEmpty()) {
+                    Text(stringResource(R.string.restore_none), style = MaterialTheme.typography.bodySmall, color = onColor)
+                }
+                list.forEach { file ->
+                    val date = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM, java.text.DateFormat.SHORT)
+                        .format(java.util.Date(file.lastModified))
+                    OutlinedButton(onClick = { onPick(file) }, enabled = !restore.busy, modifier = Modifier.fillMaxWidth()) {
+                        Text("$date · ${(file.size / 1024).coerceAtLeast(1)} KB")
+                    }
+                }
+            }
         }
     }
 }
