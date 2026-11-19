@@ -49,11 +49,21 @@ class BackupRetentionTest {
     }
 
     @Test
-    fun aelterAlsAlleFristen_wirdVerworfen() {
+    fun generationenZaehlenBackups_nichtKalenderzeit_seltenerAltesBleibt() {
         val start = LocalDate.of(2026, 11, 19)
         val old = at(start.minusYears(3))
         val keep = BackupRetention.keep(listOf(at(start), old), zone)
-        assertFalse(old in keep)
+        // Es gibt nur zwei Monats-Generationen, also bleibt auch das alte (nichts wird ohne Grund gelöscht).
+        assertTrue(old in keep)
+    }
+
+    @Test
+    fun mehrAlsZwoelfMonate_aeltesteFaelltRaus() {
+        val start = LocalDate.of(2026, 11, 19)
+        // 13 Monats-Backups, je ein Jahr-Monat-Abstand von 40 Tagen, damit Tages-Limit nicht überall greift
+        val all = (0 until 40).map { at(start.minusDays((it * 40).toLong())) }
+        val keep = BackupRetention.keep(all, zone)
+        assertFalse(all.last() in keep)
     }
 
     @Test
