@@ -85,6 +85,8 @@ fun VideosScreen(
     val compression: CompressionViewModel = hiltViewModel()
     val plan by compression.plan.collectAsStateWithLifecycle()
     val queued by compression.queued.collectAsStateWithLifecycle()
+    val test by compression.test.collectAsStateWithLifecycle()
+    val series by compression.series.collectAsStateWithLifecycle()
     var compressTarget by remember { mutableStateOf<String?>(null) }
     var rateMenu by remember { mutableStateOf(false) }
     val trashResult by viewModel.trashResult.collectAsStateWithLifecycle()
@@ -143,13 +145,15 @@ fun VideosScreen(
                     viewModel.loadUsedTags()
                     showTagDialog = true
                 }) { Text(stringResource(R.string.tag_action)) }
-                if (selected.size == 1) {
-                    OutlinedButton(onClick = {
+                OutlinedButton(onClick = {
+                    if (selected.size == 1) {
                         val id = selected.first()
                         compressTarget = id
                         compression.load(id)
-                    }) { Text(stringResource(R.string.compress_action)) }
-                }
+                    } else {
+                        compression.beginSeries(selected.toList())
+                    }
+                }) { Text(stringResource(R.string.compress_action)) }
                 OutlinedButton(onClick = { showPlaylistPick = true }) { Text(stringResource(R.string.playlist_add_action)) }
                 if (filter.playlistUuid != null) {
                     OutlinedButton(onClick = viewModel::removeSelectedFromCurrentPlaylist) { Text(stringResource(R.string.playlist_remove_action)) }
@@ -326,11 +330,31 @@ fun VideosScreen(
         plan?.let { state ->
             CompressDialog(
                 state = state,
+                test = test,
+                onRunTest = { level -> compressTarget?.let { compression.runTest(it, level) } },
+                onClearTest = compression::clearTest,
                 onStart = { level, confirmed ->
                     compressTarget?.let { compression.start(it, level, confirmed) }
+                    compression.clearTest()
                     viewModel.clearSelection()
                 },
-                onDismiss = compression::dismissPlan,
+                onDismiss = {
+                    compression.clearTest()
+                    compression.dismissPlan()
+                },
+            )
+        }
+        series?.let { uuids ->
+            SeriesDialog(
+                count = uuids.size,
+                test = test,
+                onRunTest = { level -> compression.runTest(uuids.first(), level) },
+                onClearTest = compression::clearTest,
+                onStart = { level ->
+                    compression.startSeries(level)
+                    viewModel.clearSelection()
+                },
+                onDismiss = compression::dismissSeries,
             )
         }
         queued?.let { ok ->

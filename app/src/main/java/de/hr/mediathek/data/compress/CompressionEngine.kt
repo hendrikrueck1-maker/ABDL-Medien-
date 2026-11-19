@@ -37,7 +37,14 @@ class CompressionEngine @Inject constructor(
 ) {
     /** [onProgress] darf [CancellationException] werfen, um abzubrechen. */
     @OptIn(UnstableApi::class)
-    suspend fun encode(source: Uri, output: File, videoBitrate: Int, onProgress: suspend (Float) -> Unit) {
+    suspend fun encode(
+        source: Uri,
+        output: File,
+        videoBitrate: Int,
+        clipStartMs: Long = 0,
+        clipLengthMs: Long = 0,
+        onProgress: suspend (Float) -> Unit,
+    ) {
         output.parentFile?.mkdirs()
         if (output.exists()) output.delete()
         withContext(Dispatchers.Main) {
@@ -59,7 +66,17 @@ class CompressionEngine @Inject constructor(
                     }
                 })
                 .build()
-            transformer.start(EditedMediaItem.Builder(MediaItem.fromUri(source)).build(), output.absolutePath)
+            val item = MediaItem.Builder().setUri(source).apply {
+                if (clipLengthMs > 0) {
+                    setClippingConfiguration(
+                        MediaItem.ClippingConfiguration.Builder()
+                            .setStartPositionMs(clipStartMs)
+                            .setEndPositionMs(clipStartMs + clipLengthMs)
+                            .build(),
+                    )
+                }
+            }.build()
+            transformer.start(EditedMediaItem.Builder(item).build(), output.absolutePath)
             val poller = launch {
                 val holder = ProgressHolder()
                 while (isActive) {

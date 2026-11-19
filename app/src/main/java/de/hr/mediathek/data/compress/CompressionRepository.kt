@@ -21,7 +21,20 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.cancellation.CancellationException
 
+private const val TEST_LENGTH_MS = 20_000L
+
 data class LevelOption(val level: CompressionLevel, val targetBps: Long, val estimatedBytes: Long)
+
+/** Ergebnis des 20-Sekunden-Testlaufs. */
+data class TestResult(
+    val sourceUri: String,
+    val startMs: Long,
+    val lengthMs: Long,
+    val resultPath: String,
+    val resultBytes: Long,
+    val sourceBytes: Long,
+    val estimatedTotalBytes: Long,
+)
 
 data class CompressionPlan(
     val mediaUuid: String,
@@ -43,6 +56,7 @@ class CompressionRepository @Inject constructor(
     private val dao: CompressionDao,
     private val probe: MediaProbe,
     private val scheduler: JobScheduler,
+    private val engine: CompressionEngine,
     private val errorLogger: ErrorLogger,
 ) {
     fun observeGrace(): Flow<GraceStats> = dao.observeGrace()
@@ -75,6 +89,40 @@ class CompressionRepository @Inject constructor(
             options = options,
             lowSpace = dir.usableSpace < worst * 12 / 10 || (sdFree != null && sdFree < worst * 11 / 10),
         )
+    }
+
+    /** Reiht alle gewählten Videos ein (ohne Bestätigungen: Videos mit Verlust-Hinweis werden übersprungen). */
+    suspend fun enqueueAll(mediaUuids: List<String>, level: CompressionLevel): Int =
+        mediaUuids.count { scheduler.enqueueCompress(CompressionParams(it, level, confirmed = false)) }
+
+    suspend fun move(jobUuid: String, up: Boolean) = scheduler.moveCompress(jobUuid, up)
+
+    private val testFile get() = File(context.cacheDir, "compress_test/test.mp4")
+
+    /** Kodiert etwa 20 Sekunden aus der Mitte mit den echten Einstellungen und schätzt daraus die Gesamtgröße. */
+    suspend fun runTest(mediaUuid: String, level: CompressionLevel, onProgress: suspend (Float) -> Unit): TestResult? =
+        withContext(Dispatchers.IO) {
+            val media = mediaDao.getByUuid(mediaUuid) ?: return@withContext null
+            if (media.status != MediaStatus.ONLINE) return@withContext null
+            val docId = media.documentIdCache ?: return@withContext null
+            val tree = sourceDao.getByUuid(media.sourceUuid)?.treeUri?.let { Uri.parse(it) } ?: return@withContext null
+            val docUri = DocumentsContract.buildDocumentUriUsingTree(tree, docId)
+            val facts = probe.probe(docUri, media.size) ?: return@withContext null
+            val duration = facts.durationMs?.takeIf { it > 0 } ?: return@withContext null
+            val videoBps = CompressionPolicy.videoBitrate(CompressionPolicy.totalBitrate(media.size, duration))
+            val target = CompressionPolicy.targetVideoBitrate(videoBps, level)
+            val length = minOf(TEST_LENGTH_MS, duration)
+            val start = maxOf(0L, duration / 2 - length / 2)
+            clearTest()
+            testFile.parentFile?.mkdirs()
+            engine.encode(docUri, testFile, target.toInt(), start, length, onProgress)
+            val bytes = testFile.length()
+            if (bytes <= 0) return@withContext null
+            TestResult(docUri.toString(), start, length, testFile.absolutePath, bytes, media.size, bytes * duration / length)
+        }
+
+    fun clearTest() {
+        runCatching { testFile.parentFile?.listFiles()?.forEach { it.delete() } }
     }
 
     /** Reiht die Komprimierung eines Videos ein. false, wenn für dieses Video schon eine läuft. */

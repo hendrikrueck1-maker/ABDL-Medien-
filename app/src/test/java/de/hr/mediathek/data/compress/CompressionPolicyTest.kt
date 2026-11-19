@@ -99,3 +99,12 @@ class CompressionPolicyTest {
         assertEquals(389_400_000L, CompressionPolicy.estimatedSize(5_000_000, 600_000))
     }
 }
+
+class CompressionRunPolicyTest {
+    @Test fun runsOnlyWhenAllowed() {
+        assertTrue(CompressionRunPolicy.mayRun(paused = false, onlyCharging = true, charging = true))
+        assertFalse(CompressionRunPolicy.mayRun(paused = false, onlyCharging = true, charging = false))
+        assertTrue(CompressionRunPolicy.mayRun(paused = false, onlyCharging = false, charging = false))
+        assertFalse(CompressionRunPolicy.mayRun(paused = true, onlyCharging = false, charging = true))
+    }
+}

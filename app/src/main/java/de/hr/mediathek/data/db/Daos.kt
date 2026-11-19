@@ -284,8 +284,21 @@ interface JobDao {
     @Query("SELECT * FROM job WHERE uuid = :uuid")
     suspend fun get(uuid: String): JobEntity?
 
-    @Query("SELECT * FROM job WHERE status = 'QUEUED' ORDER BY priority DESC, createdAt ASC LIMIT 1")
-    suspend fun nextQueued(): JobEntity?
+    /** Nächster Job; Komprimierung nur, wenn [allowCompress] (nicht pausiert, am Ladegerät). */
+    @Query(
+        "SELECT * FROM job WHERE status = 'QUEUED' AND (:allowCompress = 1 OR type != 'COMPRESS') " +
+            "ORDER BY priority DESC, createdAt ASC LIMIT 1",
+    )
+    suspend fun nextQueued(allowCompress: Boolean): JobEntity?
+
+    @Query("SELECT * FROM job WHERE type = 'COMPRESS' AND status IN ('QUEUED', 'RUNNING') ORDER BY priority DESC, createdAt ASC")
+    fun observeCompressQueue(): Flow<List<JobEntity>>
+
+    @Query("SELECT * FROM job WHERE type = 'COMPRESS' AND status = 'QUEUED' ORDER BY priority DESC, createdAt ASC")
+    suspend fun compressQueued(): List<JobEntity>
+
+    @Query("UPDATE job SET createdAt = :createdAt WHERE uuid = :uuid")
+    suspend fun setCreatedAt(uuid: String, createdAt: Long)
 
     /** Nach Absturz oder Neustart: laufende Jobs werden neu eingereiht (Scans sind wiederholbar). */
     @Query("UPDATE job SET status = 'QUEUED' WHERE status = 'RUNNING'")

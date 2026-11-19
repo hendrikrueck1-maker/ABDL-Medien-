@@ -33,7 +33,15 @@ object JobNotifications {
     }
 
     fun foregroundInfo(context: Context, text: String, progress: Float?): ForegroundInfo =
-        ForegroundInfo(NOTIFICATION_ID, build(context, text, progress), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        ForegroundInfo(NOTIFICATION_ID, build(context, text, progress), foregroundType())
+
+    /** Ab Android 15 zusätzlich mediaProcessing, damit die Komprimierung nicht am dataSync-Limit hängt. */
+    private fun foregroundType(): Int =
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING
+        } else {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        }
 
     fun update(context: Context, text: String, progress: Float?) {
         val manager = context.getSystemService(NotificationManager::class.java)

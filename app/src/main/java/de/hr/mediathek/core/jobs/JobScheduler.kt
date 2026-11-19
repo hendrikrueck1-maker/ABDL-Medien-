@@ -24,6 +24,7 @@ class JobScheduler @Inject constructor(
     private val storage: de.hr.mediathek.data.storage.StorageRepository,
     private val backupStore: de.hr.mediathek.data.backup.BackupStore,
     private val compressionExecutor: de.hr.mediathek.data.compress.CompressionJobExecutor,
+    private val compressionSettings: de.hr.mediathek.data.compress.CompressionSettings,
 ) {
     /** Gibt false zurück, wenn für diese Quelle schon ein Scan eingereiht ist, läuft oder auf Bestätigung wartet. */
     suspend fun enqueueScan(sourceUuid: String): Boolean {
@@ -62,9 +63,46 @@ class JobScheduler @Inject constructor(
     suspend fun enqueueCompress(params: de.hr.mediathek.data.compress.CompressionParams): Boolean {
         if (jobDao.findActive(JobType.COMPRESS, "%\"mediaUuid\":\"${params.mediaUuid}\"%") != null) return false
         jobDao.insert(JobEntity(type = JobType.COMPRESS, priority = JobPriority.MEDIUM, paramsJson = params.toJson()))
-        trigger()
+        triggerCompress()
         return true
     }
+
+    /** Startet die Warteschlange; mit der Bedingung "nur beim Laden" wartet WorkManager auf das Ladegerät. */
+    suspend fun triggerCompress() {
+        val builder = OneTimeWorkRequestBuilder<JobWorker>()
+        if (compressionSettings.onlyCharging()) {
+            builder.setConstraints(androidx.work.Constraints.Builder().setRequiresCharging(true).build())
+        }
+        WorkManager.getInstance(context)
+            .enqueueUniqueWork(WORK_NAME_COMPRESS, ExistingWorkPolicy.APPEND_OR_REPLACE, builder.build())
+    }
+
+    /** Pausiert oder setzt die Komprimierung fort. Ein laufender Job wird beendet, wenn er fertig ist. */
+    suspend fun setCompressPaused(paused: Boolean) {
+        compressionSettings.setPaused(paused)
+        if (!paused) triggerCompress()
+    }
+
+    suspend fun setCompressOnlyCharging(only: Boolean) {
+        compressionSettings.setOnlyCharging(only)
+        triggerCompress()
+    }
+
+    /** Verschiebt einen wartenden Komprimierungs-Job in der Reihenfolge um einen Platz. */
+    suspend fun moveCompress(jobUuid: String, up: Boolean) {
+        val queued = jobDao.compressQueued()
+        val i = queued.indexOfFirst { it.uuid == jobUuid }
+        val j = if (up) i - 1 else i + 1
+        if (i < 0 || j !in queued.indices) return
+        val a = queued[i]
+        val b = queued[j]
+        // Gleiche Zeit wäre nicht eindeutig: tauschen und bei Gleichstand um 1 ms versetzen.
+        val aTime = if (a.createdAt == b.createdAt) b.createdAt + (if (up) -1 else 1) else b.createdAt
+        jobDao.setCreatedAt(a.uuid, aTime)
+        jobDao.setCreatedAt(b.uuid, a.createdAt)
+    }
+
+    /** Eingereihte Jobs werden sofort beendet,
 
     /** Eingereihte Jobs werden sofort beendet, ein laufender Job bricht an der nächsten Prüfstelle ab. */
     suspend fun cancel(jobUuid: String) {
@@ -133,6 +171,7 @@ class JobScheduler @Inject constructor(
 
     private companion object {
         const val WORK_NAME = "job-runner"
+        const val WORK_NAME_COMPRESS = "job-runner-compress"
         const val BACKUP_INTERVAL_MS = 20L * 60 * 60 * 1000
     }
 }

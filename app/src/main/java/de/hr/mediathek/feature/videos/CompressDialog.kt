@@ -3,6 +3,11 @@ package de.hr.mediathek.feature.videos
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -30,6 +35,9 @@ import de.hr.mediathek.data.compress.CompressionPlan
 @Composable
 fun CompressDialog(
     state: PlanState,
+    test: TestState?,
+    onRunTest: (CompressionLevel) -> Unit,
+    onClearTest: () -> Unit,
     onStart: (CompressionLevel, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -46,12 +54,19 @@ fun CompressDialog(
             text = { Text(stringResource(R.string.compress_unavailable)) },
             confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.storage_message_ok)) } },
         )
-        is PlanState.Ready -> PlanContent(state.plan, onStart, onDismiss)
+        is PlanState.Ready -> PlanContent(state.plan, test, onRunTest, onClearTest, onStart, onDismiss)
     }
 }
 
 @Composable
-private fun PlanContent(plan: CompressionPlan, onStart: (CompressionLevel, Boolean) -> Unit, onDismiss: () -> Unit) {
+private fun PlanContent(
+    plan: CompressionPlan,
+    test: TestState?,
+    onRunTest: (CompressionLevel) -> Unit,
+    onClearTest: () -> Unit,
+    onStart: (CompressionLevel, Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
     var level by remember { mutableStateOf(CompressionLevel.BALANCED) }
     var confirmed by remember { mutableStateOf(false) }
     val noVideo = Blocker.NO_VIDEO in plan.blockers
@@ -65,7 +80,10 @@ private fun PlanContent(plan: CompressionPlan, onStart: (CompressionLevel, Boole
                 plan.options.forEach { option ->
                     val saving = 100 - (option.estimatedBytes * 100 / plan.sourceBytes).toInt()
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = level == option.level, onClick = { level = option.level })
+                        RadioButton(selected = level == option.level, onClick = {
+                            if (level != option.level) onClearTest()
+                            level = option.level
+                        })
                         Text(
                             stringResource(
                                 R.string.compress_option,
@@ -75,6 +93,7 @@ private fun PlanContent(plan: CompressionPlan, onStart: (CompressionLevel, Boole
                         )
                     }
                 }
+                TestPanel(test, onRun = { onRunTest(level) }, level = level)
                 if (level == CompressionLevel.STRONG) Warning(stringResource(R.string.compress_strong_warning))
                 if (plan.alreadySmall) Warning(stringResource(R.string.compress_small_warning))
                 plan.blockers.forEach { Warning(stringResource(blockerText(it))) }
@@ -128,4 +147,159 @@ private fun duration(ms: Long): String {
     val m = (total % 3600) / 60
     val s = total % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+}
+
+/** Testlauf-Bereich: Knopf, Fortschritt, geschätztes Ergebnis und Vorher/Nachher-Vorschau. */
+@Composable
+private fun TestPanel(test: TestState?, onRun: () -> Unit, level: CompressionLevel) {
+    var preview by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        when (test) {
+            null -> OutlinedButton(onClick = onRun) { Text(stringResource(R.string.compress_test_run)) }
+            is TestState.Running -> {
+                Text(stringResource(R.string.compress_test_running), style = MaterialTheme.typography.bodySmall)
+                LinearProgressIndicator(progress = { test.progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+            }
+            TestState.Failed -> {
+                Warning(stringResource(R.string.compress_test_failed))
+                OutlinedButton(onClick = onRun) { Text(stringResource(R.string.compress_test_run)) }
+            }
+            is TestState.Ready -> if (test.level == level) {
+                val r = test.result
+                val saving = 100 - (r.estimatedTotalBytes * 100 / r.sourceBytes).toInt()
+                Text(
+                    stringResource(R.string.compress_test_result, size(r.estimatedTotalBytes), size(r.sourceBytes), saving),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedButton(onClick = { preview = true }) { Text(stringResource(R.string.compress_test_preview)) }
+                if (preview) TestPreview(r) { preview = false }
+            } else {
+                OutlinedButton(onClick = onRun) { Text(stringResource(R.string.compress_test_run)) }
+            }
+        }
+    }
+}
+
+/** Spielt denselben Ausschnitt einmal im Original und einmal komprimiert ab; Umschalten behält die Position. */
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+@Composable
+private fun TestPreview(result: de.hr.mediathek.data.compress.TestResult, onDismiss: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val original = remember(result) {
+        androidx.media3.common.MediaItem.Builder()
+            .setUri(android.net.Uri.parse(result.sourceUri))
+            .setClippingConfiguration(
+                androidx.media3.common.MediaItem.ClippingConfiguration.Builder()
+                    .setStartPositionMs(result.startMs)
+                    .setEndPositionMs(result.startMs + result.lengthMs)
+                    .build(),
+            )
+            .build()
+    }
+    val compressed = remember(result) {
+        androidx.media3.common.MediaItem.fromUri(android.net.Uri.fromFile(java.io.File(result.resultPath)))
+    }
+    var showOriginal by remember { mutableStateOf(true) }
+    val player = remember(result) {
+        androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
+            repeatMode = androidx.media3.common.Player.REPEAT_MODE_ALL
+            setMediaItem(original)
+            prepare()
+            playWhenReady = true
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(player) { onDispose { player.release() } }
+
+    fun switchTo(originalWanted: Boolean) {
+        if (originalWanted == showOriginal) return
+        val position = player.currentPosition
+        player.setMediaItem(if (originalWanted) original else compressed, position)
+        player.prepare()
+        player.playWhenReady = true
+        showOriginal = originalWanted
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.compress_test_preview)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.ui.viewinterop.AndroidView(
+                    modifier = Modifier.fillMaxWidth().height(220.dp),
+                    factory = { ctx ->
+                        androidx.media3.ui.PlayerView(ctx).apply {
+                            this.player = player
+                            useController = true
+                        }
+                    },
+                    update = { it.player = player },
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { switchTo(true) }, enabled = !showOriginal) {
+                        Text(stringResource(R.string.compress_test_original))
+                    }
+                    OutlinedButton(onClick = { switchTo(false) }, enabled = showOriginal) {
+                        Text(stringResource(R.string.compress_test_compressed))
+                    }
+                }
+                Text(
+                    stringResource(if (showOriginal) R.string.compress_test_showing_original else R.string.compress_test_showing_compressed),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.storage_message_ok)) } },
+    )
+}
+
+/** Serie: Stufe wählen, Pflicht-Testlauf am ersten Video prüfen und bestätigen, dann alle einreihen. */
+@Composable
+fun SeriesDialog(
+    count: Int,
+    test: TestState?,
+    onRunTest: (CompressionLevel) -> Unit,
+    onClearTest: () -> Unit,
+    onStart: (CompressionLevel) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var level by remember { mutableStateOf(CompressionLevel.BALANCED) }
+    var accepted by remember { mutableStateOf(false) }
+    val testOk = test is TestState.Ready && test.level == level
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.compress_series_title, count)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                CompressionLevel.entries.forEach { l ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = level == l, onClick = {
+                            if (level != l) {
+                                onClearTest()
+                                accepted = false
+                            }
+                            level = l
+                        })
+                        Text(stringResource(levelName(l)), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                if (level == CompressionLevel.STRONG) Warning(stringResource(R.string.compress_strong_warning))
+                Text(stringResource(R.string.compress_series_info), style = MaterialTheme.typography.bodySmall)
+                TestPanel(test, onRun = { accepted = false; onRunTest(level) }, level = level)
+                if (testOk) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = accepted, onCheckedChange = { accepted = it })
+                        Text(stringResource(R.string.compress_series_accept), style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    Text(stringResource(R.string.compress_series_need_test), style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onStart(level) }, enabled = testOk && accepted) {
+                Text(stringResource(R.string.compress_series_start))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.diag_cancel)) } },
+    )
 }

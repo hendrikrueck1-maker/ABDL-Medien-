@@ -89,7 +89,7 @@ class BackupWriter @Inject constructor(
         val where = when (table) {
             "media_file" -> " WHERE $MEDIA_WITH_USER_DATA"
             "media_alias" -> " WHERE mediaUuid IN (SELECT uuid FROM media_file WHERE $MEDIA_WITH_USER_DATA)"
-            "setting" -> " WHERE `key` NOT LIKE 'thumb\\_%' ESCAPE '\\'"
+            "setting" -> " WHERE `key` NOT LIKE 'thumb\\_%' ESCAPE '\\' AND `key` NOT LIKE 'compress\\_%' ESCAPE '\\'"
             else -> ""
         }
         return "SELECT $cols FROM `$table`$where"

@@ -10,6 +10,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -33,6 +36,9 @@ fun CompressionCard(viewModel: CompressionViewModel = hiltViewModel()) {
     val blocked by viewModel.blockedCount.collectAsStateWithLifecycle()
     val job by viewModel.latestJob.collectAsStateWithLifecycle()
     val purged by viewModel.purged.collectAsStateWithLifecycle()
+    val queue by viewModel.queue.collectAsStateWithLifecycle()
+    val paused by viewModel.paused.collectAsStateWithLifecycle()
+    val onlyCharging by viewModel.onlyCharging.collectAsStateWithLifecycle()
     var confirm by remember { mutableStateOf(false) }
     val onColor = MaterialTheme.colorScheme.onSecondaryContainer
     val running = job?.status == JobStatus.QUEUED || job?.status == JobStatus.RUNNING
@@ -60,6 +66,35 @@ fun CompressionCard(viewModel: CompressionViewModel = hiltViewModel()) {
                     val p = j.progress
                     if (p != null) LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth())
                     else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Switch(checked = onlyCharging, onCheckedChange = viewModel::setOnlyCharging)
+                Text(stringResource(R.string.compress_only_charging), style = MaterialTheme.typography.bodyMedium, color = onColor)
+            }
+            if (queue.isNotEmpty() || paused) {
+                Text(
+                    stringResource(if (paused) R.string.compress_queue_paused else R.string.compress_queue_title, queue.size),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = onColor,
+                )
+                queue.forEachIndexed { index, item ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            (if (item.running) "▶ " else "${index + 1}. ") + item.name,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = onColor,
+                        )
+                        if (!item.running) {
+                            TextButton(onClick = { viewModel.move(item.jobUuid, true) }, enabled = index > 0 && !queue[index - 1].running) { Text("↑") }
+                            TextButton(onClick = { viewModel.move(item.jobUuid, false) }, enabled = index < queue.lastIndex) { Text("↓") }
+                        }
+                        TextButton(onClick = { viewModel.cancel(item.jobUuid) }) { Text(stringResource(R.string.diag_cancel)) }
+                    }
+                }
+                OutlinedButton(onClick = { viewModel.setPaused(!paused) }) {
+                    Text(stringResource(if (paused) R.string.compress_resume else R.string.compress_pause))
                 }
             }
             Text(

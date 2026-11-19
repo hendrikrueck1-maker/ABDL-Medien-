@@ -26,6 +26,12 @@ object CompressionPhase {
     val UNFINISHED = listOf(ENCODING, VERIFIED, ORIGINAL_MOVED, RENAMED)
 }
 
+/** Wann die Warteschlange laufen darf: nicht pausiert und (falls gewünscht) nur am Ladegerät. */
+object CompressionRunPolicy {
+    fun mayRun(paused: Boolean, onlyCharging: Boolean, charging: Boolean): Boolean =
+        !paused && (!onlyCharging || charging)
+}
+
 object CompressionRecovery {
     /** Vor VERIFIED wird die Temp-Datei gelöscht und das Video neu begonnen. */
     fun restartFromScratch(phase: String): Boolean = phase == CompressionPhase.ENCODING

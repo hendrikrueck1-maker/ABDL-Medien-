@@ -24,9 +24,26 @@ sealed interface PlanState {
     data class Ready(val plan: CompressionPlan) : PlanState
 }
 
+data class QueueItem(
+    val jobUuid: String,
+    val name: String,
+    val running: Boolean,
+    val phase: String?,
+    val progress: Float?,
+)
+
+sealed interface TestState {
+    data class Running(val progress: Float) : TestState
+    data class Ready(val result: de.hr.mediathek.data.compress.TestResult, val level: CompressionLevel) : TestState
+    data object Failed : TestState
+}
+
 @HiltViewModel
 class CompressionViewModel @Inject constructor(
     private val repo: CompressionRepository,
+    private val scheduler: de.hr.mediathek.core.jobs.JobScheduler,
+    private val settings: de.hr.mediathek.data.compress.CompressionSettings,
+    private val mediaDao: de.hr.mediathek.data.db.MediaFileDao,
     jobDao: JobDao,
 ) : ViewModel() {
     private val _plan = MutableStateFlow<PlanState?>(null)
@@ -45,6 +62,94 @@ class CompressionViewModel @Inject constructor(
 
     private val _purged = MutableStateFlow<Int?>(null)
     val purged: StateFlow<Int?> = _purged
+
+    // --- Warteschlange ---
+
+    val paused: StateFlow<Boolean> = settings.observePaused()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val onlyCharging: StateFlow<Boolean> = settings.observeOnlyCharging()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val queue: StateFlow<List<QueueItem>> = jobDao.observeCompressQueue().map { jobs ->
+        jobs.map { j ->
+            val uuid = runCatching { de.hr.mediathek.data.compress.CompressionParams.parse(j.paramsJson).mediaUuid }.getOrNull()
+            QueueItem(
+                jobUuid = j.uuid,
+                name = uuid?.let { mediaDao.getByUuid(it)?.displayName } ?: "",
+                running = j.status == de.hr.mediathek.data.db.JobStatus.RUNNING,
+                phase = j.phase,
+                progress = j.progress,
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun setPaused(value: Boolean) {
+        viewModelScope.launch { scheduler.setCompressPaused(value) }
+    }
+
+    fun setOnlyCharging(value: Boolean) {
+        viewModelScope.launch { scheduler.setCompressOnlyCharging(value) }
+    }
+
+    fun move(jobUuid: String, up: Boolean) {
+        viewModelScope.launch { repo.move(jobUuid, up) }
+    }
+
+    fun cancel(jobUuid: String) {
+        viewModelScope.launch { scheduler.cancel(jobUuid) }
+    }
+
+    // --- Testlauf und Serie ---
+
+    private val _test = MutableStateFlow<TestState?>(null)
+    val test: StateFlow<TestState?> = _test
+    private var testJob: kotlinx.coroutines.Job? = null
+
+    private val _series = MutableStateFlow<List<String>?>(null)
+    val series: StateFlow<List<String>?> = _series
+
+    fun beginSeries(mediaUuids: List<String>) {
+        clearTest()
+        _series.value = mediaUuids
+    }
+
+    fun dismissSeries() {
+        clearTest()
+        _series.value = null
+    }
+
+    /** Pflicht vor einer Serie: etwa 20 Sekunden mit der gewählten Stufe kodieren. */
+    fun runTest(mediaUuid: String, level: CompressionLevel) {
+        testJob?.cancel()
+        _test.value = TestState.Running(0f)
+        testJob = viewModelScope.launch {
+            try {
+                val result = repo.runTest(mediaUuid, level) { f -> _test.value = TestState.Running(f) }
+                _test.value = if (result != null) TestState.Ready(result, level) else TestState.Failed
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _test.value = TestState.Failed
+            }
+        }
+    }
+
+    fun clearTest() {
+        testJob?.cancel()
+        _test.value = null
+        repo.clearTest()
+    }
+
+    fun startSeries(level: CompressionLevel) {
+        val uuids = _series.value ?: return
+        clearTest()
+        _series.value = null
+        viewModelScope.launch { _queued.value = repo.enqueueAll(uuids, level) > 0 }
+    }
+
+    override fun onCleared() {
+        repo.clearTest()
+    }
 
     fun load(mediaUuid: String) {
         _plan.value = PlanState.Loading

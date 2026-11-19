@@ -35,12 +35,13 @@ class JobRunner @Inject constructor(
     private val thumbnailExecutor: ThumbnailJobExecutor,
     private val backupExecutor: BackupJobExecutor,
     private val compressionExecutor: de.hr.mediathek.data.compress.CompressionJobExecutor,
+    private val compressionSettings: de.hr.mediathek.data.compress.CompressionSettings,
     private val errorLogger: ErrorLogger,
 ) {
     private val runLock = Mutex()
     @Volatile private var cancelRequestedFor: String? = null
 
-    suspend fun hasWork(): Boolean = jobDao.countQueued() > 0
+    suspend fun hasWork(): Boolean = jobDao.nextQueued(compressionSettings.mayRunNow()) != null
 
     /** Bittet den laufenden Job mit dieser UUID, an der nächsten Stelle abzubrechen. */
     fun requestCancel(jobUuid: String) {
@@ -50,7 +51,7 @@ class JobRunner @Inject constructor(
     suspend fun runAll(onProgress: (text: String, progress: Float?) -> Unit) {
         runLock.withLock {
             while (true) {
-                val job = jobDao.nextQueued() ?: break
+                val job = jobDao.nextQueued(compressionSettings.mayRunNow()) ?: break
                 runOne(job, onProgress)
             }
         }
