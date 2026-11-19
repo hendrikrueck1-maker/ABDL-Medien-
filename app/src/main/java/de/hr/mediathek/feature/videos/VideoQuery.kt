@@ -17,14 +17,23 @@ data class VideoFilter(
     val tagUuid: String? = null,
     /** Nur Videos dieser (manuellen) Playlist. */
     val playlistUuid: String? = null,
+    /** Nur Dateien in diesem obersten Ordner der Quelle (Bilder); null = alle. */
+    val folder: String? = null,
 )
 
 /** Baut die Listenabfrage aus dem Filter (rein, damit sie testbar bleibt). */
 object VideoQuery {
     class Built(val sql: String, val args: List<Any>)
 
-    fun build(filter: VideoFilter, randomSeed: Long, select: String = "*", orderOverride: String? = null): Built {
-        val where = StringBuilder("type = 'VIDEO' AND deletedAt IS NULL AND status != 'TRASHED'")
+    fun build(
+        filter: VideoFilter,
+        randomSeed: Long,
+        select: String = "*",
+        orderOverride: String? = null,
+        type: String = "VIDEO",
+    ): Built {
+        require(type == "VIDEO" || type == "IMAGE")
+        val where = StringBuilder("type = '$type' AND deletedAt IS NULL AND status != 'TRASHED'")
         val args = ArrayList<Any>()
         if (filter.favoriteOnly) where.append(" AND favorite = 1")
         if (filter.minRating > 0) {
@@ -46,6 +55,10 @@ object VideoQuery {
         filter.format?.takeIf { it.isNotBlank() }?.let {
             where.append(" AND LOWER(displayName) LIKE ? ESCAPE '\\'")
             args += "%." + escapeLike(it.lowercase().removePrefix("."))
+        }
+        filter.folder?.takeIf { it.isNotBlank() }?.let {
+            where.append(" AND relativePath LIKE ? ESCAPE '\\'")
+            args += escapeLike(it) + "/%"
         }
         filter.categoryUuid?.let {
             where.append(
@@ -95,8 +108,8 @@ object VideoQuery {
     }
 
     /** Alle verfügbaren Videos in der Reihenfolge des Filters (für "Nächstes" in Playlists). */
-    fun buildOrderedUuids(filter: VideoFilter, randomSeed: Long): Built =
-        build(filter.copy(onlineOnly = true), randomSeed, select = "uuid")
+    fun buildOrderedUuids(filter: VideoFilter, randomSeed: Long, type: String = "VIDEO"): Built =
+        build(filter.copy(onlineOnly = true), randomSeed, select = "uuid", type = type)
 
     fun escapeLike(text: String): String =
         text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

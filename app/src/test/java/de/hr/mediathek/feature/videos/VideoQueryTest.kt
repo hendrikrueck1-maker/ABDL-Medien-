@@ -83,3 +83,16 @@ class VideoQueryTest {
         assertEquals(listOf<Any>("p1"), q.args)
     }
 }
+
+class ImageQueryTest {
+    @org.junit.Test fun imageTypeAndFolder() {
+        val built = VideoQuery.build(VideoFilter(folder = "Urlaub_100%"), 0, type = "IMAGE")
+        org.junit.Assert.assertTrue(built.sql.contains("type = 'IMAGE'"))
+        org.junit.Assert.assertTrue(built.sql.contains("relativePath LIKE ? ESCAPE"))
+        org.junit.Assert.assertEquals(listOf<Any>("Urlaub\\_100\\%/%"), built.args)
+    }
+
+    @org.junit.Test(expected = IllegalArgumentException::class) fun rejectsUnknownType() {
+        VideoQuery.build(VideoFilter(), 0, type = "x' OR 1=1 --")
+    }
+}

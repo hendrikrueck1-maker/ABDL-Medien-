@@ -92,6 +92,13 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
                 onOpenDuplicates = { navController.navigate("duplicates") },
             )
         }
+        composable(Destination.Images.route) {
+            de.hr.mediathek.feature.images.ImagesScreen(onOpen = { navController.navigate("image/$it") })
+        }
+        composable(
+            route = "image/{uuid}",
+            arguments = listOf(navArgument("uuid") { type = NavType.StringType }),
+        ) { de.hr.mediathek.feature.images.ImageViewerScreen(onBack = { navController.popBackStack() }) }
         composable("trash") { TrashScreen(onBack = { navController.popBackStack() }) }
         composable("duplicates") { DuplicatesScreen(onBack = { navController.popBackStack() }) }
         composable(
@@ -108,7 +115,10 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
             )
         }
         Destination.entries
-            .filter { it != Destination.Home && it != Destination.Settings && it != Destination.Videos }
+            .filter {
+                it != Destination.Home && it != Destination.Settings && it != Destination.Videos &&
+                    it != Destination.Images
+            }
             .forEach { destination ->
                 composable(destination.route) {
                     PlaceholderScreen(title = stringResource(destination.label))

@@ -21,10 +21,12 @@ class CategoryRepository @Inject constructor(
 ) {
     fun observeVideoCategories(): Flow<List<CategoryEntity>> = dao.observeVideoCategories()
 
-    suspend fun create(name: String): Boolean {
+    fun observeImageCategories(): Flow<List<CategoryEntity>> = dao.observeImageCategories()
+
+    suspend fun create(name: String, scope: CategoryScope = CategoryScope.VIDEO): Boolean {
         val clean = name.trim()
         if (clean.isEmpty() || clean.length > MAX_NAME) return false
-        dao.insert(CategoryEntity(scope = CategoryScope.VIDEO, name = clean))
+        dao.insert(CategoryEntity(scope = scope, name = clean))
         return true
     }
 

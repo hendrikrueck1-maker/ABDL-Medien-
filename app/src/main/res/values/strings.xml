@@ -145,6 +145,12 @@
     <string name="compress_queue_paused">Pausiert (%1$d wartend)</string>
     <string name="compress_pause">Pausieren</string>
     <string name="compress_resume">Fortsetzen</string>
+    <string name="image_empty">Keine Bilder gefunden. Binde unter „Speicher“ einen Ordner ein und lies ihn ein.</string>
+    <string name="image_not_found">Dieses Bild gibt es nicht mehr.</string>
+    <string name="image_offline">Dieses Bild ist gerade nicht verfügbar. Ist die Speicherkarte eingelegt?</string>
+    <string name="image_error">Dieses Bild kann nicht angezeigt werden (defekt oder Format nicht unterstützt).</string>
+    <string name="trash_confirm_title_images">%1$d Bild(er) in den Papierkorb?</string>
+    <string name="trash_confirm_title_many_images">Wirklich %1$d Bilder in den Papierkorb?</string>
     <string name="category_none">Noch keine Kategorien. Lege unten eine an.</string>
     <string name="category_add">Zuordnen</string>
     <string name="category_remove">Entfernen</string>

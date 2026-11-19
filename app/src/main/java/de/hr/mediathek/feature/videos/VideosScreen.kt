@@ -409,7 +409,7 @@ fun VideosScreen(
 }
 
 @Composable
-private fun CategoryDialog(
+internal fun CategoryDialog(
     title: String,
     categories: List<LabelItem>,
     used: Set<String>,
@@ -473,7 +473,7 @@ private fun CategoryDialog(
     }
 }
 
-private data class LabelItem(val uuid: String, val name: String)
+internal data class LabelItem(val uuid: String, val name: String)
 
 @Composable
 private fun PlaylistDialog(

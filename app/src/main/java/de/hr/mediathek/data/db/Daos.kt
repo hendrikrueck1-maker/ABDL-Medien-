@@ -201,6 +201,17 @@ interface MediaFileDao {
     @Query("SELECT * FROM media_file WHERE uuid = :uuid AND deletedAt IS NULL")
     suspend fun getByUuid(uuid: String): MediaFileEntity?
 
+    @Query("SELECT * FROM media_file WHERE uuid = :uuid AND deletedAt IS NULL")
+    fun observeByUuid(uuid: String): Flow<MediaFileEntity?>
+
+    /** Oberste Ordner der Bilder (für den Ordnerfilter). */
+    @Query(
+        "SELECT DISTINCT substr(relativePath, 1, instr(relativePath, '/') - 1) FROM media_file " +
+            "WHERE type = 'IMAGE' AND deletedAt IS NULL AND status != 'TRASHED' AND instr(relativePath, '/') > 0 " +
+            "ORDER BY 1 COLLATE NOCASE",
+    )
+    fun observeImageFolders(): Flow<List<String>>
+
     @Query("UPDATE media_file SET rating = :rating, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
     suspend fun setRating(uuid: String, rating: Int, now: Long)
 
@@ -405,6 +416,9 @@ interface ThumbnailDao {
 interface CategoryDao {
     @Query("SELECT * FROM category WHERE deletedAt IS NULL AND scope IN ('VIDEO', 'ALL') ORDER BY name COLLATE NOCASE")
     fun observeVideoCategories(): Flow<List<CategoryEntity>>
+
+    @Query("SELECT * FROM category WHERE deletedAt IS NULL AND scope IN ('IMAGE', 'ALL') ORDER BY name COLLATE NOCASE")
+    fun observeImageCategories(): Flow<List<CategoryEntity>>
 
     @Insert
     suspend fun insert(category: CategoryEntity): Long
