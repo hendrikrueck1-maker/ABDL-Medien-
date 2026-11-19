@@ -26,11 +26,19 @@ import de.hr.mediathek.feature.diag.DiagRoutes
 import de.hr.mediathek.feature.diag.PdfDiagScreen
 import de.hr.mediathek.feature.diag.ScanDiagScreen
 import de.hr.mediathek.feature.diag.TranscodeDiagScreen
+import de.hr.mediathek.feature.errorlog.ErrorLogScreen
 import de.hr.mediathek.feature.home.HomeScreen
 import de.hr.mediathek.feature.placeholder.PlaceholderScreen
 import de.hr.mediathek.feature.settings.SettingsScreen
+import de.hr.mediathek.feature.storage.StorageScreen
 
 private const val WIDE_LAYOUT_MIN_WIDTH_DP = 600
+
+/** Routen außerhalb der Hauptbereiche. */
+object AppRoutes {
+    const val STORAGE = "storage"
+    const val ERROR_LOG = "errorlog"
+}
 
 @Composable
 fun AppRoot() {
@@ -64,8 +72,10 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
             HomeScreen(onOpen = { navController.navigateTopLevel(it) })
         }
         composable(Destination.Settings.route) {
-            SettingsScreen(onOpenDiag = { navController.navigate(it) })
+            SettingsScreen(onOpenRoute = { navController.navigate(it) })
         }
+        composable(AppRoutes.STORAGE) { StorageScreen(onBack = { navController.popBackStack() }) }
+        composable(AppRoutes.ERROR_LOG) { ErrorLogScreen(onBack = { navController.popBackStack() }) }
         composable(DiagRoutes.SCAN) { ScanDiagScreen(onBack = { navController.popBackStack() }) }
         composable(DiagRoutes.TRANSCODE) { TranscodeDiagScreen(onBack = { navController.popBackStack() }) }
         composable(DiagRoutes.PDF) { PdfDiagScreen(onBack = { navController.popBackStack() }) }

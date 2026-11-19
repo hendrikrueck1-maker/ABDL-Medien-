@@ -24,10 +24,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hr.mediathek.BuildConfig
 import de.hr.mediathek.R
 import de.hr.mediathek.core.update.ApkInstaller
+import de.hr.mediathek.core.ui.AppRoutes
 import de.hr.mediathek.feature.diag.DiagRoutes
 
 @Composable
-fun SettingsScreen(onOpenDiag: (String) -> Unit, viewModel: UpdateViewModel = hiltViewModel()) {
+fun SettingsScreen(onOpenRoute: (String) -> Unit, viewModel: UpdateViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -126,6 +127,25 @@ fun SettingsScreen(onOpenDiag: (String) -> Unit, viewModel: UpdateViewModel = hi
         }
 
         Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_storage_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Button(onClick = { onOpenRoute(AppRoutes.STORAGE) }) {
+                    Text(stringResource(R.string.settings_open_storage))
+                }
+                Button(onClick = { onOpenRoute(AppRoutes.ERROR_LOG) }) {
+                    Text(stringResource(R.string.settings_open_errorlog))
+                }
+            }
+        }
+
+        Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -140,13 +160,13 @@ fun SettingsScreen(onOpenDiag: (String) -> Unit, viewModel: UpdateViewModel = hi
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                 )
-                Button(onClick = { onOpenDiag(DiagRoutes.SCAN) }) {
+                Button(onClick = { onOpenRoute(DiagRoutes.SCAN) }) {
                     Text(stringResource(R.string.diag_open_scan))
                 }
-                Button(onClick = { onOpenDiag(DiagRoutes.TRANSCODE) }) {
+                Button(onClick = { onOpenRoute(DiagRoutes.TRANSCODE) }) {
                     Text(stringResource(R.string.diag_open_transcode))
                 }
-                Button(onClick = { onOpenDiag(DiagRoutes.PDF) }) {
+                Button(onClick = { onOpenRoute(DiagRoutes.PDF) }) {
                     Text(stringResource(R.string.diag_open_pdf))
                 }
             }

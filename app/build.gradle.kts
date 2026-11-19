@@ -11,6 +11,11 @@ val runNumber = System.getenv("RUN_NUMBER")?.toIntOrNull() ?: 1
 val versionCodeOffset = 100
 val keystorePath: String? = System.getenv("KEYSTORE_PATH")
 
+// Room exportiert das Schema fuer Migrationstests ins Repo.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 android {
     namespace = "de.hr.mediathek"
     compileSdk = 35
@@ -96,6 +101,10 @@ dependencies {
     implementation(libs.androidx.media3.common)
     implementation(libs.androidx.media3.transformer)
     implementation(libs.pdfbox.android)
+
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

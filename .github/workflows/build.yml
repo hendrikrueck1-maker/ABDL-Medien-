@@ -65,6 +65,17 @@ jobs:
           path: dist/*.apk
           retention-days: 14
 
+      - name: Room-Schema ins Repo sichern
+        if: github.ref == 'refs/heads/main'
+        run: |
+          if [ -n "$(git status --porcelain app/schemas)" ]; then
+            git config user.name "build-bot"
+            git config user.email "build-bot@users.noreply.github.com"
+            git add app/schemas
+            git commit -m "Room-Schema aktualisiert"
+            git push || true
+          fi
+
       - name: Release veröffentlichen
         if: github.ref == 'refs/heads/main'
         env:
