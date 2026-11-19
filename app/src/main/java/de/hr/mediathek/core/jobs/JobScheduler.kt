@@ -21,6 +21,8 @@ class JobScheduler @Inject constructor(
     private val jobDao: JobDao,
     private val runner: JobRunner,
     private val scanExecutor: ScanJobExecutor,
+    private val storage: de.hr.mediathek.data.storage.StorageRepository,
+    private val backupStore: de.hr.mediathek.data.backup.BackupStore,
 ) {
     /** Gibt false zurück, wenn für diese Quelle schon ein Scan eingereiht ist, läuft oder auf Bestätigung wartet. */
     suspend fun enqueueScan(sourceUuid: String): Boolean {
@@ -29,6 +31,22 @@ class JobScheduler @Inject constructor(
         jobDao.insert(JobEntity(type = JobType.SCAN, priority = JobPriority.HIGH, paramsJson = params))
         trigger()
         return true
+    }
+
+    /** Backup jetzt einreihen (Nutzeraktion). */
+    suspend fun enqueueBackup(): Boolean {
+        if (jobDao.findActive(JobType.BACKUP, "%") != null) return false
+        jobDao.insert(JobEntity(type = JobType.BACKUP, priority = JobPriority.HIGH))
+        trigger()
+        return true
+    }
+
+    /** Reiht ein Backup ein, wenn das letzte erfolgreiche länger als etwa einen Tag her ist und ein Arbeitsordner gewählt ist. */
+    suspend fun enqueueBackupIfDue() {
+        if (storage.getWorkFolderUri() == null) return
+        val last = backupStore.lastSuccessAt()
+        if (last != null && System.currentTimeMillis() - last < BACKUP_INTERVAL_MS) return
+        enqueueBackup()
     }
 
     /** Vorschaubilder nachziehen (läuft sonst automatisch nach jedem Scan). */
@@ -83,6 +101,8 @@ class JobScheduler @Inject constructor(
         jobDao.resetRunning()
         jobDao.deleteFinishedBefore(System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000)
         if (runner.hasWork()) trigger()
+        // Verpasste Backups (Karte war nicht da, App war zu) werden spätestens hier nachgeholt.
+        enqueueBackupIfDue()
     }
 
     private fun trigger() {
@@ -93,5 +113,6 @@ class JobScheduler @Inject constructor(
 
     private companion object {
         const val WORK_NAME = "job-runner"
+        const val BACKUP_INTERVAL_MS = 20L * 60 * 60 * 1000
     }
 }

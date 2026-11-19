@@ -13,6 +13,8 @@ import de.hr.mediathek.data.db.SourceEntity
 import de.hr.mediathek.data.storage.AddSourceResult
 import de.hr.mediathek.data.storage.StorageRepository
 import de.hr.mediathek.data.storage.WorkFolderResult
+import de.hr.mediathek.data.backup.BackupStatus
+import de.hr.mediathek.data.backup.BackupStore
 import de.hr.mediathek.data.thumb.ThumbnailCache
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -61,6 +63,7 @@ class StorageViewModel @Inject constructor(
     private val repository: StorageRepository,
     private val scheduler: JobScheduler,
     private val thumbCache: ThumbnailCache,
+    private val backupStore: BackupStore,
 ) : ViewModel() {
 
     private val reachability = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -96,6 +99,13 @@ class StorageViewModel @Inject constructor(
         thumbCache.observeLowSpace(),
     ) { stats, full, low -> ThumbUiState(stats.count, stats.bytes, full, low) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThumbUiState())
+
+    val backup: StateFlow<BackupStatus> = backupStore.observeStatus()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BackupStatus(null, null, null))
+
+    fun backupNow() {
+        viewModelScope.launch { scheduler.enqueueBackup() }
+    }
 
     fun generateThumbnails() {
         viewModelScope.launch { scheduler.enqueueThumbnails() }

@@ -35,6 +35,14 @@
     <string name="storage_work_current">Aktuell: %1$s</string>
     <string name="storage_work_none">Noch kein Arbeitsordner gewählt.</string>
     <string name="storage_work_choose">Arbeitsordner wählen</string>
+    <string name="backup_title">Sicherung</string>
+    <string name="backup_never">Noch keine Sicherung gemacht.</string>
+    <string name="backup_today">Letzte Sicherung: heute</string>
+    <string name="backup_days_ago">Letzte Sicherung: vor %1$d Tagen</string>
+    <string name="backup_old_warning">Die letzte Sicherung ist älter als 3 Tage. Bitte jetzt sichern oder prüfen, ob die Karte eingelegt ist.</string>
+    <string name="backup_needs_work_folder">Wähle unten zuerst einen Arbeitsordner, dort werden die Sicherungen abgelegt.</string>
+    <string name="backup_failed">Sicherung fehlgeschlagen: %1$s</string>
+    <string name="backup_now">Jetzt sichern</string>
     <string name="thumbs_title">Vorschaubilder</string>
     <string name="thumbs_stats">%1$d Bilder, %2$d MB belegt (Obergrenze 2 GB)</string>
     <string name="thumbs_full">Der Speicher für Vorschaubilder ist voll. Es werden keine neuen erzeugt, bis du Platz schaffst.</string>

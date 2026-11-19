@@ -6,6 +6,7 @@ import de.hr.mediathek.data.db.JobDao
 import de.hr.mediathek.data.db.JobEntity
 import de.hr.mediathek.data.db.JobStatus
 import de.hr.mediathek.data.db.JobType
+import de.hr.mediathek.data.backup.BackupJobExecutor
 import de.hr.mediathek.data.scan.ScanJobExecutor
 import de.hr.mediathek.data.thumb.ThumbnailJobExecutor
 import kotlinx.coroutines.NonCancellable
@@ -32,6 +33,7 @@ class JobRunner @Inject constructor(
     private val jobDao: JobDao,
     private val scanExecutor: ScanJobExecutor,
     private val thumbnailExecutor: ThumbnailJobExecutor,
+    private val backupExecutor: BackupJobExecutor,
     private val errorLogger: ErrorLogger,
 ) {
     private val runLock = Mutex()
@@ -121,6 +123,7 @@ class JobRunner @Inject constructor(
     private suspend fun execute(job: JobEntity, context: JobContext): JobOutcome = when (job.type) {
         JobType.SCAN -> scanExecutor.execute(job, context)
         JobType.THUMBNAILS -> thumbnailExecutor.execute(context)
+        JobType.BACKUP -> backupExecutor.execute(context)
         else -> JobOutcome.Failed("Job-Typ ${job.type} ist noch nicht verfügbar")
     }
 

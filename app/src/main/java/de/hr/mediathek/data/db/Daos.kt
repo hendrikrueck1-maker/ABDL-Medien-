@@ -229,6 +229,9 @@ interface JobDao {
     )
     suspend fun findActive(type: JobType, pattern: String): JobEntity?
 
+    @Query("SELECT * FROM job WHERE type = :type ORDER BY createdAt DESC LIMIT 1")
+    fun observeLatest(type: JobType): Flow<JobEntity?>
+
     @Query("SELECT * FROM job WHERE type = 'SCAN' ORDER BY createdAt DESC LIMIT 30")
     fun observeRecentScans(): Flow<List<JobEntity>>
 

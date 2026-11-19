@@ -43,6 +43,7 @@ import de.hr.mediathek.R
 @Composable
 fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val backup by viewModel.backup.collectAsStateWithLifecycle()
     val thumbs by viewModel.thumbs.collectAsStateWithLifecycle()
     val onboardingSeen by viewModel.onboardingSeen.collectAsStateWithLifecycle()
     var showOnboarding by remember { mutableStateOf(false) }
@@ -153,6 +154,8 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
                 }
             }
         }
+
+        BackupCard(backup, hasWorkFolder = state.workFolderLabel != null, onBackup = viewModel::backupNow)
 
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
@@ -305,6 +308,49 @@ private fun SourceBlock(
                     OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.storage_scan_cancel)) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun BackupCard(status: de.hr.mediathek.data.backup.BackupStatus, hasWorkFolder: Boolean, onBackup: () -> Unit) {
+    val onColor = MaterialTheme.colorScheme.onSecondaryContainer
+    val job = status.latestJob
+    val running = job != null && (job.status == JobStatus.QUEUED || job.status == JobStatus.RUNNING)
+    val ageDays = status.lastSuccessAt?.let { ((System.currentTimeMillis() - it) / 86_400_000L).toInt() }
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.backup_title), style = MaterialTheme.typography.titleMedium, color = onColor)
+            Text(
+                when {
+                    ageDays == null -> stringResource(R.string.backup_never)
+                    ageDays == 0 -> stringResource(R.string.backup_today)
+                    else -> stringResource(R.string.backup_days_ago, ageDays)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = onColor,
+            )
+            if (ageDays != null && ageDays > 3) {
+                Text(stringResource(R.string.backup_old_warning), color = MaterialTheme.colorScheme.error)
+            }
+            status.warning?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (!hasWorkFolder) {
+                Text(stringResource(R.string.backup_needs_work_folder), style = MaterialTheme.typography.bodySmall, color = onColor)
+            }
+            if (job != null && job.status == JobStatus.RUNNING) {
+                Text(job.phase ?: "", style = MaterialTheme.typography.bodySmall, color = onColor)
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            } else if (job != null && job.status == JobStatus.QUEUED) {
+                Text(stringResource(R.string.storage_scan_queued), style = MaterialTheme.typography.bodySmall, color = onColor)
+            } else if (job != null && job.status == JobStatus.FAILED) {
+                Text(stringResource(R.string.backup_failed, job.lastError ?: "-"), color = MaterialTheme.colorScheme.error)
+            } else if (job != null && job.status == JobStatus.COMPLETED) {
+                Text(job.phase ?: "", style = MaterialTheme.typography.bodySmall, color = onColor)
+            }
+            Button(onClick = onBackup, enabled = hasWorkFolder && !running) { Text(stringResource(R.string.backup_now)) }
         }
     }
 }
