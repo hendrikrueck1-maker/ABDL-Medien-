@@ -62,4 +62,24 @@ class VideoQueryTest {
         assertTrue(q.sql.contains("deletedAt IS NULL)"))
         assertEquals(listOf<Any>("abc"), q.args)
     }
+
+    @Test
+    fun tag_undPlaylistFilter() {
+        val q = VideoQuery.build(VideoFilter(tagUuid = "t1", playlistUuid = "p1", sort = VideoSort.PLAYLIST_ORDER), 1)
+        assertTrue(q.sql.contains("FROM tag_assignment"))
+        assertTrue(q.sql.contains("FROM playlist_item WHERE playlistUuid = ?"))
+        assertTrue(q.sql.contains("p.mediaUuid = media_file.uuid"))
+        // Argumente stehen in der Reihenfolge der Platzhalter: Tag, Playlist (WHERE), Playlist (ORDER BY)
+        assertEquals(listOf<Any>("t1", "p1", "p1"), q.args)
+    }
+
+    @Test
+    fun zufallsPick_nurVerfuegbare_einErgebnis_ohneUeberzaehligeArgumente() {
+        val q = VideoQuery.buildRandomPick(VideoFilter(playlistUuid = "p1", sort = VideoSort.PLAYLIST_ORDER))
+        assertTrue(q.sql.startsWith("SELECT uuid FROM media_file"))
+        assertTrue(q.sql.contains("status = 'ONLINE'"))
+        assertTrue(q.sql.contains("ORDER BY RANDOM()"))
+        assertTrue(q.sql.endsWith("LIMIT 1"))
+        assertEquals(listOf<Any>("p1"), q.args)
+    }
 }

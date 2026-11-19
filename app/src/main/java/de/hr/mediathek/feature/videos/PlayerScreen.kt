@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Star
@@ -54,14 +55,14 @@ private val SPEEDS = listOf(1f, 1.25f, 1.5f, 2f, 0.5f, 0.75f)
 
 @OptIn(UnstableApi::class)
 @Composable
-fun PlayerScreen(onBack: () -> Unit, viewModel: PlayerViewModel = hiltViewModel()) {
+fun PlayerScreen(onBack: () -> Unit, onNext: (String) -> Unit, viewModel: PlayerViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     when (val s = state) {
         PlayerState.Loading -> CenterText(stringResource(R.string.player_loading), onBack)
         PlayerState.Offline -> CenterText(stringResource(R.string.player_offline), onBack)
         PlayerState.NotFound -> CenterText(stringResource(R.string.player_not_found), onBack)
-        is PlayerState.Ready -> ReadyPlayer(s, viewModel, onBack)
+        is PlayerState.Ready -> ReadyPlayer(s, viewModel, onBack, onNext)
     }
 }
 
@@ -79,11 +80,12 @@ private fun CenterText(text: String, onBack: () -> Unit) {
 
 @OptIn(UnstableApi::class)
 @Composable
-private fun ReadyPlayer(state: PlayerState.Ready, viewModel: PlayerViewModel, onBack: () -> Unit) {
+private fun ReadyPlayer(state: PlayerState.Ready, viewModel: PlayerViewModel, onBack: () -> Unit, onNext: (String) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var error by remember { mutableStateOf<String?>(null) }
     var speedIndex by remember { mutableIntStateOf(0) }
+    var showTracks by remember { mutableStateOf(false) }
 
     val player = remember(state.uri) {
         ExoPlayer.Builder(context)
@@ -101,8 +103,21 @@ private fun ReadyPlayer(state: PlayerState.Ready, viewModel: PlayerViewModel, on
 
     val errorUnsupported = stringResource(R.string.player_error_unsupported)
     val errorGeneric = stringResource(R.string.player_error_generic)
+    var tracks by remember(player) { mutableStateOf(player.currentTracks) }
     DisposableEffect(player) {
         val listener = object : Player.Listener {
+            override fun onTracksChanged(t: androidx.media3.common.Tracks) {
+                tracks = t
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                // Am Ende automatisch zum nächsten Video der Liste (Playlist, Filter oder Zufall).
+                if (playbackState == Player.STATE_ENDED) {
+                    viewModel.saveProgress(player.duration, player.duration)
+                    viewModel.next(onNext)
+                }
+            }
+
             override fun onPlayerError(e: PlaybackException) {
                 error = when (e.errorCode) {
                     PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
@@ -139,6 +154,8 @@ private fun ReadyPlayer(state: PlayerState.Ready, viewModel: PlayerViewModel, on
         }
     }
 
+    if (showTracks) TrackDialog(player, tracks) { showTracks = false }
+
     Column(Modifier.fillMaxSize().background(Color.Black)) {
         Box(Modifier.weight(1f, fill = true).fillMaxWidth()) {
             AndroidView(
@@ -174,6 +191,10 @@ private fun ReadyPlayer(state: PlayerState.Ready, viewModel: PlayerViewModel, on
                 speedIndex = (speedIndex + 1) % SPEEDS.size
                 player.setPlaybackSpeed(SPEEDS[speedIndex])
             }) { Text("${SPEEDS[speedIndex]}x") }
+            if (viewModel.hasContext) {
+                OutlinedButton(onClick = { viewModel.next(onNext) }) { Text(stringResource(R.string.player_next)) }
+            }
+            OutlinedButton(onClick = { showTracks = true }) { Text(stringResource(R.string.player_tracks)) }
             IconButton(onClick = viewModel::toggleFavorite) {
                 Icon(
                     Icons.Filled.Favorite,
@@ -192,4 +213,53 @@ private fun ReadyPlayer(state: PlayerState.Ready, viewModel: PlayerViewModel, on
             }
         }
     }
+}
+
+@OptIn(UnstableApi::class)
+@Composable
+private fun TrackDialog(player: Player, tracks: androidx.media3.common.Tracks, onDismiss: () -> Unit) {
+    val audio = tracks.groups.filter { it.type == androidx.media3.common.C.TRACK_TYPE_AUDIO && it.isSupported }
+    val text = tracks.groups.filter { it.type == androidx.media3.common.C.TRACK_TYPE_TEXT && it.isSupported }
+    val textDisabled = player.trackSelectionParameters.disabledTrackTypes.contains(androidx.media3.common.C.TRACK_TYPE_TEXT)
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.player_tracks)) },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.player_audio), style = MaterialTheme.typography.titleSmall)
+                if (audio.size <= 1) Text(stringResource(R.string.player_single_track), style = MaterialTheme.typography.bodySmall)
+                audio.forEachIndexed { i, group ->
+                    TextButton(onClick = {
+                        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                            .setOverrideForType(androidx.media3.common.TrackSelectionOverride(group.mediaTrackGroup, 0))
+                            .build()
+                        onDismiss()
+                    }) { Text(trackLabel(group, i) + if (group.isSelected) " ✓" else "") }
+                }
+                Text(stringResource(R.string.player_subtitles), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+                TextButton(onClick = {
+                    player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                        .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true).build()
+                    onDismiss()
+                }) { Text(stringResource(R.string.player_subtitles_off) + if (textDisabled || text.none { it.isSelected }) " ✓" else "") }
+                text.forEachIndexed { i, group ->
+                    TextButton(onClick = {
+                        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                            .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, false)
+                            .setOverrideForType(androidx.media3.common.TrackSelectionOverride(group.mediaTrackGroup, 0))
+                            .build()
+                        onDismiss()
+                    }) { Text(trackLabel(group, i) + if (group.isSelected && !textDisabled) " ✓" else "") }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.storage_message_ok)) } },
+    )
+}
+
+private fun trackLabel(group: androidx.media3.common.Tracks.Group, index: Int): String {
+    val f = group.mediaTrackGroup.getFormat(0)
+    val language = f.language?.takeIf { it != "und" }?.let { java.util.Locale(it).displayLanguage }
+    val parts = listOfNotNull(f.label, language, f.channelCount.takeIf { it > 0 }?.let { "$it Kanäle" })
+    return if (parts.isEmpty()) "Spur ${index + 1}" else parts.joinToString(" · ")
 }

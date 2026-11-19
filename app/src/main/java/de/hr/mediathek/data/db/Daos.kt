@@ -246,6 +246,9 @@ interface MediaFileDao {
     )
     fun observeDuplicates(): Flow<List<MediaFileEntity>>
 
+    @RawQuery(observedEntities = [MediaFileEntity::class])
+    suspend fun uuids(query: SupportSQLiteQuery): List<String>
+
     @Query("UPDATE media_file SET status = 'OFFLINE', updatedAt = :now WHERE uuid = :uuid AND status = 'ONLINE'")
     suspend fun markOffline(uuid: String, now: Long)
 
@@ -455,4 +458,73 @@ interface TrashDao {
             "WHERE t.entityType = 'MEDIA' AND t.expiresAt < :now",
     )
     suspend fun expired(now: Long): List<TrashRow>
+}
+
+@Dao
+interface TagDao {
+    @Query("SELECT * FROM tag WHERE deletedAt IS NULL ORDER BY name COLLATE NOCASE")
+    fun observeAll(): Flow<List<TagEntity>>
+
+    @Query("SELECT * FROM tag WHERE deletedAt IS NULL AND nameNormalized = :normalized LIMIT 1")
+    suspend fun findByNormalized(normalized: String): TagEntity?
+
+    @Insert
+    suspend fun insert(tag: TagEntity): Long
+
+    @Query("UPDATE tag SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun tombstone(uuid: String, now: Long)
+
+    @Query(
+        "UPDATE tag_assignment SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now " +
+            "WHERE tagUuid = :tagUuid AND deletedAt IS NULL",
+    )
+    suspend fun tombstoneAllAssignments(tagUuid: String, now: Long)
+
+    @Query("SELECT * FROM tag_assignment WHERE entityType = 'MEDIA' AND tagUuid = :tagUuid AND entityUuid IN (:mediaUuids)")
+    suspend fun assignmentsFor(tagUuid: String, mediaUuids: List<String>): List<TagAssignmentEntity>
+
+    @Upsert
+    suspend fun upsertAssignments(items: List<TagAssignmentEntity>)
+
+    @Query(
+        "UPDATE tag_assignment SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now " +
+            "WHERE entityType = 'MEDIA' AND tagUuid = :tagUuid AND entityUuid IN (:mediaUuids) AND deletedAt IS NULL",
+    )
+    suspend fun tombstoneAssignments(tagUuid: String, mediaUuids: List<String>, now: Long)
+
+    @Query("SELECT DISTINCT tagUuid FROM tag_assignment WHERE entityType = 'MEDIA' AND deletedAt IS NULL AND entityUuid IN (:mediaUuids)")
+    suspend fun usedTags(mediaUuids: List<String>): List<String>
+}
+
+@Dao
+interface PlaylistDao {
+    @Query("SELECT * FROM playlist WHERE deletedAt IS NULL ORDER BY name COLLATE NOCASE")
+    fun observeAll(): Flow<List<PlaylistEntity>>
+
+    @Query("SELECT * FROM playlist WHERE uuid = :uuid AND deletedAt IS NULL")
+    suspend fun get(uuid: String): PlaylistEntity?
+
+    @Insert
+    suspend fun insert(playlist: PlaylistEntity): Long
+
+    @Query("UPDATE playlist SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun tombstone(uuid: String, now: Long)
+
+    @Query("UPDATE playlist_item SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE playlistUuid = :uuid AND deletedAt IS NULL")
+    suspend fun tombstoneAllItems(uuid: String, now: Long)
+
+    @Query("SELECT COALESCE(MAX(position), -1) FROM playlist_item WHERE playlistUuid = :uuid AND deletedAt IS NULL")
+    suspend fun maxPosition(uuid: String): Int
+
+    @Query("SELECT * FROM playlist_item WHERE playlistUuid = :uuid AND mediaUuid IN (:mediaUuids)")
+    suspend fun itemsFor(uuid: String, mediaUuids: List<String>): List<PlaylistItemEntity>
+
+    @Upsert
+    suspend fun upsertItems(items: List<PlaylistItemEntity>)
+
+    @Query(
+        "UPDATE playlist_item SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now " +
+            "WHERE playlistUuid = :uuid AND mediaUuid IN (:mediaUuids) AND deletedAt IS NULL",
+    )
+    suspend fun tombstoneItems(uuid: String, mediaUuids: List<String>, now: Long)
 }

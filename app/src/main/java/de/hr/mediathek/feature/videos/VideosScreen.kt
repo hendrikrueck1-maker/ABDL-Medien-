@@ -75,6 +75,13 @@ fun VideosScreen(
     val categories by viewModel.categoryList.collectAsStateWithLifecycle()
     val usedCategories by viewModel.usedCategories.collectAsStateWithLifecycle()
     var showCategoryDialog by remember { mutableStateOf(false) }
+    val tags by viewModel.tagList.collectAsStateWithLifecycle()
+    val usedTags by viewModel.usedTags.collectAsStateWithLifecycle()
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    var showTagDialog by remember { mutableStateOf(false) }
+    var showPlaylistDialog by remember { mutableStateOf(false) }
+    var showPlaylistPick by remember { mutableStateOf(false) }
+    var noRandom by remember { mutableStateOf(false) }
     var rateMenu by remember { mutableStateOf(false) }
     val trashResult by viewModel.trashResult.collectAsStateWithLifecycle()
     var confirmTrash by remember { mutableStateOf(0) } // 0 = zu, 1 = erste Rückfrage, 2 = zweite ab 10 Dateien
@@ -92,6 +99,8 @@ fun VideosScreen(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f),
                 )
+                Button(onClick = { viewModel.openRandom(onOpen) { noRandom = true } }) { Text(stringResource(R.string.video_random)) }
+                OutlinedButton(onClick = { showPlaylistDialog = true }) { Text(stringResource(R.string.playlist_title)) }
                 OutlinedButton(onClick = onOpenDuplicates) { Text(stringResource(R.string.dup_title)) }
                 OutlinedButton(onClick = onOpenTrash) { Text(stringResource(R.string.trash_title)) }
             }
@@ -126,6 +135,14 @@ fun VideosScreen(
                     viewModel.loadUsedCategories()
                     showCategoryDialog = true
                 }) { Text(stringResource(R.string.video_category_action)) }
+                OutlinedButton(onClick = {
+                    viewModel.loadUsedTags()
+                    showTagDialog = true
+                }) { Text(stringResource(R.string.tag_action)) }
+                OutlinedButton(onClick = { showPlaylistPick = true }) { Text(stringResource(R.string.playlist_add_action)) }
+                if (filter.playlistUuid != null) {
+                    OutlinedButton(onClick = viewModel::removeSelectedFromCurrentPlaylist) { Text(stringResource(R.string.playlist_remove_action)) }
+                }
                 OutlinedButton(onClick = { confirmTrash = 1 }) { Text(stringResource(R.string.trash_action)) }
                 TextButton(onClick = viewModel::clearSelection) { Text(stringResource(R.string.video_clear_selection)) }
             }
@@ -141,7 +158,7 @@ fun VideosScreen(
             Box {
                 OutlinedButton(onClick = { sortMenu = true }) { Text(stringResource(sortLabel(filter.sort))) }
                 DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
-                    VideoSort.entries.forEach { sort ->
+                    VideoSort.entries.filter { it != VideoSort.PLAYLIST_ORDER }.forEach { sort ->
                         DropdownMenuItem(
                             text = { Text(stringResource(sortLabel(sort))) },
                             onClick = {
@@ -183,6 +200,20 @@ fun VideosScreen(
                 onClick = { viewModel.update { it.copy(onlineOnly = !it.onlineOnly) } },
                 label = { Text(stringResource(R.string.video_filter_online)) },
             )
+            filter.playlistUuid?.let { pl ->
+                FilterChip(
+                    selected = true,
+                    onClick = { viewModel.update { it.copy(playlistUuid = null, sort = VideoSort.ADDED_DESC) } },
+                    label = { Text("▶ " + (playlists.firstOrNull { it.uuid == pl }?.name ?: "") + " ✕") },
+                )
+            }
+            tags.forEach { tag ->
+                FilterChip(
+                    selected = filter.tagUuid == tag.uuid,
+                    onClick = { viewModel.update { it.copy(tagUuid = if (it.tagUuid == tag.uuid) null else tag.uuid) } },
+                    label = { Text("#" + tag.name) },
+                )
+            }
             categories.forEach { category ->
                 FilterChip(
                     selected = filter.categoryUuid == category.uuid,
@@ -234,13 +265,58 @@ fun VideosScreen(
         }
         if (showCategoryDialog) {
             CategoryDialog(
-                categories = categories,
+                title = stringResource(R.string.video_category_action),
+                categories = categories.map { LabelItem(it.uuid, it.name) },
                 used = usedCategories,
                 onAssign = viewModel::assignSelected,
                 onUnassign = viewModel::unassignSelected,
                 onCreate = viewModel::createCategory,
                 onDelete = viewModel::deleteCategory,
                 onDismiss = { showCategoryDialog = false },
+            )
+        }
+
+        if (showTagDialog) {
+            CategoryDialog(
+                title = stringResource(R.string.tag_action),
+                categories = tags.map { LabelItem(it.uuid, it.name) },
+                used = usedTags,
+                onAssign = viewModel::assignTag,
+                onUnassign = viewModel::unassignTag,
+                onCreate = viewModel::createTag,
+                onDelete = viewModel::deleteTag,
+                onDismiss = { showTagDialog = false },
+            )
+        }
+        if (showPlaylistDialog) {
+            PlaylistDialog(
+                playlists = playlists,
+                pickMode = false,
+                onOpen = { showPlaylistDialog = false; viewModel.applyPlaylist(it) },
+                onAddSelected = {},
+                onCreate = viewModel::createPlaylist,
+                onSaveSmart = viewModel::saveSmartPlaylist,
+                onDelete = viewModel::deletePlaylist,
+                onDismiss = { showPlaylistDialog = false },
+            )
+        }
+        if (showPlaylistPick) {
+            PlaylistDialog(
+                playlists = playlists,
+                pickMode = true,
+                onOpen = {},
+                onAddSelected = { showPlaylistPick = false; viewModel.addSelectedToPlaylist(it.uuid) },
+                onCreate = viewModel::createPlaylist,
+                onSaveSmart = {},
+                onDelete = {},
+                onDismiss = { showPlaylistPick = false },
+            )
+        }
+        if (noRandom) {
+            AlertDialog(
+                onDismissRequest = { noRandom = false },
+                text = { Text(stringResource(R.string.video_random_none)) },
+                confirmButton = { TextButton(onClick = { noRandom = false }) { Text(stringResource(R.string.storage_message_ok)) } },
             )
         }
 
@@ -265,7 +341,12 @@ fun VideosScreen(
                         viewModel = viewModel,
                         selected = video.uuid in selected,
                         onClick = {
-                            if (selected.isNotEmpty()) viewModel.toggleSelected(video.uuid) else onOpen(video.uuid)
+                            if (selected.isNotEmpty()) {
+                                viewModel.toggleSelected(video.uuid)
+                            } else {
+                                viewModel.rememberContext()
+                                onOpen(video.uuid)
+                            }
                         },
                         onLongClick = { viewModel.toggleSelected(video.uuid) },
                     )
@@ -277,7 +358,8 @@ fun VideosScreen(
 
 @Composable
 private fun CategoryDialog(
-    categories: List<de.hr.mediathek.data.db.CategoryEntity>,
+    title: String,
+    categories: List<LabelItem>,
     used: Set<String>,
     onAssign: (String) -> Unit,
     onUnassign: (String) -> Unit,
@@ -286,10 +368,10 @@ private fun CategoryDialog(
     onDismiss: () -> Unit,
 ) {
     var newName by remember { mutableStateOf("") }
-    var confirmDelete by remember { mutableStateOf<de.hr.mediathek.data.db.CategoryEntity?>(null) }
+    var confirmDelete by remember { mutableStateOf<LabelItem?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.video_category_action)) },
+        title = { Text(title) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (categories.isEmpty()) Text(stringResource(R.string.category_none))
@@ -339,7 +421,80 @@ private fun CategoryDialog(
     }
 }
 
+private data class LabelItem(val uuid: String, val name: String)
+
+@Composable
+private fun PlaylistDialog(
+    playlists: List<de.hr.mediathek.data.db.PlaylistEntity>,
+    pickMode: Boolean,
+    onOpen: (de.hr.mediathek.data.db.PlaylistEntity) -> Unit,
+    onAddSelected: (de.hr.mediathek.data.db.PlaylistEntity) -> Unit,
+    onCreate: (String) -> Unit,
+    onSaveSmart: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var newName by remember { mutableStateOf("") }
+    var confirmDelete by remember { mutableStateOf<de.hr.mediathek.data.db.PlaylistEntity?>(null) }
+    val list = if (pickMode) playlists.filter { it.type == de.hr.mediathek.data.db.PlaylistType.MANUAL } else playlists
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(if (pickMode) R.string.playlist_pick_title else R.string.playlist_title)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (list.isEmpty()) Text(stringResource(R.string.playlist_none))
+                list.forEach { p ->
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            p.name + if (p.type == de.hr.mediathek.data.db.PlaylistType.SMART) " " + stringResource(R.string.playlist_smart_suffix) else "",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        if (pickMode) {
+                            TextButton(onClick = { onAddSelected(p) }) { Text(stringResource(R.string.category_add)) }
+                        } else {
+                            TextButton(onClick = { onOpen(p) }) { Text(stringResource(R.string.playlist_open)) }
+                            TextButton(onClick = { confirmDelete = p }) { Text(stringResource(R.string.category_delete)) }
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text(stringResource(R.string.playlist_new)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { onCreate(newName); newName = "" }, enabled = newName.isNotBlank()) {
+                        Text(stringResource(R.string.playlist_create))
+                    }
+                    if (!pickMode) {
+                        OutlinedButton(onClick = { onSaveSmart(newName); newName = "" }, enabled = newName.isNotBlank()) {
+                            Text(stringResource(R.string.playlist_save_smart))
+                        }
+                    }
+                }
+                if (!pickMode) Text(stringResource(R.string.playlist_smart_hint), style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.storage_message_ok)) } },
+    )
+    confirmDelete?.let { p ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            title = { Text(stringResource(R.string.category_delete_title, p.name)) },
+            text = { Text(stringResource(R.string.playlist_delete_text)) },
+            confirmButton = {
+                TextButton(onClick = { onDelete(p.uuid); confirmDelete = null }) { Text(stringResource(R.string.category_delete)) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(stringResource(R.string.diag_cancel)) } },
+        )
+    }
+}
+
 private fun sortLabel(sort: VideoSort): Int = when (sort) {
+    VideoSort.PLAYLIST_ORDER -> R.string.sort_playlist
     VideoSort.ADDED_DESC -> R.string.sort_added
     VideoSort.NAME_ASC -> R.string.sort_name_asc
     VideoSort.NAME_DESC -> R.string.sort_name_desc

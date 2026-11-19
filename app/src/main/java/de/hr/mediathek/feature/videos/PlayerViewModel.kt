@@ -39,6 +39,7 @@ class PlayerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val mediaDao: MediaFileDao,
     private val sourceDao: SourceDao,
+    private val playback: PlaybackContext,
 ) : ViewModel() {
 
     private val uuid: String = checkNotNull(savedStateHandle["uuid"])
@@ -94,6 +95,19 @@ class PlayerViewModel @Inject constructor(
         // Läuft auch nach dem Verlassen des Bildschirms zu Ende, damit die letzte Position nicht verloren geht.
         viewModelScope.launch(NonCancellable) { mediaDao.setProgress(uuid, stored, seen, System.currentTimeMillis()) }
     }
+
+    /** Das Video nach diesem in der Liste, aus der geöffnet wurde (Filter, Sortierung, Playlist). */
+    fun next(onFound: (String) -> Unit) {
+        val ctx = playback.filter ?: return
+        viewModelScope.launch {
+            val built = VideoQuery.buildOrderedUuids(ctx, playback.seed)
+            val ids = mediaDao.uuids(androidx.sqlite.db.SimpleSQLiteQuery(built.sql, built.args.toTypedArray()))
+            val idx = ids.indexOf(uuid)
+            ids.getOrNull(idx + 1)?.let(onFound)
+        }
+    }
+
+    val hasContext: Boolean get() = playback.filter != null
 
     fun setRating(rating: Int) {
         val current = _state.value as? PlayerState.Ready ?: return

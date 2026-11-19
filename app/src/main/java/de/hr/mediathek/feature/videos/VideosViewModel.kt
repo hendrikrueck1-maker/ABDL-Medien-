@@ -34,6 +34,9 @@ class VideosViewModel @Inject constructor(
     private val thumbs: ThumbnailCache,
     private val categories: CategoryRepository,
     private val trash: de.hr.mediathek.data.trash.TrashRepository,
+    private val tags: de.hr.mediathek.data.tag.TagRepository,
+    private val playlistRepo: de.hr.mediathek.data.playlist.PlaylistRepository,
+    private val playback: PlaybackContext,
 ) : ViewModel() {
 
     private val _filter = MutableStateFlow(VideoFilter())
@@ -41,6 +44,12 @@ class VideosViewModel @Inject constructor(
 
     /** Seed für "Zufall": bleibt während der Sitzung gleich, damit beim Blättern nichts doppelt oder fehlt. */
     private var randomSeed = System.currentTimeMillis() % 1_000_000_000L
+
+    val tagList: StateFlow<List<de.hr.mediathek.data.db.TagEntity>> = tags.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val playlists: StateFlow<List<de.hr.mediathek.data.db.PlaylistEntity>> = playlistRepo.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     val videos: Flow<PagingData<MediaFileEntity>> = _filter
         .debounce(250)
@@ -95,6 +104,86 @@ class VideosViewModel @Inject constructor(
 
     fun dismissTrashResult() {
         _trashResult.value = null
+    }
+
+    private val _usedTags = MutableStateFlow<Set<String>>(emptySet())
+    val usedTags: StateFlow<Set<String>> = _usedTags
+
+    fun loadUsedTags() {
+        val ids = _selected.value.toList()
+        viewModelScope.launch { _usedTags.value = tags.usedBy(ids) }
+    }
+
+    fun assignTag(uuid: String) = withSelection { tags.assign(it, uuid); _usedTags.value = tags.usedBy(it) }
+    fun unassignTag(uuid: String) = withSelection { tags.unassign(it, uuid); _usedTags.value = tags.usedBy(it) }
+
+    fun createTag(name: String) {
+        viewModelScope.launch { tags.create(name) }
+    }
+
+    fun deleteTag(uuid: String) {
+        viewModelScope.launch {
+            tags.delete(uuid)
+            if (_filter.value.tagUuid == uuid) update { it.copy(tagUuid = null) }
+        }
+    }
+
+    // --- Playlists ---------------------------------------------------------------------------
+
+    fun createPlaylist(name: String) {
+        viewModelScope.launch { playlistRepo.createManual(name) }
+    }
+
+    fun saveSmartPlaylist(name: String) {
+        viewModelScope.launch { playlistRepo.createSmart(name, _filter.value.copy(playlistUuid = null, sort = _filter.value.sort)) }
+    }
+
+    fun deletePlaylist(uuid: String) {
+        viewModelScope.launch {
+            playlistRepo.delete(uuid)
+            if (_filter.value.playlistUuid == uuid) update { it.copy(playlistUuid = null, sort = VideoSort.ADDED_DESC) }
+        }
+    }
+
+    fun addSelectedToPlaylist(uuid: String) = withSelection { playlistRepo.add(uuid, it) }
+
+    fun removeSelectedFromCurrentPlaylist() {
+        val pl = _filter.value.playlistUuid ?: return
+        withSelection { playlistRepo.remove(pl, it) }
+    }
+
+    /** Öffnet eine Playlist: manuell = nur ihre Videos in Listenreihenfolge, smart = gespeicherter Filter. */
+    fun applyPlaylist(playlist: de.hr.mediathek.data.db.PlaylistEntity) {
+        if (playlist.type == de.hr.mediathek.data.db.PlaylistType.MANUAL) {
+            _filter.value = VideoFilter(playlistUuid = playlist.uuid, sort = VideoSort.PLAYLIST_ORDER)
+        } else {
+            _filter.value = de.hr.mediathek.data.playlist.FilterJson.decode(playlist.filterJson, playlist.filterVersion)
+            playlist.randomSeed?.let { randomSeed = it }
+        }
+    }
+
+    // --- Öffnen und Zufall -------------------------------------------------------------------
+
+    /** Merkt die Liste, aus der geöffnet wird, damit der Player "Nächstes" kennt. */
+    fun rememberContext() {
+        playback.filter = _filter.value
+        playback.seed = randomSeed
+    }
+
+    /** Ein zufälliges verfügbares Video aus dem aktuellen Filter; danach läuft der Player zufällig weiter. */
+    fun openRandom(onFound: (String) -> Unit, onNone: () -> Unit) {
+        viewModelScope.launch {
+            val built = VideoQuery.buildRandomPick(_filter.value)
+            val id = dao.uuids(SimpleSQLiteQuery(built.sql, built.args.toTypedArray())).firstOrNull()
+            if (id == null) {
+                onNone()
+            } else {
+                randomSeed = System.currentTimeMillis() % 1_000_000_000L
+                playback.filter = _filter.value.copy(sort = VideoSort.RANDOM)
+                playback.seed = randomSeed
+                onFound(id)
+            }
+        }
     }
 
     fun createCategory(name: String) {

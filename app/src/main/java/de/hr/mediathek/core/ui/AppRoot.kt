@@ -97,7 +97,16 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         composable(
             route = "player/{uuid}",
             arguments = listOf(navArgument("uuid") { type = NavType.StringType }),
-        ) { PlayerScreen(onBack = { navController.popBackStack() }) }
+        ) {
+            PlayerScreen(
+                onBack = { navController.popBackStack() },
+                onNext = { next ->
+                    // Das aktuelle Video wird durch das nächste ersetzt, damit "Zurück" zur Liste führt.
+                    navController.popBackStack()
+                    navController.navigate("player/$next")
+                },
+            )
+        }
         Destination.entries
             .filter { it != Destination.Home && it != Destination.Settings && it != Destination.Videos }
             .forEach { destination ->
