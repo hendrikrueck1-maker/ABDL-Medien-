@@ -35,6 +35,7 @@ import de.hr.mediathek.core.ui.theme.TileColors
 import de.hr.mediathek.core.ui.theme.TilePalette
 
 private val moduleTiles = listOf(
+    Destination.Media,
     Destination.Stories,
     Destination.Images,
     Destination.Videos,
@@ -46,6 +47,7 @@ private fun tileColors(destination: Destination): TileColors {
     val dark = isSystemInDarkTheme()
     val scheme = MaterialTheme.colorScheme
     return when (destination) {
+        Destination.Media -> if (dark) TilePalette.lavenderDark else TilePalette.lavenderLight
         Destination.Stories -> TileColors(scheme.primaryContainer, scheme.onPrimaryContainer)
         Destination.Images -> TileColors(scheme.secondaryContainer, scheme.onSecondaryContainer)
         Destination.Videos -> TileColors(scheme.tertiaryContainer, scheme.onTertiaryContainer)

@@ -1,7 +1,12 @@
 package de.hr.mediathek.core.ui
 
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -92,6 +97,12 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
                 onOpenDuplicates = { navController.navigate("duplicates") },
             )
         }
+        composable(Destination.Media.route) {
+            de.hr.mediathek.feature.media.MediaAllScreen(
+                onOpenVideo = { navController.navigate("player/$it") },
+                onOpenImage = { navController.navigate("image/$it") },
+            )
+        }
         composable(Destination.Images.route) {
             de.hr.mediathek.feature.images.ImagesScreen(
                 onOpen = { navController.navigate("image/$it") },
@@ -128,7 +139,7 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         Destination.entries
             .filter {
                 it != Destination.Home && it != Destination.Settings && it != Destination.Videos &&
-                    it != Destination.Images
+                    it != Destination.Images && it != Destination.Media
             }
             .forEach { destination ->
                 composable(destination.route) {
@@ -157,13 +168,20 @@ private fun AppBottomBar(navController: NavHostController) {
 private fun AppNavigationRail(navController: NavHostController) {
     val currentRoute = navController.currentRoute()
     NavigationRail {
-        Destination.entries.forEach { destination ->
-            NavigationRailItem(
-                selected = currentRoute == destination.route,
-                onClick = { navController.navigateTopLevel(destination) },
-                icon = { Icon(destination.icon, contentDescription = null) },
-                label = { Text(stringResource(destination.label)) },
-            )
+        Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+            var previousGroup = Destination.entries.first().group
+            Destination.entries.forEach { destination ->
+                if (destination.group != previousGroup) {
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    previousGroup = destination.group
+                }
+                NavigationRailItem(
+                    selected = currentRoute == destination.route,
+                    onClick = { navController.navigateTopLevel(destination) },
+                    icon = { Icon(destination.icon, contentDescription = null) },
+                    label = { Text(stringResource(destination.label)) },
+                )
+            }
         }
     }
 }

@@ -341,4 +341,8 @@
     <string name="badge_offline">Offline</string>
     <string name="search_hint">Suchen</string>
     <string name="menu_more">Mehr</string>
+    <string name="nav_media">Alle Medien</string>
+    <string name="media_empty">Keine Medien gefunden. Binde unter Einstellungen einen Ordner ein und lies ihn ein.</string>
+    <string name="media_type_video">Video</string>
+    <string name="media_type_image">Bild</string>
 </resources>
