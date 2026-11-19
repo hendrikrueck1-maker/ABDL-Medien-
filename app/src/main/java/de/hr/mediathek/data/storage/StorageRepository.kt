@@ -7,8 +7,12 @@ import android.provider.DocumentsContract
 import dagger.hilt.android.qualifiers.ApplicationContext
 import de.hr.mediathek.core.log.ErrorLogger
 import de.hr.mediathek.core.log.ErrorType
+import de.hr.mediathek.data.db.JobDao
+import de.hr.mediathek.data.db.JobEntity
+import de.hr.mediathek.data.db.MediaFileDao
 import de.hr.mediathek.data.db.SettingDao
 import de.hr.mediathek.data.db.SettingEntity
+import de.hr.mediathek.data.db.SourceCount
 import de.hr.mediathek.data.db.SourceDao
 import de.hr.mediathek.data.db.SourceEntity
 import de.hr.mediathek.data.db.SourceRole
@@ -35,10 +39,14 @@ sealed interface WorkFolderResult {
 class StorageRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sourceDao: SourceDao,
+    private val mediaDao: MediaFileDao,
+    private val jobDao: JobDao,
     private val settingDao: SettingDao,
     private val errorLogger: ErrorLogger,
 ) {
     fun observeSources(): Flow<List<SourceEntity>> = sourceDao.observeAll()
+    fun observeCounts(): Flow<List<SourceCount>> = mediaDao.observeCounts()
+    fun observeScanJobs(): Flow<List<JobEntity>> = jobDao.observeRecentScans()
     fun observeWorkFolderLabel(): Flow<String?> = settingDao.observe(KEY_WORK_FOLDER_LABEL)
     fun observeOnboardingSeen(): Flow<String?> = settingDao.observe(KEY_SAF_ONBOARDING)
 

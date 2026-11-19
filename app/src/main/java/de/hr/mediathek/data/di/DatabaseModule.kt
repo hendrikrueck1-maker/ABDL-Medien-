@@ -8,6 +8,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import de.hr.mediathek.data.db.ErrorLogDao
+import de.hr.mediathek.data.db.JobDao
+import de.hr.mediathek.data.db.MediaFileDao
 import de.hr.mediathek.data.db.MediathekDatabase
 import de.hr.mediathek.data.db.MigrationBackup
 import de.hr.mediathek.data.db.SettingDao
@@ -31,4 +33,6 @@ object DatabaseModule {
     @Provides fun provideSourceDao(db: MediathekDatabase): SourceDao = db.sourceDao()
     @Provides fun provideSettingDao(db: MediathekDatabase): SettingDao = db.settingDao()
     @Provides fun provideErrorLogDao(db: MediathekDatabase): ErrorLogDao = db.errorLogDao()
+    @Provides fun provideMediaFileDao(db: MediathekDatabase): MediaFileDao = db.mediaFileDao()
+    @Provides fun provideJobDao(db: MediathekDatabase): JobDao = db.jobDao()
 }

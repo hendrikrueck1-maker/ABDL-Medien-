@@ -56,6 +56,8 @@ data class MediaFileEntity(
     val mimeType: String? = null,
     val dateDetermined: Long? = null,
     val dateSource: DateSource? = null,
+    /** Änderungszeit der Datei (ms), für das schnelle Erkennen unveränderter Dateien beim Scan. */
+    val lastModified: Long? = null,
     val status: MediaStatus = MediaStatus.ONLINE,
     val missingScanCount: Int = 0,
     val lastSeenScanUuid: String? = null,

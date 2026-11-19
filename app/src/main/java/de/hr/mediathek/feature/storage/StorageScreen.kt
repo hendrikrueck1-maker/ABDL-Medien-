@@ -1,5 +1,14 @@
 package de.hr.mediathek.feature.storage
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import de.hr.mediathek.data.db.JobStatus
+import de.hr.mediathek.core.jobs.JobRunner
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +51,17 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
     }
     val workPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) viewModel.setWorkFolder(uri)
+    }
+
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    val context = LocalContext.current
+    val requestNotificationPermissionIfNeeded: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     if (showOnboarding) {
@@ -111,24 +131,16 @@ fun StorageScreen(onBack: () -> Unit, viewModel: StorageViewModel = hiltViewMode
                     )
                 }
                 state.sources.forEach { item ->
-                    Column {
-                        Text(
-                            item.source.label,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                        Text(
-                            stringResource(
-                                when (item.reachable) {
-                                    true -> R.string.storage_status_online
-                                    false -> R.string.storage_status_offline
-                                    null -> R.string.storage_status_checking
-                                },
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
+                    SourceBlock(
+                        item = item,
+                        onScan = {
+                            requestNotificationPermissionIfNeeded()
+                            viewModel.scan(item.source)
+                        },
+                        onCancel = { item.job?.let { viewModel.cancelJob(it.uuid) } },
+                        onConfirm = { info -> viewModel.confirmMissing(info.jobUuid) },
+                        onDismiss = { info -> viewModel.dismissConfirmation(info.jobUuid) },
+                    )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Button(onClick = {
@@ -177,4 +189,93 @@ private fun StorageMessage.textRes(): Int = when (this) {
     StorageMessage.WORK_FOLDER_SET -> R.string.storage_msg_work_set
     StorageMessage.WORK_FOLDER_REJECTED -> R.string.storage_msg_work_rejected
     StorageMessage.WORK_FOLDER_FAILED -> R.string.storage_msg_work_failed
+    StorageMessage.SCAN_ALREADY_ACTIVE -> R.string.storage_msg_scan_active
+}
+
+@Composable
+private fun SourceBlock(
+    item: SourceItem,
+    onScan: () -> Unit,
+    onCancel: () -> Unit,
+    onConfirm: (ConfirmInfo) -> Unit,
+    onDismiss: (ConfirmInfo) -> Unit,
+) {
+    val textColor = MaterialTheme.colorScheme.onSecondaryContainer
+    val job = item.job
+    val busy = job != null && (job.status == JobStatus.QUEUED || job.status == JobStatus.RUNNING || job.status == JobStatus.PAUSED)
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(item.source.label, style = MaterialTheme.typography.titleSmall, color = textColor)
+        Text(
+            stringResource(
+                when (item.reachable) {
+                    true -> R.string.storage_status_online
+                    false -> R.string.storage_status_offline
+                    null -> R.string.storage_status_checking
+                },
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = textColor,
+        )
+        if (item.total > 0) {
+            Text(
+                stringResource(R.string.storage_counts, item.total, item.offline),
+                style = MaterialTheme.typography.bodySmall,
+                color = textColor,
+            )
+        }
+
+        when {
+            item.confirm != null -> {
+                Text(
+                    stringResource(R.string.storage_confirm_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                Text(
+                    stringResource(R.string.storage_confirm_text, item.confirm.missing, item.confirm.total),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = textColor,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { onConfirm(item.confirm) }) { Text(stringResource(R.string.storage_confirm_yes)) }
+                    OutlinedButton(onClick = { onDismiss(item.confirm) }) { Text(stringResource(R.string.storage_confirm_no)) }
+                }
+            }
+            job != null && job.status == JobStatus.QUEUED -> {
+                Text(stringResource(R.string.storage_scan_queued), style = MaterialTheme.typography.bodySmall, color = textColor)
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+            job != null && job.status == JobStatus.RUNNING -> {
+                Text(job.phase ?: "", style = MaterialTheme.typography.bodySmall, color = textColor)
+                val progress = job.progress
+                if (progress != null) {
+                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                } else {
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
+            }
+            job != null && job.status == JobStatus.COMPLETED ->
+                Text(job.phase ?: "", style = MaterialTheme.typography.bodySmall, color = textColor)
+            job != null && job.status == JobStatus.FAILED ->
+                Text(
+                    stringResource(R.string.storage_scan_failed, job.lastError ?: "-"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            job != null && job.status == JobStatus.CANCELLED ->
+                Text(stringResource(R.string.storage_scan_cancelled), style = MaterialTheme.typography.bodySmall, color = textColor)
+        }
+
+        if (item.confirm == null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onScan, enabled = item.reachable == true && !busy) {
+                    Text(stringResource(R.string.storage_scan_now))
+                }
+                if (job != null && (job.status == JobStatus.QUEUED || job.status == JobStatus.RUNNING)) {
+                    OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.storage_scan_cancel)) }
+                }
+            }
+        }
+    }
 }
