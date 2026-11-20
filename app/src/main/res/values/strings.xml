@@ -505,4 +505,29 @@
     <string name="reader_expand_images">Bilder einblenden</string>
     <string name="reader_collapse_images">Bilder einklappen</string>
     <string name="reader_tools_title">Lesen</string>
+    <string name="tracker_title">Tracker</string>
+    <string name="tracker_day_start">Tag beginnt um %1$s</string>
+    <string name="tracker_period_day">Tag</string>
+    <string name="tracker_period_week">Woche</string>
+    <string name="tracker_period_month">Monat</string>
+    <string name="tracker_quick">Schnell eintragen</string>
+    <string name="tracker_other">Anderes</string>
+    <string name="tracker_hint">Tippen = eintragen, lang drücken = mit Notiz</string>
+    <string name="tracker_stats_more">Mehr Statistik</string>
+    <string name="tracker_chart_title">Einträge im Zeitraum</string>
+    <string name="tracker_chart_total">Summe: %1$d</string>
+    <string name="tracker_chart_desc">Diagramm der Einträge: %1$s</string>
+    <string name="tracker_distribution">Verteilung</string>
+    <string name="tracker_cost_title">Kosten und Schnitt</string>
+    <string name="tracker_cost_sum">Kosten im Zeitraum: %1$s</string>
+    <string name="tracker_cost_avg">Schnitt pro %1$s: %2$s · %3$s Einträge</string>
+    <string name="tracker_without_price">%1$d Einträge ohne Preis sind nicht enthalten.</string>
+    <string name="tracker_entries">Einträge</string>
+    <string name="tracker_more">Mehr anzeigen</string>
+    <string name="tracker_edit">Eintrag bearbeiten</string>
+    <string name="tracker_undo">Eingetragen: %1$s</string>
+    <string name="tracker_undo_button">Rückgängig (%1$d s)</string>
+    <string name="tracker_search">Produkt suchen</string>
+    <string name="tracker_current">Aktuell: %1$s · %2$s</string>
+    <string name="tracker_none">Noch kein Eintrag.</string>
 </resources>

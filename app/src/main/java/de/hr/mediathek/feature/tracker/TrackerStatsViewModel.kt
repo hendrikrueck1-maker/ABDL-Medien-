@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
 
-enum class RangeFilter(val label: String, val days: Long?) { D30("30 Tage", 30), D90("90 Tage", 90), YEAR("1 Jahr", 365), ALL("Alles", null) }
+enum class RangeFilter(val label: String, val days: Long?) { D14("14 Tage", 14), D30("30 Tage", 30), D90("90 Tage", 90), YEAR("1 Jahr", 365), ALL("Alles", null) }
 
 data class StatsFilter(
     val period: StatPeriod = StatPeriod.DAY,
