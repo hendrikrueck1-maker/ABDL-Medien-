@@ -89,7 +89,7 @@ object PwaFormat {
     }
 
     /** True, wenn das Objekt wie eine Sicherung der PWA aussieht. */
-    fun isBackup(o: JSONObject) = listOf("ratings", "tags", "wip", "customStories", "progress").any { o.has(it) }
+    fun isBackup(o: JSONObject) = listOf("ratings", "read", "tags", "wip", "customStories", "progress", "translations").any { o.has(it) }
 
     /**
      * Sicherung: eigene Geschichten werden vollständig angelegt, für alle anderen IDs mit Bewertung, Geschlecht-Tag oder

@@ -68,11 +68,11 @@ fun MarkdownImportScreen(onBack: () -> Unit, viewModel: MarkdownImportViewModel 
         if (state.phase == MdPhase.IDLE) {
             Button(onClick = { folderPicker.launch(null) }, modifier = Modifier.fillMaxWidth()) { Text("Ordner wählen") }
             OutlinedButton(
-                onClick = { zipPicker.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
+                onClick = { zipPicker.launch(arrayOf("*/*")) },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("ZIP-Datei wählen") }
             OutlinedButton(
-                onClick = { jsonPicker.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
+                onClick = { jsonPicker.launch(arrayOf("*/*")) },
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("JSON-Datei wählen (Sicherung, Liste)") }
             state.message?.let { Text(it, color = MaterialTheme.colorScheme.error) }

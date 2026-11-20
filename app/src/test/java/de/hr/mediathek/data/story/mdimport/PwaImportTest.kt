@@ -136,7 +136,7 @@ class PwaImportTest {
         val unknown = run(FakeStore(), ContainerSource.fromJsonText("""{"foo":1}"""))
         assertTrue(unknown.errors.single().reason.startsWith("Unbekanntes JSON-Format"))
         val broken = run(FakeStore(), ContainerSource.fromJsonText("{kaputt"))
-        assertEquals("Kein gültiges JSON", broken.errors.single().reason)
+        assertTrue(broken.errors.single().reason.startsWith("Kein gültiges JSON"))
         val list = run(FakeStore(), ContainerSource.fromJsonText("""[{"title":"A","content":"x"}]"""))
         assertEquals(1, list.created)
     }

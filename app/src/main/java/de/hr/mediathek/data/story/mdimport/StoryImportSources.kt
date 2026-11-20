@@ -148,11 +148,11 @@ object ContainerSource {
                         ImportSource("Sicherung", list.size, list.asSequence(), notes)
                     }
                     o.has("title") && o.has("text") -> ImportSource("JSON", 1, sequenceOf(ImportItem("JSON-Datei") { PwaFormat.customStory("story", o, now) }))
-                    else -> failing("Unbekanntes JSON-Format (erwartet: Liste, geschichten-backup.json oder eine Geschichte mit title und text)")
+                    else -> failing("Unbekanntes JSON-Format (erwartet: Liste, geschichten-backup.json oder eine Geschichte mit title und text). Gefundene Felder: ${o.keys().asSequence().take(10).joinToString(", ").ifEmpty { "keine" }}")
                 }
             }
         } catch (e: org.json.JSONException) {
-            failing("Kein gültiges JSON")
+            failing("Kein gültiges JSON (${e.message?.take(80)})")
         }
     }
 }
