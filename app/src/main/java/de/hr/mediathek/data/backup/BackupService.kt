@@ -47,9 +47,9 @@ class BackupService @Inject constructor(
 
     private suspend fun runImport(uri: Uri): Result<ImportResult> = try {
         Result.success(
-            importer.import {
+            importer.import(open = {
                 context.contentResolver.openInputStream(uri) ?: throw java.io.IOException("Datei nicht lesbar")
-            },
+            }),
         )
     } catch (e: kotlin.coroutines.cancellation.CancellationException) {
         throw e
