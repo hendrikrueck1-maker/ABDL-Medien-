@@ -202,10 +202,17 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
                 onDuplicates = { navController.navigate("story-duplicates") },
                 onSeriesSuggest = { navController.navigate("story-series-suggest") },
                 onTools = { navController.navigate("story-tools") },
+                onEditSeries = { navController.navigate("series-edit/$it") },
             )
         }
         composable("story-duplicates") {
             de.hr.mediathek.feature.stories.DuplicatesScreen(
+                onBack = { navController.popBackStack() },
+                onOpen = { navController.navigate("story/$it") },
+            )
+        }
+        composable("series-edit/{uuid}", arguments = listOf(navArgument("uuid") { type = NavType.StringType })) {
+            de.hr.mediathek.feature.stories.SeriesEditScreen(
                 onBack = { navController.popBackStack() },
                 onOpen = { navController.navigate("story/$it") },
             )
@@ -229,6 +236,7 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
             de.hr.mediathek.feature.stories.StoryReaderScreen(
                 onBack = { navController.popBackStack() },
                 onEdit = { navController.navigate("story-edit/$it") },
+                onEditSeries = { navController.navigate("series-edit/$it") },
                 onOpenStory = { id ->
                     navController.navigate("story/$id") { popUpTo("story/{uuid}") { inclusive = true } }
                 },

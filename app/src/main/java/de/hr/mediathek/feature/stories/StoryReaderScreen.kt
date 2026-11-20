@@ -62,7 +62,7 @@ import kotlinx.coroutines.flow.debounce
 
 @OptIn(FlowPreview::class)
 @Composable
-fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, onOpenStory: (String) -> Unit = {}, viewModel: StoryReaderViewModel = hiltViewModel()) {
+fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, onOpenStory: (String) -> Unit = {}, onEditSeries: (String) -> Unit = {}, viewModel: StoryReaderViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     var showSettings by remember { mutableStateOf(false) }
@@ -128,6 +128,7 @@ fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, onOpenStory:
                     AlertDialog(
                         onDismissRequest = { showParts = false },
                         confirmButton = { TextButton(onClick = { showParts = false }) { Text("Schließen") } },
+                        dismissButton = { TextButton(onClick = { showParts = false; story.seriesUuid?.let(onEditSeries) }) { Text("✎ Serie bearbeiten") } },
                         title = { Text(sr.name) },
                         text = {
                             LazyColumn {

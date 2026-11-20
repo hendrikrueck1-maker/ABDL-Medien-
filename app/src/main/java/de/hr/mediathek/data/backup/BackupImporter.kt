@@ -218,6 +218,6 @@ class BackupImporter @Inject constructor(
             "work_folder_uri", "work_folder_label", "saf_onboarding_seen",
             "backup_last_success", "backup_last_records", "backup_warning",
         )
-        private val DEVICE_SETTING_PREFIXES = listOf("thumb_", "compress_", "search_sig_")
+        private val DEVICE_SETTING_PREFIXES = listOf("thumb_", "compress_", "search_sig_", "stories_")
     }
 }

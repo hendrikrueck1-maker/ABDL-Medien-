@@ -821,6 +821,12 @@ interface StoryDao {
     @Query("SELECT * FROM story WHERE uuid = :uuid")
     suspend fun get(uuid: String): StoryEntity?
 
+    @Query("UPDATE series SET name = :name, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun renameSeries(uuid: String, name: String, now: Long)
+
+    @Query("UPDATE series SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun softDeleteSeries(uuid: String, now: Long)
+
     @Query("SELECT uuid, name FROM series WHERE deletedAt IS NULL")
     fun observeSeriesRows(): Flow<List<SeriesRow>>
 
@@ -918,6 +924,12 @@ interface StoryDao {
             "ORDER BY COALESCE(seriesOrder, 1000000), createdAt, title",
     )
     fun observeSeriesParts(seriesUuid: String): Flow<List<SeriesPart>>
+
+    @Query(
+        "SELECT uuid, title, seriesOrder FROM story WHERE seriesUuid = :seriesUuid AND deletedAt IS NULL " +
+            "ORDER BY COALESCE(seriesOrder, 1000000), createdAt, title",
+    )
+    suspend fun seriesPartsOnce(seriesUuid: String): List<SeriesPart>
 
     @Query("SELECT name FROM series WHERE uuid = :uuid")
     suspend fun seriesName(uuid: String): String?

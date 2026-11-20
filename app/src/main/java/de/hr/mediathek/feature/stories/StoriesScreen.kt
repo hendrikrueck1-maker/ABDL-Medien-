@@ -30,6 +30,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,10 +56,12 @@ fun StoriesScreen(
     onDuplicates: () -> Unit = {},
     onSeriesSuggest: () -> Unit = {},
     onTools: () -> Unit = {},
+    onEditSeries: (String) -> Unit = {},
     viewModel: StoriesViewModel = hiltViewModel(),
 ) {
     val filter by viewModel.filter.collectAsStateWithLifecycle()
-    val items by viewModel.items.collectAsStateWithLifecycle()
+    val paged by viewModel.paged.collectAsStateWithLifecycle()
+    val lastOpened by viewModel.lastOpened.collectAsStateWithLifecycle()
     val trash by viewModel.trash.collectAsStateWithLifecycle()
     val resume by viewModel.continueReading.collectAsStateWithLifecycle()
     val folders by viewModel.folders.collectAsStateWithLifecycle()
@@ -66,11 +69,27 @@ fun StoriesScreen(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     var menu by remember { mutableStateOf(false) }
+    var gotoPage by remember { mutableStateOf(false) }
+    var firstShown by remember { mutableStateOf(false) }
     var pickFor by remember { mutableStateOf<List<String>?>(null) }
     var newFolder by remember { mutableStateOf<String?>(null) } // Name im Eingabedialog
     var renameFolder by remember { mutableStateOf<String?>(null) }
     var confirmDeleteFolder by remember { mutableStateOf(false) }
     val currentFolder = folders.firstOrNull { it.uuid == filter.folder }
+    val items = paged.items
+    val stripShown = resume.isNotEmpty() && paged.page == 0
+
+    // Beim ersten Anzeigen zur zuletzt geöffneten Geschichte springen, danach bei jedem Seitenwechsel nach oben.
+    LaunchedEffect(paged.page, paged.loaded) {
+        if (!paged.loaded) return@LaunchedEffect
+        if (!firstShown) {
+            firstShown = true
+            val idx = items.indexOfFirst { it is ListItem.Single && it.row.uuid == lastOpened || it is ListItem.SeriesGroup && it.parts.any { p -> p.uuid == lastOpened } }
+            if (idx > 0) listState.scrollToItem(idx + if (stripShown) 1 else 0)
+        } else {
+            listState.scrollToItem(0)
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
@@ -176,11 +195,11 @@ fun StoriesScreen(
                     }
                 }
             } else {
-                if (items.isEmpty() && resume.isEmpty()) {
+                if (paged.loaded && items.isEmpty() && resume.isEmpty()) {
                     Text("Keine Geschichten gefunden.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-                    if (resume.isNotEmpty()) {
+                    if (stripShown) {
                         item(key = "resume") { ResumeStrip(resume, onOpen) }
                     }
                     items(items, key = { it.key }) { item ->
@@ -193,12 +212,15 @@ fun StoriesScreen(
                             is ListItem.Folder -> FolderCard(item) { viewModel.update { f -> f.copy(folder = item.folder.uuid) } }
                             is ListItem.SeriesGroup -> SeriesCard(
                                 item,
+                                highlight = item.parts.any { it.uuid == lastOpened },
                                 onToggle = { viewModel.toggleExpanded(item.key) },
                                 onResume = { onOpen(item.resumePart.uuid) },
                                 onFolder = { pickFor = item.parts.map { it.uuid } },
+                                onEdit = { onEditSeries(item.uuid) },
                             )
                             is ListItem.Single -> StoryCard(
                                 item.row, item.indent,
+                                highlight = item.row.uuid == lastOpened,
                                 onOpen = { onOpen(item.row.uuid) },
                                 onRate = { viewModel.setRating(item.row, it) },
                                 onFavorite = { viewModel.toggleFavorite(item.row) },
@@ -209,13 +231,19 @@ fun StoriesScreen(
                         }
                     }
                 }
+                if (paged.pageCount > 1) {
+                    PageBar(paged.page, paged.pageCount, paged.total, viewModel::setPage) { gotoPage = true }
+                }
             }
         }
-        if (!filter.trash && filter.sort == StorySort.TITLE && filter.view != StoryView.FOLDERS && items.size > 15) {
-            LetterBar(items, listState, Modifier.align(Alignment.CenterEnd))
+        if (!filter.trash && filter.sort == StorySort.TITLE && filter.view == StoryView.LIST && paged.pageCount > 1) {
+            LetterBar(paged.letterPages, viewModel::setPage, Modifier.align(Alignment.CenterEnd))
         }
     }
 
+    if (gotoPage) {
+        GotoPageDialog(paged.page, paged.pageCount, onDismiss = { gotoPage = false }) { viewModel.setPage(it); gotoPage = false }
+    }
     pickFor?.let { ids ->
         FolderPickerDialog(
             storyUuids = ids,
@@ -278,9 +306,10 @@ private fun FolderCard(item: ListItem.Folder, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SeriesCard(item: ListItem.SeriesGroup, onToggle: () -> Unit, onResume: () -> Unit, onFolder: () -> Unit) {
+private fun SeriesCard(item: ListItem.SeriesGroup, highlight: Boolean, onToggle: () -> Unit, onResume: () -> Unit, onFolder: () -> Unit, onEdit: () -> Unit) {
     Card(
         colors = glassCardColors(MaterialTheme.colorScheme.secondaryContainer),
+        border = if (highlight) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         modifier = Modifier.fillMaxWidth().padding(start = (item.indent * 16).dp).bounceClick(onClick = onToggle),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -294,6 +323,7 @@ private fun SeriesCard(item: ListItem.SeriesGroup, onToggle: () -> Unit, onResum
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Button(onClick = onResume) { Text("▶ Weiterlesen (Teil ${partNumber(item)})") }
                 TextButton(onClick = onFolder) { Text("📁") }
+                TextButton(onClick = onEdit) { Text("✎ Bearbeiten") }
             }
         }
     }
@@ -305,6 +335,7 @@ private fun partNumber(item: ListItem.SeriesGroup): Int = item.parts.indexOfFirs
 private fun StoryCard(
     row: StoryRow,
     indent: Int,
+    highlight: Boolean,
     onOpen: () -> Unit,
     onRate: (Int) -> Unit,
     onFavorite: () -> Unit,
@@ -314,6 +345,7 @@ private fun StoryCard(
 ) {
     Card(
         colors = glassCardColors(MaterialTheme.colorScheme.surfaceContainer),
+        border = if (highlight) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         modifier = Modifier.fillMaxWidth().padding(start = (indent * 16).dp).bounceClick(onClick = onOpen),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -347,40 +379,58 @@ private fun StoryCard(
 internal fun formatWords(n: Int): String = if (n >= 1000) "${n / 1000} Tsd. Wörter" else "$n Wörter"
 
 @Composable
-private fun LetterBar(items: List<ListItem>, listState: androidx.compose.foundation.lazy.LazyListState, modifier: Modifier) {
-    val scope = rememberCoroutineScope()
-    val firstIndex = remember(items) {
-        val map = LinkedHashMap<Char, Int>()
-        items.forEachIndexed { i, item ->
-            val title = when (item) {
-                is ListItem.Single -> if (item.indent == 0) item.row.title else null
-                is ListItem.SeriesGroup -> item.name
-                else -> null
-            }
-            val c = title?.trim()?.firstOrNull()?.uppercaseChar()?.let { if (it in 'A'..'Z') it else '#' }
-            if (c != null && c !in map) map[c] = i
-        }
-        map
-    }
+private fun LetterBar(letterPages: Map<Char, Int>, onPage: (Int) -> Unit, modifier: Modifier) {
     Column(
-        modifier.fillMaxHeight().padding(vertical = 80.dp),
+        modifier.fillMaxHeight().padding(top = 80.dp, bottom = 110.dp),
         verticalArrangement = Arrangement.SpaceEvenly,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         for (c in "#ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
-            val idx = firstIndex[c]
+            val page = letterPages[c]
             Text(
                 c.toString(),
                 style = MaterialTheme.typography.labelSmall,
                 textAlign = TextAlign.Center,
-                color = if (idx != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                modifier = Modifier.width(24.dp).clickable(enabled = idx != null) {
-                    // +1 wegen der Weiterlesen-Leiste, die als erstes Element in der Liste stehen kann.
-                    scope.launch { listState.scrollToItem(idx!! + if (listState.layoutInfo.totalItemsCount > items.size) 1 else 0) }
-                },
+                color = if (page != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                modifier = Modifier.width(24.dp).clickable(enabled = page != null) { onPage(page!!) },
             )
         }
     }
+}
+
+/** Seitenleiste unten: erste, zurück, "Seite x von y" (antippen zum Springen), weiter, letzte. */
+@Composable
+private fun PageBar(page: Int, pageCount: Int, total: Int, onPage: (Int) -> Unit, onGoto: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+        TextButton(onClick = { onPage(0) }, enabled = page > 0) { Text("⏮") }
+        TextButton(onClick = { onPage(page - 1) }, enabled = page > 0) { Text("◀") }
+        Text(
+            "Seite ${page + 1} von $pageCount",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.clickable(onClick = onGoto).padding(horizontal = 8.dp, vertical = 12.dp),
+        )
+        TextButton(onClick = { onPage(page + 1) }, enabled = page < pageCount - 1) { Text("▶") }
+        TextButton(onClick = { onPage(pageCount - 1) }, enabled = page < pageCount - 1) { Text("⏭") }
+    }
+}
+
+@Composable
+private fun GotoPageDialog(page: Int, pageCount: Int, onDismiss: () -> Unit, onGo: (Int) -> Unit) {
+    var text by remember { mutableStateOf((page + 1).toString()) }
+    val n = text.toIntOrNull()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Zu Seite springen") },
+        text = {
+            OutlinedTextField(
+                value = text, onValueChange = { text = it.filter(Char::isDigit).take(5) }, singleLine = true,
+                label = { Text("Seite 1 bis $pageCount") },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+            )
+        },
+        confirmButton = { TextButton(onClick = { onGo((n ?: 1) - 1) }, enabled = n != null && n in 1..pageCount) { Text("Springen") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+    )
 }
 
 @Composable

@@ -80,6 +80,7 @@ class StoryReaderViewModel @Inject constructor(
     val settings: StateFlow<ReaderSettings> = _settings
 
     init {
+        viewModelScope.launch { settingDao.set(SettingEntity("stories_last_open", uuid)) }
         viewModelScope.launch {
             val story = repository.get(uuid)
             val paragraphs = withContext(Dispatchers.Default) { TextCleaner.paragraphs(repository.text(uuid)) }

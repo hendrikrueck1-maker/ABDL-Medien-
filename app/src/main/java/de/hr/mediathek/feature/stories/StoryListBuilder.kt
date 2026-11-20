@@ -168,3 +168,74 @@ object StoryListBuilder {
         active.filter { it.lastReadAt != null && it.readProgress < READ_DONE_AT }
             .sortedByDescending { it.lastReadAt }.take(limit)
 }
+
+/** Ergebnis der Seitenaufteilung für die Anzeige. */
+data class PagedUi(
+    val items: List<ListItem> = emptyList(),
+    val page: Int = 0,
+    val pageCount: Int = 1,
+    val total: Int = 0,
+    /** Anfangsbuchstabe -> Seite, auf der die erste Geschichte mit diesem Buchstaben steht (für die A-Z-Leiste). */
+    val letterPages: Map<Char, Int> = emptyMap(),
+    val loaded: Boolean = false,
+)
+
+/** Teilt die Liste in Seiten mit je [PAGE_SIZE] Einträgen; eine aufgeklappte Serie bleibt samt Kapiteln auf einer Seite. */
+object StoryPaging {
+    const val PAGE_SIZE = 10
+
+    fun paginate(items: List<ListItem>, pageSize: Int = PAGE_SIZE): List<List<ListItem>> {
+        val pages = ArrayList<List<ListItem>>()
+        var current = ArrayList<ListItem>()
+        var units = 0
+        val pendingHeaders = ArrayList<ListItem>()
+        var seriesIndent = -1
+        for (item in items) {
+            when {
+                item is ListItem.Header -> {
+                    seriesIndent = -1
+                    // Aufgeklappte Kategorien ziehen ihre Überschrift mit dem ersten Eintrag um; zugeklappte stehen einfach da.
+                    if (item.expanded) pendingHeaders += item else current += item
+                }
+                item is ListItem.Single && seriesIndent >= 0 && item.indent == seriesIndent + 1 -> current += item
+                else -> {
+                    seriesIndent = if (item is ListItem.SeriesGroup && item.expanded) item.indent else -1
+                    if (units >= pageSize) {
+                        pages += current
+                        current = ArrayList()
+                        units = 0
+                    }
+                    current += pendingHeaders
+                    pendingHeaders.clear()
+                    current += item
+                    units++
+                }
+            }
+        }
+        current += pendingHeaders
+        if (current.isNotEmpty() || pages.isEmpty()) pages += current
+        return pages
+    }
+
+    fun build(items: List<ListItem>, requestedPage: Int, pageSize: Int = PAGE_SIZE): PagedUi {
+        val pages = paginate(items, pageSize)
+        val page = requestedPage.coerceIn(0, pages.lastIndex)
+        val letters = LinkedHashMap<Char, Int>()
+        pages.forEachIndexed { p, list ->
+            for (i in list) {
+                val title = when (i) {
+                    is ListItem.Single -> if (i.indent == 0) i.row.title else null
+                    is ListItem.SeriesGroup -> i.name
+                    else -> null
+                }
+                val c = title?.trim()?.firstOrNull()?.uppercaseChar()?.let { if (it in 'A'..'Z') it else '#' }
+                if (c != null && c !in letters) letters[c] = p
+            }
+        }
+        val total = items.count { it is ListItem.SeriesGroup || it is ListItem.Folder || (it is ListItem.Single && it.indent <= 1 && !isPart(items, it)) }
+        return PagedUi(pages[page], page, pages.size, total, letters, loaded = true)
+    }
+
+    private fun isPart(items: List<ListItem>, single: ListItem.Single): Boolean =
+        single.row.seriesUuid != null && items.any { it is ListItem.SeriesGroup && it.uuid == single.row.seriesUuid && it.expanded }
+}

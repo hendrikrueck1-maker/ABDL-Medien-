@@ -106,6 +106,65 @@ class StoryOrganizer @Inject constructor(
         for (part in proposal.parts) dao.setSeries(part.uuid, seriesUuid, part.order + offset, now)
     }
 
+    // --- Serien bearbeiten ---
+
+    fun observeParts(seriesUuid: String) = dao.observeSeriesParts(seriesUuid)
+
+    suspend fun renameSeries(uuid: String, name: String) {
+        if (name.isNotBlank()) dao.renameSeries(uuid, name.trim(), nowMillis())
+    }
+
+    /** Verschiebt einen Teil um einen Platz nach oben ([up]) oder unten; die Nummern werden dabei neu durchgezählt. */
+    suspend fun movePart(seriesUuid: String, partUuid: String, up: Boolean) {
+        val parts = dao.seriesPartsOnce(seriesUuid).map { it.uuid }.toMutableList()
+        val i = parts.indexOf(partUuid)
+        val j = if (up) i - 1 else i + 1
+        if (i < 0 || j !in parts.indices) return
+        parts[i] = parts[j].also { parts[j] = parts[i] }
+        renumber(seriesUuid, parts)
+    }
+
+    /** Ordnet die Teile nach Titel (Zahlen im Titel werden als Zahlen verglichen: "Teil 2" vor "Teil 10"). */
+    suspend fun sortPartsByTitle(seriesUuid: String) {
+        val parts = dao.seriesPartsOnce(seriesUuid).sortedWith { a, b -> naturalCompare(a.title, b.title) }
+        renumber(seriesUuid, parts.map { it.uuid })
+    }
+
+    suspend fun removePart(seriesUuid: String, partUuid: String) {
+        dao.setSeries(partUuid, null, null, nowMillis())
+        renumber(seriesUuid, dao.seriesPartsOnce(seriesUuid).map { it.uuid })
+    }
+
+    /** Hängt Geschichten ans Ende der Serie an (auch solche, die schon in einer anderen Serie liegen). */
+    suspend fun addParts(seriesUuid: String, storyUuids: List<String>) {
+        val order = dao.seriesPartsOnce(seriesUuid).map { it.uuid }.toMutableList()
+        for (id in storyUuids) if (id !in order) order += id
+        renumber(seriesUuid, order)
+    }
+
+    /** Löst die Serie auf: die Geschichten bleiben, nur die Zuordnung entfällt. */
+    suspend fun dissolveSeries(seriesUuid: String) {
+        val now = nowMillis()
+        for (p in dao.seriesPartsOnce(seriesUuid)) dao.setSeries(p.uuid, null, null, now)
+        dao.softDeleteSeries(seriesUuid, now)
+    }
+
+    private suspend fun renumber(seriesUuid: String, ordered: List<String>) {
+        val now = nowMillis()
+        ordered.forEachIndexed { i, id -> dao.setSeries(id, seriesUuid, i + 1, now) }
+    }
+
+    internal fun naturalCompare(a: String, b: String): Int {
+        val x = Regex("\\d+|\\D+").findAll(a.lowercase()).map { it.value }.toList()
+        val y = Regex("\\d+|\\D+").findAll(b.lowercase()).map { it.value }.toList()
+        for (k in 0 until minOf(x.size, y.size)) {
+            val p = x[k]; val q = y[k]
+            val c = if (p[0].isDigit() && q[0].isDigit()) p.toBigInteger().compareTo(q.toBigInteger()) else p.compareTo(q)
+            if (c != 0) return c
+        }
+        return x.size.compareTo(y.size)
+    }
+
     // --- Ordner ---
 
     suspend fun createFolder(name: String, parentUuid: String?): String {

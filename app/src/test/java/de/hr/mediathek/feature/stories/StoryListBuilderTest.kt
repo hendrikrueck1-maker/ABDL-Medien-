@@ -50,3 +50,39 @@ class StoryListBuilderTest {
         assertEquals(listOf("x"), StoryListBuilder.continueReading(rows).map { it.uuid })
     }
 }
+
+class StoryPagingTest {
+    private fun row(i: Int, series: String? = null) =
+        StoryRow("u$i", "Titel %03d".format(i), StoryCategory.MIXED, 0, false, false, null, i.toLong(), 1, null, series, null, null, null, 0f, 10)
+
+    @Test fun splitsIntoPagesOfTen() {
+        val items = (1..25).map { ListItem.Single(row(it), 0) }
+        val pages = StoryPaging.paginate(items)
+        assertEquals(listOf(10, 10, 5), pages.map { it.size })
+        assertEquals(3, StoryPaging.build(items, 99).pageCount)
+        assertEquals(2, StoryPaging.build(items, 99).page)
+    }
+
+    @Test fun expandedSeriesStaysOnOnePage() {
+        val parts = (1..4).map { row(100 + it, "s") }
+        val group = ListItem.SeriesGroup("s", "Serie", parts, true, 0)
+        val items = (1..9).map { ListItem.Single(row(it), 0) } + group + parts.map { ListItem.Single(it, 1) } + ListItem.Single(row(50), 0)
+        val pages = StoryPaging.paginate(items)
+        assertEquals(2, pages.size)
+        assertEquals(9 + 1 + 4, pages[0].size)
+        assertEquals(1, pages[1].size)
+    }
+
+    @Test fun emptyListHasOnePage() {
+        val p = StoryPaging.build(emptyList(), 3)
+        assertEquals(1, p.pageCount)
+        assertEquals(0, p.page)
+    }
+
+    @Test fun letterMapPointsToPages() {
+        val items = (1..15).map { ListItem.Single(row(it).copy(title = if (it <= 10) "Anna $it" else "Berta $it"), 0) }
+        val p = StoryPaging.build(items, 0)
+        assertEquals(0, p.letterPages['A'])
+        assertEquals(1, p.letterPages['B'])
+    }
+}
