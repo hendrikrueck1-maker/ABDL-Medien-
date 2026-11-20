@@ -18,6 +18,7 @@ class StoryRepository @Inject constructor(private val dao: StoryDao) {
     fun observe(uuid: String): Flow<StoryEntity?> = dao.observe(uuid)
     fun recentSources(): Flow<List<String>> = dao.observeRecentSources()
     fun recentUrls(): Flow<List<String>> = dao.observeRecentUrls()
+    fun tagNames(uuid: String): Flow<List<String>> = dao.observeTagNames(uuid)
 
     suspend fun get(uuid: String): StoryEntity? = dao.get(uuid)
     suspend fun text(uuid: String): String = dao.getText(uuid) ?: ""

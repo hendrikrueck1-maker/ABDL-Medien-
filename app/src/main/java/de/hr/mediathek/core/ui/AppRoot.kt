@@ -202,7 +202,13 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
             )
         }
         composable("story-import") {
-            de.hr.mediathek.feature.stories.StoryImportScreen(onBack = { navController.popBackStack() })
+            de.hr.mediathek.feature.stories.StoryImportScreen(
+                onBack = { navController.popBackStack() },
+                onMarkdown = { navController.navigate("story-import-md") },
+            )
+        }
+        composable("story-import-md") {
+            de.hr.mediathek.feature.stories.MarkdownImportScreen(onBack = { navController.popBackStack() })
         }
         composable("story/{uuid}", arguments = listOf(navArgument("uuid") { type = NavType.StringType })) {
             de.hr.mediathek.feature.stories.StoryReaderScreen(

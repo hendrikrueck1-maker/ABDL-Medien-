@@ -35,7 +35,7 @@ import de.hr.mediathek.data.story.StoryFileKind
 import de.hr.mediathek.data.story.TextEncoding
 
 @Composable
-fun StoryImportScreen(onBack: () -> Unit, viewModel: StoryImportViewModel = hiltViewModel()) {
+fun StoryImportScreen(onBack: () -> Unit, onMarkdown: () -> Unit, viewModel: StoryImportViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) viewModel.loadFiles(uris)
@@ -62,6 +62,7 @@ fun StoryImportScreen(onBack: () -> Unit, viewModel: StoryImportViewModel = hilt
             }) { Text("Dateien wählen") }
             OutlinedButton(onClick = { folderPicker.launch(null) }) { Text("Ordner wählen") }
         }
+        OutlinedButton(onClick = onMarkdown) { Text("Markdown-Import (Ordner, ZIP, JSON) …") }
         state.importedCount?.let { Text("$it Geschichten importiert.", color = MaterialTheme.colorScheme.primary) }
         if (state.loading) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

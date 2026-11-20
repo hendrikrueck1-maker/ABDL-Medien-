@@ -76,6 +76,15 @@ fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, viewModel: S
             TextButton(onClick = { story?.let { onEdit(it.uuid) } }) { Text("✏ Bearbeiten", color = fg) }
         }
         if (story != null) {
+            val tags by viewModel.tags.collectAsStateWithLifecycle()
+            val info = listOfNotNull(
+                story.author?.let { "von $it" },
+                story.status?.takeIf { it != "published" }?.let { statusLabel(it) },
+                tags.takeIf { it.isNotEmpty() }?.joinToString(" · ") { "#$it" },
+            ).joinToString("  ·  ")
+            if (info.isNotEmpty()) {
+                Text(info, color = fg.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp))
+            }
             Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                 StarRow(story.rating, viewModel::setRating)
                 Text(
@@ -215,4 +224,9 @@ fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, viewModel: S
             },
         )
     }
+}
+
+private fun statusLabel(status: String): String = when (status) {
+    "draft" -> "Entwurf"
+    else -> status
 }

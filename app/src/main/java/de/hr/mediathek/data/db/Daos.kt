@@ -650,6 +650,12 @@ interface TagDao {
     @Upsert
     suspend fun upsertAssignments(items: List<TagAssignmentEntity>)
 
+    @Query("SELECT * FROM tag_assignment WHERE entityType = 'STORY' AND entityUuid = :storyUuid AND deletedAt IS NULL")
+    suspend fun storyAssignments(storyUuid: String): List<TagAssignmentEntity>
+
+    @Query("UPDATE tag_assignment SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid IN (:uuids)")
+    suspend fun tombstoneAssignmentsByUuid(uuids: List<String>, now: Long)
+
     @Query(
         "UPDATE tag_assignment SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now " +
             "WHERE entityType = 'MEDIA' AND tagUuid = :tagUuid AND entityUuid IN (:mediaUuids) AND deletedAt IS NULL",
@@ -796,6 +802,34 @@ interface StoryDao {
 
     @Query("SELECT title FROM story WHERE deletedAt IS NULL AND textHash = :hash LIMIT 1")
     suspend fun titleByHash(hash: String): String?
+
+    /** Markdown-Import: Geschichte zur stabilen Kennung (auch aus dem Papierkorb, der Slug ist eindeutig). */
+    @Query("SELECT * FROM story WHERE slug = :slug LIMIT 1")
+    suspend fun getBySlug(slug: String): StoryEntity?
+
+    /** Aktive Geschichte mit gleichem Import-Hash, die nicht zum angegebenen Slug gehört. */
+    @Query(
+        "SELECT title FROM story WHERE deletedAt IS NULL AND importHash = :hash AND (slug IS NULL OR slug != :slug) LIMIT 1",
+    )
+    suspend fun titleByImportHash(hash: String, slug: String): String?
+
+    @Query(
+        "SELECT title FROM story WHERE deletedAt IS NULL AND textHash = :hash AND (slug IS NULL OR slug != :slug) LIMIT 1",
+    )
+    suspend fun titleByTextHashExcept(hash: String, slug: String): String?
+
+    @Query(
+        "SELECT t.name FROM tag t JOIN tag_assignment a ON a.tagUuid = t.uuid " +
+            "WHERE a.entityType = 'STORY' AND a.entityUuid = :uuid AND a.deletedAt IS NULL AND t.deletedAt IS NULL " +
+            "ORDER BY t.name COLLATE NOCASE",
+    )
+    fun observeTagNames(uuid: String): Flow<List<String>>
+
+    @Query(
+        "SELECT t.name FROM tag t JOIN tag_assignment a ON a.tagUuid = t.uuid " +
+            "WHERE a.entityType = 'STORY' AND a.entityUuid = :uuid AND a.deletedAt IS NULL AND t.deletedAt IS NULL",
+    )
+    suspend fun tagNames(uuid: String): List<String>
 
     @Insert
     suspend fun insert(story: StoryEntity): Long

@@ -105,6 +105,7 @@ dependencies {
     implementation(libs.androidx.paging.compose)
     implementation(libs.androidx.room.paging)
     implementation(libs.pdfbox.android)
+    implementation(libs.snakeyaml.engine)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
@@ -113,6 +114,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
 
     testImplementation(libs.junit)
+    testImplementation(libs.org.json)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

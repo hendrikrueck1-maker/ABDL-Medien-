@@ -51,5 +51,20 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+/** 6 -> 7: Markdown-Import für Geschichten (Slug, Autor, Status, Veröffentlichungsdatum, Import-Hash). */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE story ADD COLUMN slug TEXT")
+        db.execSQL("ALTER TABLE story ADD COLUMN author TEXT")
+        db.execSQL("ALTER TABLE story ADD COLUMN status TEXT")
+        db.execSQL("ALTER TABLE story ADD COLUMN publishedAt INTEGER")
+        db.execSQL("ALTER TABLE story ADD COLUMN importHash TEXT")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_story_slug` ON `story` (`slug`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_story_importHash` ON `story` (`importHash`)")
+    }
+}
+
 /** Alle Schema-Migrationen in Reihenfolge. */
-val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+val MIGRATIONS: Array<Migration> = arrayOf(
+    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
+)

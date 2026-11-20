@@ -180,6 +180,8 @@ data class SeriesEntity(
         Index("title"),
         Index("createdAt"),
         Index("rating"),
+        Index("slug", unique = true),
+        Index("importHash"),
     ],
 )
 data class StoryEntity(
@@ -201,6 +203,14 @@ data class StoryEntity(
     val updatedAt: Long = createdAt,
     val userUpdatedAt: Long = createdAt,
     val deletedAt: Long? = null,
+    /** Stabile Kennung aus dem Markdown-Import (Dateiname ohne .md); null bei selbst angelegten Geschichten. */
+    val slug: String? = null,
+    val author: String? = null,
+    /** "draft", "published" o. ä. aus dem Import; null bei selbst angelegten Geschichten. */
+    val status: String? = null,
+    val publishedAt: Long? = null,
+    /** SHA-256 über den normalisierten Text, nur für den Import (Duplikaterkennung). */
+    val importHash: String? = null,
 )
 
 /** Eigene Tabelle, damit die Liste nie den Text lädt (CursorWindow-Limit). */

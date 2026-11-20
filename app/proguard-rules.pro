@@ -9,3 +9,6 @@
 -dontwarn com.tom_roush.fontbox.**
 -dontwarn com.gemalto.jp2.**
 -dontwarn org.bouncycastle.**
+
+# YAML-Parser des Markdown-Imports
+-dontwarn org.snakeyaml.engine.**
