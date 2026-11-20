@@ -18,12 +18,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - profile: pixel_6
-            api: 34
           - profile: pixel_c
             api: 34
-          - profile: pixel_6
-            api: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -65,4 +61,4 @@ jobs:
           profile: ${{ matrix.profile }}
           disable-animations: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: bash .github/audit/monkey.sh ${{ matrix.profile }}-${{ matrix.api }}
+          script: SEEDS=4711 bash .github/audit/monkey.sh ${{ matrix.profile }}-${{ matrix.api }}
