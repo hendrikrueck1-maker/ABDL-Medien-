@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.hr.mediathek.R
 
-private val NightScheme = AppColors().let { c ->
+private val NightScheme = AppColors().solid().let { c ->
     darkColorScheme(
         primary = c.rosa, onPrimary = c.onAccent,
         primaryContainer = Color(0xFF3B2142), onPrimaryContainer = Color(0xFFFFC4DE),

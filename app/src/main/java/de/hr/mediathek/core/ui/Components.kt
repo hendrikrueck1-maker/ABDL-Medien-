@@ -3,6 +3,8 @@ package de.hr.mediathek.core.ui
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.getValue
@@ -39,12 +41,18 @@ fun AppCard(
     val c = LocalAppColors.current
     val shape = RoundedCornerShape(30.dp)
     Surface(
-        modifier = modifier.shadow(12.dp, shape, ambientColor = c.shadow, spotColor = c.shadow),
+        modifier = modifier,
         shape = shape,
         color = if (bar) c.bar else c.card,
         contentColor = c.onCard,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.28f)),
     ) {
-        Column(Modifier.padding(padding), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
+        // Glanz: heller Schimmer von links oben, dazu der feine helle Rand.
+        Column(
+            Modifier.background(Brush.linearGradient(listOf(Color.White.copy(alpha = 0.16f), Color.Transparent))).padding(padding),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            content = content,
+        )
     }
 }
 
@@ -90,7 +98,7 @@ fun OutlineAccentButton(
         enabled = enabled,
         shape = CircleShape,
         border = BorderStroke(2.dp, color),
-        colors = ButtonDefaults.outlinedButtonColors(containerColor = LocalAppColors.current.bar, contentColor = color),
+        colors = ButtonDefaults.outlinedButtonColors(containerColor = LocalAppColors.current.bar.copy(alpha = 1f), contentColor = color),
         content = content,
     )
 }

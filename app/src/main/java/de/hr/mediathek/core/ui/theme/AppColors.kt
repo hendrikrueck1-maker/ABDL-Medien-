@@ -6,9 +6,10 @@ import androidx.compose.ui.graphics.Color
 /** Farb-Tokens „Nacht-Pastell“. Ein festes dunkles Design; Flächen sind immer deckend. */
 data class AppColors(
     val bgFullscreen: Color = Color(0xFF07060D),
-    val bar: Color = Color(0xFF1E1A33),
-    val card: Color = Color(0xFF2A2442),
-    val cardInset: Color = Color(0xFF3A3360),
+    /** Dunkle Flächen: zu 60 % durchsichtig (Glasoptik); [solid] liefert die deckende Variante für Menüs und Dialoge. */
+    val bar: Color = Color(0xFF1E1A33).copy(alpha = 0.4f),
+    val card: Color = Color(0xFF2A2442).copy(alpha = 0.4f),
+    val cardInset: Color = Color(0xFF3A3360).copy(alpha = 0.4f),
     val muted: Color = Color(0xFF4A4270),
     val onCard: Color = Color(0xFFF6F0FF),
     val onCardVariant: Color = Color(0xFFC9BEDF),
@@ -20,7 +21,10 @@ data class AppColors(
     val lavendel: Color = Color(0xFFC9B2FF),
     val warnung: Color = Color(0xFFFF8A8A),
     val shadow: Color = Color(0xFF140E28),
-)
+) {
+    /** Dieselben Farben, aber deckend. */
+    fun solid() = copy(bar = bar.copy(alpha = 1f), card = card.copy(alpha = 1f), cardInset = cardInset.copy(alpha = 1f))
+}
 
 /** Rotierende Tönungen für eigene Kategorien: Fläche und Text. */
 val CategoryChipColors: List<Pair<Color, Color>> = listOf(

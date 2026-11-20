@@ -21,11 +21,11 @@ import androidx.compose.ui.unit.dp
  * bestehenden Bildschirme sofort die neue, immer lesbare Optik bekommen.
  */
 fun Modifier.glass(tint: Color, shape: Shape = RoundedCornerShape(28.dp)): Modifier =
-    this.clip(shape).background(tint.copy(alpha = 1f), shape)
+    this.clip(shape).background(tint.copy(alpha = 0.4f), shape)
 
 /** Kartenfarben: deckend, damit Karten auf jedem Hintergrundbild lesbar sind. */
 @Composable
-fun glassCardColors(tint: Color): CardColors = CardDefaults.cardColors(containerColor = tint.copy(alpha = 1f))
+fun glassCardColors(tint: Color): CardColors = CardDefaults.cardColors(containerColor = tint.copy(alpha = 0.4f))
 
 /** Überschrift als Pille auf deckender Fläche. */
 @Composable

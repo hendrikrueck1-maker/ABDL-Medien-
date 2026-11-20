@@ -293,7 +293,7 @@ fun TrackerScreen(
         var note by remember(tile.uuid) { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { noteFor = null },
-            containerColor = c.bar,
+            containerColor = c.bar.copy(alpha = 1f),
             shape = RoundedCornerShape(30.dp),
             confirmButton = { Button(onClick = { viewModel.tap(tile, note); noteFor = null }) { Text("Eintragen") } },
             dismissButton = { TextButton(onClick = { noteFor = null }) { Text("Abbrechen") } },
@@ -372,7 +372,7 @@ private fun OtherDialog(viewModel: TrackerViewModel, tiles: List<Tile>, onDismis
     val brands by viewModel.brands.collectAsStateWithLifecycle()
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = c.bar,
+        containerColor = c.bar.copy(alpha = 1f),
         shape = RoundedCornerShape(30.dp),
         confirmButton = { TextButton(onClick = onDismiss) { Text("Fertig") } },
         title = { Text(stringResource(R.string.tracker_other)) },
@@ -467,7 +467,7 @@ private fun EditEntryDialog(e: EntryView, tiles: List<Tile>, onDismiss: () -> Un
     var error by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = LocalAppColors.current.bar,
+        containerColor = LocalAppColors.current.bar.copy(alpha = 1f),
         shape = RoundedCornerShape(30.dp),
         title = { Text("Eintrag bearbeiten") },
         text = {

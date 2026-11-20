@@ -41,7 +41,7 @@ import de.hr.mediathek.core.ui.theme.LocalAppColors
 @Composable
 internal fun OverlayPill(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
     Row(
-        modifier.clip(RoundedCornerShape(28.dp)).background(LocalAppColors.current.bar).padding(horizontal = 10.dp, vertical = 6.dp),
+        modifier.clip(RoundedCornerShape(28.dp)).background(LocalAppColors.current.bar).border(1.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(28.dp)).padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         content = content,

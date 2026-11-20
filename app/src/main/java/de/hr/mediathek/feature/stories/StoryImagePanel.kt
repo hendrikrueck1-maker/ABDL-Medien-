@@ -185,7 +185,7 @@ internal fun StoryImagePanel(
     if (chooseFolder) {
         AlertDialog(
             onDismissRequest = { chooseFolder = false },
-            containerColor = c.bar,
+            containerColor = c.bar.copy(alpha = 1f),
             shape = RoundedCornerShape(30.dp),
             confirmButton = { TextButton(onClick = { chooseFolder = false }) { Text(stringResource(R.string.diag_back)) } },
             title = { Text(stringResource(R.string.reader_folder_choose)) },

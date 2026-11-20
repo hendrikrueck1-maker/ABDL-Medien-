@@ -281,7 +281,7 @@ internal fun ReadingCard(
             if (showParts) {
                 AlertDialog(
                     onDismissRequest = { showParts = false },
-                    containerColor = c.bar, shape = RoundedCornerShape(30.dp),
+                    containerColor = c.bar.copy(alpha = 1f), shape = RoundedCornerShape(30.dp),
                     confirmButton = { TextButton(onClick = { showParts = false }) { Text("Schließen") } },
                     dismissButton = { TextButton(onClick = { showParts = false; story.seriesUuid?.let(onEditSeries) }) { Text("✎ Serie bearbeiten") } },
                     title = { Text(sr.name) },
@@ -364,7 +364,7 @@ internal fun ReadingCard(
         if (showBookmarks) {
             AlertDialog(
                 onDismissRequest = { showBookmarks = false },
-                containerColor = c.bar, shape = RoundedCornerShape(30.dp),
+                containerColor = c.bar.copy(alpha = 1f), shape = RoundedCornerShape(30.dp),
                 confirmButton = { TextButton(onClick = { showBookmarks = false }) { Text("Schließen") } },
                 title = { Text(stringResource(R.string.reader_bookmarks)) },
                 text = {
@@ -393,7 +393,7 @@ internal fun ReadingCard(
         if (showChapters) {
             AlertDialog(
                 onDismissRequest = { showChapters = false },
-                containerColor = c.bar, shape = RoundedCornerShape(30.dp),
+                containerColor = c.bar.copy(alpha = 1f), shape = RoundedCornerShape(30.dp),
                 confirmButton = { TextButton(onClick = { showChapters = false }) { Text("Schließen") } },
                 title = { Text("Kapitel (${chapters.size})") },
                 text = {

@@ -190,7 +190,7 @@ private fun ReaderSettingsDialog(settings: ReaderSettings, viewModel: StoryReade
     val c = LocalAppColors.current
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = c.bar,
+        containerColor = c.bar.copy(alpha = 1f),
         shape = RoundedCornerShape(30.dp),
         confirmButton = { TextButton(onClick = onDismiss) { Text("Fertig") } },
         title = { Text(stringResource(R.string.reader_settings)) },

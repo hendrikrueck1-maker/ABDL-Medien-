@@ -109,10 +109,10 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(if (wide) 20.dp else 12.dp),
     ) {
         HeaderCard(date, wide, onNewBackground = background::reload)
-        // Reihenfolge wie vorher: erst die Bereiche, dann Aktuell, Vorschläge (alle sichtbar, ohne seitliches Scrollen), Zuletzt.
+        // Reihenfolge: Bereiche, Vorschläge (fünf nebeneinander), Aktuell (alle sichtbar, ohne seitliches Scrollen), Zuletzt.
         AreasGrid(Modifier.fillMaxWidth(), onOpen, wide = wide)
-        CurrentCard(tiles.filter { it.favorite }.take(3), todayCount, tracker, wide = wide, onMore = { onOpen(Destination.Tracker) })
         SuggestionsCard(suggestions, viewModel, wide = wide, onOpenVideo)
+        CurrentCard(tiles.filter { it.favorite }.take(3), todayCount, tracker, wide = wide, onMore = { onOpen(Destination.Tracker) })
         RecentCard(recent, onOpenVideo)
         Text(
             stringResource(R.string.version_label, BuildConfig.VERSION_NAME),
@@ -194,7 +194,7 @@ private fun SuggestionsCard(
     val c = LocalAppColors.current
     AppCard(Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.home_suggestions), style = MaterialTheme.typography.titleLarge, color = c.onCard)
-        val cols = if (wide) 4 else 2
+        val cols = 5
         Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
           suggestions.chunked(cols).forEach { rowItems ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
