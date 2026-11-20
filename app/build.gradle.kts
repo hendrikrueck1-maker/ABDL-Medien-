@@ -78,6 +78,15 @@ android {
         buildConfig = true
     }
 
+    // Audit: Robolectric-Tests brauchen Ressourcen und die Room-Schemas als Assets
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+    sourceSets {
+        getByName("test").assets.srcDir("$projectDir/schemas")
+        getByName("debug").assets.srcDir("$projectDir/schemas")
+    }
+
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
@@ -118,6 +127,10 @@ dependencies {
     testImplementation(libs.org.json)
     // Audit: echte FTS4-Engine fuer den Such-Fuzz-Test (nur Testcode, Branch audit/tests)
     testImplementation("org.xerial:sqlite-jdbc:3.46.1.3")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.room:room-testing:2.6.1")
+    testImplementation("androidx.test:core:1.6.1")
+    testImplementation("androidx.test.ext:junit:1.2.1")
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
