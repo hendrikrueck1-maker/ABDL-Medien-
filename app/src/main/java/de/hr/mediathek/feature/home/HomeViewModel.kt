@@ -23,11 +23,15 @@ class HomeViewModel @Inject constructor(
     private val _suggestions = MutableStateFlow<List<Suggestion<MediaFileEntity>>>(emptyList())
     val suggestions: StateFlow<List<Suggestion<MediaFileEntity>>> = _suggestions
 
+    private val _recent = MutableStateFlow<List<MediaFileEntity>>(emptyList())
+    val recent: StateFlow<List<MediaFileEntity>> = _recent
+
     init { refresh() }
 
     /** Würfelt die Vorschläge neu; bei jedem Öffnen der Übersicht entsteht eine frische Auswahl. */
     fun refresh() {
         viewModelScope.launch {
+            _recent.value = dao.recentlyPlayed(10)
             _suggestions.value = VideoSuggestions.pick(
                 often = dao.suggestFrequent(8),
                 rare = dao.suggestRare(8),

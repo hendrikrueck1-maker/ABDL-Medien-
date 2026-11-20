@@ -35,6 +35,16 @@
     <string name="nav_settings">Einstellungen</string>
 
     <string name="home_title">Übersicht</string>
+    <string name="home_new_background">Neues Hintergrundbild</string>
+    <string name="home_new_background_short">Hintergrundbild wechseln</string>
+    <string name="home_current">Aktuell</string>
+    <string name="home_current_today">Heute: %1$d Einträge</string>
+    <string name="home_more">Weitere</string>
+    <string name="home_recent">Zuletzt geöffnet</string>
+    <string name="home_area_stories_desc">Lesen und schreiben</string>
+    <string name="home_area_images_desc">Sammlung und Diashow</string>
+    <string name="home_area_videos_desc">Ordner und Kategorien</string>
+    <string name="home_area_products_desc">Bewertungen</string>
     <string name="home_subtitle">Bereich wählen</string>
     <string name="placeholder_coming_soon">Dieser Bereich wird in einer späteren Etappe gebaut.</string>
     <string name="version_label">Version %1$s</string>

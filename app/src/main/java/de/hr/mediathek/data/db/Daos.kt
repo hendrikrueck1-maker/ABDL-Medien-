@@ -298,6 +298,10 @@ interface MediaFileDao {
     @Query("SELECT * FROM media_file WHERE type = 'VIDEO' AND status = 'ONLINE' AND deletedAt IS NULL AND playCount = 0 AND seenState = 'UNSEEN' ORDER BY RANDOM() LIMIT :limit")
     suspend fun suggestNeverWatched(limit: Int): List<MediaFileEntity>
 
+    /** Zuletzt geöffnete Videos für die Übersicht. */
+    @Query("SELECT * FROM media_file WHERE type = 'VIDEO' AND status = 'ONLINE' AND deletedAt IS NULL AND lastPlayedAt IS NOT NULL ORDER BY lastPlayedAt DESC LIMIT :limit")
+    suspend fun recentlyPlayed(limit: Int): List<MediaFileEntity>
+
     @Query("SELECT uuid FROM media_file WHERE type = 'IMAGE' AND status = 'ONLINE' AND deletedAt IS NULL ORDER BY RANDOM() LIMIT 1")
     suspend fun randomImageUuid(): String?
 
