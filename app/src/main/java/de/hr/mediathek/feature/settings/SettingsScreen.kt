@@ -59,6 +59,10 @@ fun SettingsScreen(onOpenRoute: (String) -> Unit, viewModel: UpdateViewModel = h
             onOpenRoute(AppRoutes.storage(StorageSection.COMPRESSION))
         }
 
+        SettingsRow(R.string.settings_row_package, R.string.settings_row_package_hint, GlassTint.BLUE) {
+            onOpenRoute("packages")
+        }
+
         GroupTitle(stringResource(R.string.settings_group_data))
         SettingsRow(R.string.settings_row_backup, R.string.settings_row_backup_hint, GlassTint.MINT) {
             onOpenRoute(AppRoutes.storage(StorageSection.BACKUP))

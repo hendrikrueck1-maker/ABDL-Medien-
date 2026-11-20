@@ -388,6 +388,8 @@
     <string name="storage_section_backup">Sicherung und Arbeitsordner</string>
     <string name="storage_section_compression">Komprimierung</string>
     <string name="settings_group_media">Medien</string>
+    <string name="settings_row_package">Mobil-Paket</string>
+    <string name="settings_row_package_hint">Auswahl auf SD-Karte für das Handy packen oder ein Paket einbinden</string>
     <string name="settings_group_data">Daten</string>
     <string name="settings_group_app">App</string>
     <string name="settings_row_sources">Medienquellen und Vorschaubilder</string>

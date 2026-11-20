@@ -950,3 +950,61 @@ interface TrackerDao {
     @Query("UPDATE tracker_entry SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
     suspend fun softDelete(uuid: String, now: Long)
 }
+
+data class PackageRow(val uuid: String, val size: Long)
+
+data class PackageSourceRow(val uuid: String, val label: String, val treeUri: String)
+
+@Dao
+interface PackageDao {
+    @Query(
+        "SELECT uuid, size FROM media_file WHERE deletedAt IS NULL AND status = 'ONLINE' AND type = :type AND favorite = 1 " +
+            "ORDER BY rating DESC, displayName",
+    )
+    suspend fun favorites(type: String): List<PackageRow>
+
+    @Query(
+        "SELECT uuid, size FROM media_file WHERE deletedAt IS NULL AND status = 'ONLINE' AND type = :type AND rating >= :min " +
+            "ORDER BY rating DESC, displayName",
+    )
+    suspend fun rated(type: String, min: Int): List<PackageRow>
+
+    @Query(
+        "SELECT uuid, size FROM media_file WHERE deletedAt IS NULL AND status = 'ONLINE' AND uuid IN " +
+            "(SELECT mediaUuid FROM playlist_item WHERE playlistUuid = :playlistUuid AND deletedAt IS NULL) ORDER BY displayName",
+    )
+    suspend fun inPlaylist(playlistUuid: String): List<PackageRow>
+
+    @Query(
+        "SELECT uuid, size FROM media_file WHERE deletedAt IS NULL AND status = 'ONLINE' AND type = 'VIDEO' AND seenState = 'UNSEEN' " +
+            "ORDER BY createdAt DESC",
+    )
+    suspend fun unseenVideos(): List<PackageRow>
+
+    @Query("SELECT * FROM media_file WHERE uuid IN (:uuids)")
+    suspend fun byUuids(uuids: List<String>): List<MediaFileEntity>
+
+    @Query("SELECT uuid FROM media_file WHERE uuid IN (:uuids)")
+    suspend fun existing(uuids: List<String>): List<String>
+
+    @Query(
+        "UPDATE media_file SET sourceUuid = :source, relativePath = :path, documentIdCache = :docId, fingerprint = :fp, size = :size, " +
+            "status = 'ONLINE', missingScanCount = 0, lastModified = NULL, deletedAt = NULL, updatedAt = :now WHERE uuid = :uuid",
+    )
+    suspend fun attach(uuid: String, source: String, path: String, docId: String?, fp: String, size: Long, now: Long)
+
+    @Query("SELECT uuid FROM media_file WHERE sourceUuid = :source AND deletedAt IS NULL")
+    suspend fun uuidsOfSource(source: String): List<String>
+
+    @Query("UPDATE media_file SET status = 'OFFLINE', updatedAt = :now WHERE uuid IN (:uuids)")
+    suspend fun markOffline(uuids: List<String>, now: Long)
+
+    @Query("SELECT COUNT(*) FROM media_file WHERE sourceUuid = :source AND deletedAt IS NULL")
+    fun observeCount(source: String): Flow<Int>
+
+    @Query("SELECT uuid, label, treeUri FROM source WHERE deletedAt IS NULL AND role = 'MEDIA' AND label LIKE 'Paket: %' ORDER BY createdAt DESC")
+    fun observePackageSources(): Flow<List<PackageSourceRow>>
+
+    @Query("SELECT COUNT(*) FROM media_alias WHERE mediaUuid = :mediaUuid AND fingerprint = :fp")
+    suspend fun aliasCount(mediaUuid: String, fp: String): Int
+}

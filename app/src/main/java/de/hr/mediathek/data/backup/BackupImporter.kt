@@ -35,7 +35,7 @@ class BackupImporter @Inject constructor(
     private val db: MediathekDatabase,
 ) {
     /** [open] liefert bei jedem Aufruf einen frischen Stream (die Datei wird zweimal gelesen: Prüfung, Import). */
-    suspend fun import(open: () -> InputStream): ImportResult = withContext(Dispatchers.IO) {
+    suspend fun import(open: () -> InputStream, skipTables: Set<String> = emptySet()): ImportResult = withContext(Dispatchers.IO) {
         val info = open().use { BackupWriter.inspect(it) }
         if (info.schemaVersion > MediathekDatabase.VERSION) {
             throw ImportRejected("Das Backup stammt aus einer neueren App-Version. Bitte zuerst die App aktualisieren.")
@@ -55,7 +55,7 @@ class BackupImporter @Inject constructor(
                 while (entry != null) {
                     if (entry.name.endsWith(".ndjson")) {
                         val table = entry.name.removeSuffix(".ndjson")
-                        val meta = tableMeta(sql, table)
+                        val meta = if (table in skipTables) null else tableMeta(sql, table)
                         if (meta != null) {
                             val reader = zip.bufferedReader(Charsets.UTF_8)
                             while (true) {

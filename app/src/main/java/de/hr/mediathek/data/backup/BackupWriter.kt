@@ -32,7 +32,7 @@ class BackupWriter @Inject constructor(
     private val db: MediathekDatabase,
 ) {
     /** Schreibt ein Backup in [target]. Der Snapshot ist konsistent, weil alles in einer Transaktion gelesen wird. */
-    suspend fun write(target: File, appVersion: String): BackupSummary = withContext(Dispatchers.IO) {
+    suspend fun write(target: File, appVersion: String, includeSelection: Boolean = false): BackupSummary = withContext(Dispatchers.IO) {
         val counts = LinkedHashMap<String, Int>()
         val checksums = LinkedHashMap<String, String>()
         db.withTransaction {
@@ -44,7 +44,7 @@ class BackupWriter @Inject constructor(
                     var count = 0
                     zip.putNextEntry(ZipEntry("$table.ndjson"))
                     val columns = exportColumns(sql, table)
-                    sql.query(selectFor(table, columns)).use { cursor ->
+                    sql.query(selectFor(table, columns, includeSelection)).use { cursor ->
                         val out = DigestingWriter(zip, digest)
                         while (cursor.moveToNext()) {
                             out.line(Ndjson.encodeRow(columns, cells(cursor, columns.size)))
@@ -84,11 +84,12 @@ class BackupWriter @Inject constructor(
         return if ("uuid" in all) all.filter { it != "id" } else all
     }
 
-    private fun selectFor(table: String, columns: List<String>): String {
+    private fun selectFor(table: String, columns: List<String>, includeSelection: Boolean): String {
+        val userData = if (includeSelection) "($MEDIA_WITH_USER_DATA OR uuid IN (SELECT uuid FROM package_selection))" else MEDIA_WITH_USER_DATA
         val cols = columns.joinToString(",") { "`$it`" }
         val where = when (table) {
-            "media_file" -> " WHERE $MEDIA_WITH_USER_DATA"
-            "media_alias" -> " WHERE mediaUuid IN (SELECT uuid FROM media_file WHERE $MEDIA_WITH_USER_DATA)"
+            "media_file" -> " WHERE $userData"
+            "media_alias" -> " WHERE mediaUuid IN (SELECT uuid FROM media_file WHERE $userData)"
             "setting" -> " WHERE `key` NOT LIKE 'thumb\\_%' ESCAPE '\\' AND `key` NOT LIKE 'compress\\_%' ESCAPE '\\'"
             else -> ""
         }
@@ -134,7 +135,7 @@ class BackupWriter @Inject constructor(
         const val MANIFEST = "manifest.json"
 
         /** Nicht gesichert: technische Daten, die neu entstehen oder nur lokal Sinn haben. */
-        val EXCLUDED_TABLES = setOf("job", "error_log", "thumbnail", "compression_record", "room_master_table", "android_metadata")
+        val EXCLUDED_TABLES = setOf("job", "error_log", "thumbnail", "compression_record", "room_master_table", "android_metadata", "package_selection")
 
         /** Medien-Einträge werden nur gesichert, wenn sie Nutzerdaten tragen; der Rest entsteht beim Scan neu. */
         const val MEDIA_WITH_USER_DATA =

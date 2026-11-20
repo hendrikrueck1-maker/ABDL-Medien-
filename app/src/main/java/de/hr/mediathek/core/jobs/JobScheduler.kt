@@ -59,6 +59,24 @@ class JobScheduler @Inject constructor(
         return true
     }
 
+    /** Mobil-Paket erstellen (die Auswahl liegt in der Auswahl-Tabelle). */
+    suspend fun enqueuePackageExport(treeUri: String, folder: String): Boolean {
+        if (jobDao.findActive(JobType.PACKAGE_EXPORT, "%") != null) return false
+        val params = JSONObject().put("treeUri", treeUri).put("folder", folder).toString()
+        jobDao.insert(JobEntity(type = JobType.PACKAGE_EXPORT, priority = JobPriority.MEDIUM, paramsJson = params))
+        trigger()
+        return true
+    }
+
+    /** Mobil-Paket auf dem Handy einbinden oder aktualisieren. */
+    suspend fun enqueuePackageImport(treeUri: String): Boolean {
+        if (jobDao.findActive(JobType.PACKAGE_IMPORT, "%") != null) return false
+        val params = JSONObject().put("treeUri", treeUri).toString()
+        jobDao.insert(JobEntity(type = JobType.PACKAGE_IMPORT, priority = JobPriority.MEDIUM, paramsJson = params))
+        trigger()
+        return true
+    }
+
     /** Vorschaubilder nachziehen (läuft sonst automatisch nach jedem Scan). */
     suspend fun enqueueThumbnails(): Boolean {
         if (jobDao.findActive(JobType.THUMBNAILS, "%") != null) return false

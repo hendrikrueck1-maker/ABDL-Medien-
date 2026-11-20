@@ -180,6 +180,7 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
                 onOpenProduct = { navController.navigate("product/$it") },
             )
         }
+        composable("packages") { de.hr.mediathek.feature.pkg.PackageScreen(onBack = { navController.popBackStack() }) }
         composable("trash") { TrashScreen(onBack = { navController.popBackStack() }) }
         composable("duplicates") { DuplicatesScreen(onBack = { navController.popBackStack() }) }
         composable(

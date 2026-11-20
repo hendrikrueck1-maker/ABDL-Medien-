@@ -36,6 +36,8 @@ class JobRunner @Inject constructor(
     private val hashExecutor: de.hr.mediathek.data.images.ImageHashJobExecutor,
     private val backupExecutor: BackupJobExecutor,
     private val mirrorExecutor: de.hr.mediathek.data.backup.MirrorCopyExecutor,
+    private val packageExporter: de.hr.mediathek.data.pkg.PackageExportExecutor,
+    private val packageImporter: de.hr.mediathek.data.pkg.PackageImportExecutor,
     private val compressionExecutor: de.hr.mediathek.data.compress.CompressionJobExecutor,
     private val compressionSettings: de.hr.mediathek.data.compress.CompressionSettings,
     private val errorLogger: ErrorLogger,
@@ -140,6 +142,8 @@ class JobRunner @Inject constructor(
         JobType.BACKUP -> backupExecutor.execute(context)
         JobType.MIRROR_COPY -> mirrorExecutor.execute(context)
         JobType.COMPRESS -> compressionExecutor.execute(job, context)
+        JobType.PACKAGE_EXPORT -> packageExporter.execute(job, context)
+        JobType.PACKAGE_IMPORT -> packageImporter.execute(job, context)
         else -> JobOutcome.Failed("Job-Typ ${job.type} ist noch nicht verfügbar")
     }
 
