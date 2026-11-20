@@ -1,6 +1,22 @@
 package de.hr.mediathek.feature.stories
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Switch
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -51,6 +67,16 @@ fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, onOpenStory:
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     var showSettings by remember { mutableStateOf(false) }
     var showChapters by remember { mutableStateOf(false) }
+    var showBookmarks by remember { mutableStateOf(false) }
+    var autoScroll by remember { mutableStateOf(false) }
+    val wide = LocalConfiguration.current.screenWidthDp >= 600
+    val split = wide && settings.splitOn
+    var rowWidthPx by remember { mutableIntStateOf(1) }
+    var draftFraction by remember { mutableStateOf<Float?>(null) }
+    val fraction = draftFraction ?: settings.splitFraction
+    val image by viewModel.image.collectAsStateWithLifecycle()
+    val bookmarks by viewModel.bookmarks.collectAsStateWithLifecycle()
+    val density = LocalDensity.current.density
     val scope = rememberCoroutineScope()
     // Kapitel aus den Überschriften im Text; erst ab zwei Kapiteln gibt es die Kapitelansicht.
     val chapters = remember(state.paragraphs) { ChapterDetector.detect(state.paragraphs) }
@@ -66,14 +92,18 @@ fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, onOpenStory:
         ReaderFont.MONO -> FontFamily.Monospace
     }
 
-    Column(Modifier.fillMaxSize().background(bg)) {
+    Row(Modifier.fillMaxSize().background(bg).onSizeChanged { rowWidthPx = it.width.coerceAtLeast(1) }) {
+    Column(Modifier.weight(if (split) 1f - fraction else 1f).fillMaxHeight()) {
         val story = state.story
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) { Text("←", color = fg) }
             Text(story?.title ?: "", color = fg, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), maxLines = 1)
-            if (chapters.size >= 2) TextButton(onClick = { showChapters = true }) { Text("☰ Kapitel", color = fg) }
+            if (chapters.size >= 2) TextButton(onClick = { showChapters = true }) { Text("☰", color = fg) }
+            TextButton(onClick = { showBookmarks = true }) { Text("🔖", color = fg) }
+            TextButton(onClick = { autoScroll = !autoScroll }) { Text(if (autoScroll) "⏸" else "▶ Auto", color = fg) }
+            if (wide) TextButton(onClick = { viewModel.setSettings(settings.copy(splitOn = !settings.splitOn)) }) { Text("🖼", color = fg.copy(alpha = if (settings.splitOn) 1f else 0.4f)) }
             TextButton(onClick = { showSettings = true }) { Text("Aa", color = fg) }
-            TextButton(onClick = { story?.let { onEdit(it.uuid) } }) { Text("✏ Bearbeiten", color = fg) }
+            TextButton(onClick = { story?.let { onEdit(it.uuid) } }) { Text("✏", color = fg) }
         }
         if (story != null) {
             val tags by viewModel.tags.collectAsStateWithLifecycle()
@@ -139,6 +169,27 @@ fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, onOpenStory:
             DisposableEffect(listState) {
                 onDispose { viewModel.saveProgress(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
             }
+            val dragged by listState.interactionSource.collectIsDraggedAsState()
+            LaunchedEffect(dragged) { if (dragged) autoScroll = false }
+            LaunchedEffect(autoScroll, settings.scrollSpeed) {
+                if (autoScroll) {
+                    var last = withFrameNanos { it }
+                    while (true) {
+                        val now = withFrameNanos { it }
+                        val dt = (now - last) / 1_000_000_000f
+                        last = now
+                        listState.scrollBy(settings.scrollSpeed * density * dt)
+                        if (!listState.canScrollForward) {
+                            autoScroll = false
+                            break
+                        }
+                    }
+                }
+            }
+            val readFraction by remember(state.paragraphs.size) {
+                derivedStateOf { if (state.paragraphs.size <= 1) 0f else listState.firstVisibleItemIndex.toFloat() / (state.paragraphs.size - 1) }
+            }
+            LinearProgressIndicator(progress = { readFraction.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(3.dp))
             // Welches Kapitel gerade oben im Bild steht.
             val currentChapter by remember(chapters) {
                 derivedStateOf {
@@ -194,6 +245,34 @@ fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, onOpenStory:
                     }
                 }
             }
+            if (showBookmarks) {
+                AlertDialog(
+                    onDismissRequest = { showBookmarks = false },
+                    confirmButton = { TextButton(onClick = { showBookmarks = false }) { Text("Schließen") } },
+                    title = { Text("Lesezeichen") },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            TextButton(onClick = { viewModel.addBookmark(listState.firstVisibleItemIndex) }) { Text("🔖 Hier ein Lesezeichen setzen") }
+                            if (bookmarks.isEmpty()) Text("Noch keine Lesezeichen.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            LazyColumn {
+                                items(bookmarks, key = { it.uuid }) { b ->
+                                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            "Absatz ${b.paragraph + 1}: ${b.label}",
+                                            maxLines = 2,
+                                            modifier = Modifier.weight(1f).clickable {
+                                                showBookmarks = false
+                                                scope.launch { listState.scrollToItem(b.paragraph) }
+                                            }.padding(vertical = 10.dp),
+                                        )
+                                        TextButton(onClick = { viewModel.deleteBookmark(b.uuid) }) { Text("✕") }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                )
+            }
             if (showChapters) {
                 AlertDialog(
                     onDismissRequest = { showChapters = false },
@@ -233,6 +312,27 @@ fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, onOpenStory:
             }
         }
     }
+    if (split) {
+        Box(
+            Modifier.width(18.dp).fillMaxHeight().pointerInput(rowWidthPx, settings.splitFraction) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        draftFraction?.let { viewModel.setSettings(settings.copy(splitFraction = it)) }
+                        draftFraction = null
+                    },
+                    onDragCancel = { draftFraction = null },
+                ) { change, drag ->
+                    change.consume()
+                    draftFraction = ((draftFraction ?: settings.splitFraction) - drag / rowWidthPx).coerceIn(0.2f, 0.7f)
+                }
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.width(4.dp).height(56.dp).background(fg.copy(alpha = 0.35f), RoundedCornerShape(2.dp)))
+        }
+        StorySlidePane(image, settings.slideSeconds, viewModel::nextImage, viewModel::previousImage, Modifier.weight(fraction).fillMaxHeight())
+    }
+    }
 
     if (showSettings) {
         AlertDialog(
@@ -245,6 +345,18 @@ fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, onOpenStory:
                     Slider(value = settings.fontSize, onValueChange = { viewModel.setSettings(settings.copy(fontSize = it)) }, valueRange = 14f..32f)
                     Text("Zeilenabstand ${"%.1f".format(settings.lineSpacing)}")
                     Slider(value = settings.lineSpacing, onValueChange = { viewModel.setSettings(settings.copy(lineSpacing = it)) }, valueRange = 1.1f..2.2f)
+                    Text("Auto-Scroll: ${settings.scrollSpeed.toInt()} dp pro Sekunde")
+                    Slider(value = settings.scrollSpeed, onValueChange = { viewModel.setSettings(settings.copy(scrollSpeed = it)) }, valueRange = 10f..200f)
+                    if (wide) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Switch(checked = settings.splitOn, onCheckedChange = { viewModel.setSettings(settings.copy(splitOn = it)) })
+                            Text("Bilder neben dem Text")
+                        }
+                        Text("Bildwechsel alle ${settings.slideSeconds} Sekunden")
+                        Slider(value = settings.slideSeconds.toFloat(), onValueChange = { viewModel.setSettings(settings.copy(slideSeconds = it.toInt())) }, valueRange = 3f..60f)
+                        Text("Breite der Bilder ${(settings.splitFraction * 100).toInt()} %  (oder die Trennlinie ziehen)")
+                        Slider(value = settings.splitFraction, onValueChange = { viewModel.setSettings(settings.copy(splitFraction = it)) }, valueRange = 0.2f..0.7f)
+                    }
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         for (t in ReaderTheme.entries) FilterChip(selected = settings.theme == t, onClick = { viewModel.setSettings(settings.copy(theme = t)) }, label = { Text(t.label) })
                     }

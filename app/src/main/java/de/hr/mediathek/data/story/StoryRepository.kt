@@ -79,6 +79,12 @@ class StoryRepository @Inject constructor(private val dao: StoryDao) {
         dao.setReadingFull(uuid, paragraph, offset, progress, nowMillis())
     }
 
+    fun observeBookmarks(uuid: String) = dao.observeBookmarks(uuid)
+    suspend fun addBookmark(storyUuid: String, paragraph: Int, label: String) {
+        dao.insertBookmark(de.hr.mediathek.data.db.StoryBookmarkEntity(storyUuid = storyUuid, paragraph = paragraph, label = label))
+    }
+    suspend fun deleteBookmark(uuid: String) = dao.deleteBookmark(uuid, nowMillis())
+
     fun observeSeriesRows() = dao.observeSeriesRows()
     fun observeFolders() = dao.observeFolders()
     fun observeFolderItems() = dao.observeFolderItems()
