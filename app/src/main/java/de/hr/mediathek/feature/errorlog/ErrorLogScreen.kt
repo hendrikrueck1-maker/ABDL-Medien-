@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import de.hr.mediathek.core.ui.glass
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -39,11 +40,15 @@ fun ErrorLogScreen(onBack: () -> Unit, viewModel: ErrorLogViewModel = hiltViewMo
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text(stringResource(R.string.diag_back)) }
-            Text(
+            TextButton(
+                onClick = onBack,
+                modifier = Modifier.glass(MaterialTheme.colorScheme.primaryContainer, androidx.compose.foundation.shape.CircleShape),
+                colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+            ) { Text(stringResource(R.string.diag_back)) }
+            androidx.compose.foundation.layout.Spacer(Modifier.padding(4.dp))
+            de.hr.mediathek.core.ui.GlassTitle(
                 text = stringResource(R.string.errorlog_title),
                 style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
             )
         }
         if (entries.isEmpty()) {
@@ -61,7 +66,7 @@ fun ErrorLogScreen(onBack: () -> Unit, viewModel: ErrorLogViewModel = hiltViewMo
             ) {
                 items(entries, key = { it.id }) { entry ->
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                        colors = de.hr.mediathek.core.ui.glassCardColors(MaterialTheme.colorScheme.surfaceContainerHigh),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

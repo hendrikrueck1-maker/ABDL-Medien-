@@ -54,7 +54,7 @@ fun TrashScreen(onBack: () -> Unit, viewModel: TrashViewModel = hiltViewModel())
         if (items.isEmpty()) Text(stringResource(R.string.trash_empty))
         items.forEach { item ->
             val daysLeft = ((item.expiresAt - System.currentTimeMillis()) / 86_400_000L).coerceAtLeast(0)
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+            Card(colors = de.hr.mediathek.core.ui.glassCardColors(MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(item.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 2)
                     Text(stringResource(R.string.trash_days_left, daysLeft.toInt()), style = MaterialTheme.typography.bodySmall)
@@ -121,7 +121,7 @@ fun DuplicatesScreen(onBack: () -> Unit, viewModel: TrashViewModel = hiltViewMod
         }
         if (groups.isEmpty()) Text(stringResource(R.string.dup_none))
         groups.forEach { group ->
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer), modifier = Modifier.fillMaxWidth()) {
+            Card(colors = de.hr.mediathek.core.ui.glassCardColors(MaterialTheme.colorScheme.secondaryContainer), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     group.forEach { m ->
                         Column {

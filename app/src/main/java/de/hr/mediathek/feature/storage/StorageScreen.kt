@@ -12,6 +12,7 @@ import de.hr.mediathek.core.jobs.JobRunner
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import de.hr.mediathek.core.ui.glass
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -133,8 +134,13 @@ fun StorageScreen(onBack: () -> Unit, section: String = StorageSection.SOURCES, 
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text(stringResource(R.string.diag_back)) }
-            Text(
+            TextButton(
+                onClick = onBack,
+                modifier = Modifier.glass(MaterialTheme.colorScheme.primaryContainer, androidx.compose.foundation.shape.CircleShape),
+                colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+            ) { Text(stringResource(R.string.diag_back)) }
+            androidx.compose.foundation.layout.Spacer(Modifier.padding(4.dp))
+            de.hr.mediathek.core.ui.GlassTitle(
                 text = stringResource(
                     when (section) {
                         StorageSection.BACKUP -> R.string.storage_section_backup
@@ -143,13 +149,12 @@ fun StorageScreen(onBack: () -> Unit, section: String = StorageSection.SOURCES, 
                     },
                 ),
                 style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.primary,
             )
         }
 
         state.message?.let { msg ->
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                colors = de.hr.mediathek.core.ui.glassCardColors(MaterialTheme.colorScheme.primaryContainer),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Row(
@@ -168,7 +173,7 @@ fun StorageScreen(onBack: () -> Unit, section: String = StorageSection.SOURCES, 
 
         if (section == StorageSection.SOURCES) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+            colors = de.hr.mediathek.core.ui.glassCardColors(MaterialTheme.colorScheme.secondaryContainer),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -245,7 +250,7 @@ fun StorageScreen(onBack: () -> Unit, section: String = StorageSection.SOURCES, 
 
         if (section == StorageSection.SOURCES) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+            colors = de.hr.mediathek.core.ui.glassCardColors(MaterialTheme.colorScheme.primaryContainer),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -275,7 +280,7 @@ fun StorageScreen(onBack: () -> Unit, section: String = StorageSection.SOURCES, 
 
         if (section == StorageSection.BACKUP) {
         Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+            colors = de.hr.mediathek.core.ui.glassCardColors(MaterialTheme.colorScheme.tertiaryContainer),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -428,7 +433,7 @@ private fun BackupCard(
     val running = job != null && (job.status == JobStatus.QUEUED || job.status == JobStatus.RUNNING)
     val ageDays = status.lastSuccessAt?.let { ((System.currentTimeMillis() - it) / 86_400_000L).toInt() }
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        colors = de.hr.mediathek.core.ui.glassCardColors(MaterialTheme.colorScheme.secondaryContainer),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

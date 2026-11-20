@@ -102,3 +102,11 @@ class CompressionEngine @Inject constructor(
         }
     }
 }
+
+/** Kurze, inhaltsfreie Fehlerursache; bei Media3-Fehlern mit dem Fehlercode (z. B. ENCODER_INIT_FAILED). */
+@androidx.annotation.OptIn(UnstableApi::class)
+internal fun describeFailure(e: Throwable): String {
+    val code = (e as? ExportException)?.errorCodeName
+    val cause = e.cause?.let { it::class.java.simpleName }
+    return listOfNotNull(e::class.java.simpleName, code, cause?.takeIf { code == null }).joinToString(" / ")
+}

@@ -45,7 +45,7 @@ fun CompressionCard(viewModel: CompressionViewModel = hiltViewModel()) {
     val running = job?.status == JobStatus.QUEUED || job?.status == JobStatus.RUNNING
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        colors = de.hr.mediathek.core.ui.glassCardColors(MaterialTheme.colorScheme.secondaryContainer),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

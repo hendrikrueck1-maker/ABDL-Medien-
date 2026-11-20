@@ -60,7 +60,7 @@ fun AppBackground(content: @Composable () -> Unit) {
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         image?.let {
             Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = 0.78f)))
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = 0.84f)))
         }
         content()
     }

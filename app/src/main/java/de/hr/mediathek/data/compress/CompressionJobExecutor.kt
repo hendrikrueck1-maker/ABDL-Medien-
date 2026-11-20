@@ -185,12 +185,7 @@ class CompressionJobExecutor @Inject constructor(
         return finish(record, ctx)
     }
 
-    /** Kurze, inhaltsfreie Fehlerursache; bei Media3-Fehlern mit dem Fehlercode (z. B. ENCODER_INIT_FAILED). */
-    private fun failureReason(e: Throwable): String {
-        val code = (e as? androidx.media3.transformer.ExportException)?.errorCodeName
-        val cause = e.cause?.let { it::class.java.simpleName }
-        return listOfNotNull(e::class.java.simpleName, code, cause?.takeIf { code == null }).joinToString(" / ")
-    }
+    private fun failureReason(e: Throwable): String = describeFailure(e)
 
     private suspend fun rejected(job: JobEntity, record: CompressionRecordEntity, note: String, message: String): JobOutcome {
         withContext(NonCancellable) {

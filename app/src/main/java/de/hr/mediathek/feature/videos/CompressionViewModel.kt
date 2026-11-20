@@ -35,7 +35,7 @@ data class QueueItem(
 sealed interface TestState {
     data class Running(val progress: Float) : TestState
     data class Ready(val result: de.hr.mediathek.data.compress.TestResult, val level: CompressionLevel) : TestState
-    data object Failed : TestState
+    data class Failed(val reason: String? = null) : TestState
 }
 
 @HiltViewModel
@@ -132,11 +132,11 @@ class CompressionViewModel @Inject constructor(
         testJob = viewModelScope.launch {
             try {
                 val result = repo.runTest(mediaUuid, level) { f -> _test.value = TestState.Running(f) }
-                _test.value = if (result != null) TestState.Ready(result, level) else TestState.Failed
+                _test.value = if (result != null) TestState.Ready(result, level) else TestState.Failed()
             } catch (e: kotlin.coroutines.cancellation.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _test.value = TestState.Failed
+                _test.value = TestState.Failed(e.message)
             }
         }
     }

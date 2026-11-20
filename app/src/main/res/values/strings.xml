@@ -153,6 +153,8 @@
     <string name="compress_purge_done">%1$d Originale gelöscht.</string>
     <string name="compress_test_run">Testlauf (ca. 20 s)</string>
     <string name="compress_test_running">Testlauf läuft …</string>
+    <string name="compress_test_reason">Ursache: %1$s</string>
+    <string name="compress_series_without_test">Trotzdem ohne Testlauf starten. Videos, bei denen das Ergebnis nicht passt, bleiben unverändert.</string>
     <string name="compress_test_failed">Der Testlauf ist fehlgeschlagen. Das Video lässt sich so vermutlich nicht komprimieren.</string>
     <string name="compress_test_result">Geschätzt: %1$s statt %2$s (−%3$d %%)</string>
     <string name="compress_test_preview">Vorher/Nachher ansehen</string>

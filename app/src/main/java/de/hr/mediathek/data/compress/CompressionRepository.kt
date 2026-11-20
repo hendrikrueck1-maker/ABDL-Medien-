@@ -116,7 +116,15 @@ class CompressionRepository @Inject constructor(
             val start = maxOf(0L, duration / 2 - length / 2)
             clearTest()
             testFile.parentFile?.mkdirs()
-            engine.encode(docUri, testFile, target.toInt(), start, length, onProgress)
+            try {
+                engine.encode(docUri, testFile, target.toInt(), start, length, onProgress)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val reason = describeFailure(e)
+                errorLogger.logNow(ErrorType.COMPRESSION, "Testlauf fehlgeschlagen: $reason")
+                throw IllegalStateException(reason, e)
+            }
             val bytes = testFile.length()
             if (bytes <= 0) return@withContext null
             TestResult(docUri.toString(), start, length, testFile.absolutePath, bytes, media.size, bytes * duration / length)

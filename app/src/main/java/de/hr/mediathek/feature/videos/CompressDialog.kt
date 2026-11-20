@@ -160,8 +160,9 @@ private fun TestPanel(test: TestState?, onRun: () -> Unit, level: CompressionLev
                 Text(stringResource(R.string.compress_test_running), style = MaterialTheme.typography.bodySmall)
                 LinearProgressIndicator(progress = { test.progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
             }
-            TestState.Failed -> {
+            is TestState.Failed -> {
                 Warning(stringResource(R.string.compress_test_failed))
+                test.reason?.let { Text(stringResource(R.string.compress_test_reason, it), style = MaterialTheme.typography.bodySmall) }
                 OutlinedButton(onClick = onRun) { Text(stringResource(R.string.compress_test_run)) }
             }
             is TestState.Ready -> if (test.level == level) {
@@ -265,6 +266,9 @@ fun SeriesDialog(
     var level by remember { mutableStateOf(CompressionLevel.BALANCED) }
     var accepted by remember { mutableStateOf(false) }
     val testOk = test is TestState.Ready && test.level == level
+    // Schlägt der Testlauf fehl, darf die Serie trotzdem gestartet werden, wenn der Nutzer das ausdrücklich bestätigt.
+    var withoutTest by remember { mutableStateOf(false) }
+    val testFailed = test is TestState.Failed
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.compress_series_title, count)) },
@@ -290,13 +294,18 @@ fun SeriesDialog(
                         Checkbox(checked = accepted, onCheckedChange = { accepted = it })
                         Text(stringResource(R.string.compress_series_accept), style = MaterialTheme.typography.bodyMedium)
                     }
+                } else if (testFailed) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = withoutTest, onCheckedChange = { withoutTest = it })
+                        Text(stringResource(R.string.compress_series_without_test), style = MaterialTheme.typography.bodyMedium)
+                    }
                 } else {
                     Text(stringResource(R.string.compress_series_need_test), style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onStart(level) }, enabled = testOk && accepted) {
+            TextButton(onClick = { onStart(level) }, enabled = (testOk && accepted) || (testFailed && withoutTest)) {
                 Text(stringResource(R.string.compress_series_start))
             }
         },

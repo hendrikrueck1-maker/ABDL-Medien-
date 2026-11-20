@@ -31,6 +31,9 @@ import de.hr.mediathek.BuildConfig
 import de.hr.mediathek.R
 import de.hr.mediathek.core.update.ApkInstaller
 import de.hr.mediathek.core.ui.AppRoutes
+import de.hr.mediathek.core.ui.GlassTitle
+import de.hr.mediathek.core.ui.glass
+import de.hr.mediathek.core.ui.glassCardColors
 import de.hr.mediathek.feature.diag.DiagRoutes
 
 @Composable
@@ -42,31 +45,31 @@ fun SettingsScreen(onOpenRoute: (String) -> Unit, viewModel: UpdateViewModel = h
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
+        GlassTitle(
             text = stringResource(R.string.nav_settings),
             style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.align(Alignment.Start),
         )
 
         GroupTitle(stringResource(R.string.settings_group_media))
-        SettingsRow(R.string.settings_row_sources, R.string.settings_row_sources_hint) {
+        SettingsRow(R.string.settings_row_sources, R.string.settings_row_sources_hint, GlassTint.BLUE) {
             onOpenRoute(AppRoutes.storage(StorageSection.SOURCES))
         }
-        SettingsRow(R.string.settings_row_compression, R.string.settings_row_compression_hint) {
+        SettingsRow(R.string.settings_row_compression, R.string.settings_row_compression_hint, GlassTint.BLUE) {
             onOpenRoute(AppRoutes.storage(StorageSection.COMPRESSION))
         }
 
         GroupTitle(stringResource(R.string.settings_group_data))
-        SettingsRow(R.string.settings_row_backup, R.string.settings_row_backup_hint) {
+        SettingsRow(R.string.settings_row_backup, R.string.settings_row_backup_hint, GlassTint.MINT) {
             onOpenRoute(AppRoutes.storage(StorageSection.BACKUP))
         }
-        SettingsRow(R.string.settings_open_errorlog, R.string.settings_row_errorlog_hint) {
+        SettingsRow(R.string.settings_open_errorlog, R.string.settings_row_errorlog_hint, GlassTint.MINT) {
             onOpenRoute(AppRoutes.ERROR_LOG)
         }
 
         GroupTitle(stringResource(R.string.settings_group_app))
         Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+            colors = glassCardColors(MaterialTheme.colorScheme.secondaryContainer),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -149,39 +152,48 @@ fun SettingsScreen(onOpenRoute: (String) -> Unit, viewModel: UpdateViewModel = h
             }
         }
 
-        SettingsRow(R.string.diag_open_scan, R.string.diag_section_hint) { onOpenRoute(DiagRoutes.SCAN) }
-        SettingsRow(R.string.diag_open_transcode, null) { onOpenRoute(DiagRoutes.TRANSCODE) }
-        SettingsRow(R.string.diag_open_pdf, null) { onOpenRoute(DiagRoutes.PDF) }
+        SettingsRow(R.string.diag_open_scan, R.string.diag_section_hint, GlassTint.PINK) { onOpenRoute(DiagRoutes.SCAN) }
+        SettingsRow(R.string.diag_open_transcode, null, GlassTint.PINK) { onOpenRoute(DiagRoutes.TRANSCODE) }
+        SettingsRow(R.string.diag_open_pdf, null, GlassTint.PINK) { onOpenRoute(DiagRoutes.PDF) }
     }
 }
 
 @Composable
 private fun GroupTitle(text: String) {
-    Text(
+    GlassTitle(
         text = text,
+        tint = MaterialTheme.colorScheme.tertiaryContainer,
+        onTint = MaterialTheme.colorScheme.onTertiaryContainer,
         style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(top = 8.dp),
     )
 }
 
-/** Eine Zeile der Einstellungsliste: Titel, kurzer Hinweis, Pfeil. */
+private enum class GlassTint { PINK, BLUE, MINT }
+
+/** Eine Zeile der Einstellungsliste als farbige Glasfläche: Titel, kurzer Hinweis, Pfeil. */
 @Composable
-private fun SettingsRow(@StringRes title: Int, @StringRes hint: Int?, onClick: () -> Unit) {
+private fun SettingsRow(@StringRes title: Int, @StringRes hint: Int?, tint: GlassTint, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val (container, onContainer) = when (tint) {
+        GlassTint.PINK -> scheme.primaryContainer to scheme.onPrimaryContainer
+        GlassTint.BLUE -> scheme.secondaryContainer to scheme.onSecondaryContainer
+        GlassTint.MINT -> scheme.tertiaryContainer to scheme.onTertiaryContainer
+    }
     Row(
         Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
+            .glass(container, MaterialTheme.shapes.large)
             .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 12.dp),
+            .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(title), style = MaterialTheme.typography.titleMedium, color = onContainer)
             if (hint != null) {
-                Text(stringResource(hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(hint), style = MaterialTheme.typography.bodySmall, color = onContainer.copy(alpha = 0.8f))
             }
         }
-        Text("›", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.outline)
+        Text("›", style = MaterialTheme.typography.titleLarge, color = onContainer)
     }
 }
