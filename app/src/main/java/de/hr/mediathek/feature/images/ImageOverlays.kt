@@ -1,5 +1,6 @@
 package de.hr.mediathek.feature.images
 
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,14 +64,14 @@ internal fun StarRow(rating: Int, onRate: (Int) -> Unit) {
     Row(Modifier.selectableGroup(), verticalAlignment = Alignment.CenterVertically) {
         (1..5).forEach { star ->
             Box(
-                Modifier.size(44.dp).clip(CircleShape)
+                Modifier.size(48.dp).clip(CircleShape)
                     .selectable(selected = star == rating, role = Role.RadioButton, onClick = { onRate(star) }),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Filled.Star,
+                    if (star <= rating) Icons.Filled.Star else Icons.Outlined.StarBorder,
                     stringResource(R.string.video_rate, star),
-                    tint = if (star <= rating) c.gold else c.muted,
+                    tint = if (star <= rating) c.gold else c.onCardVariant,
                     modifier = Modifier.size(28.dp),
                 )
             }
@@ -83,7 +84,7 @@ internal fun StarRow(rating: Int, onRate: (Int) -> Unit) {
 internal fun FavoritePill(active: Boolean, onToggle: () -> Unit) {
     val c = LocalAppColors.current
     Row(
-        Modifier.height(44.dp).clip(CircleShape)
+        Modifier.height(48.dp).clip(CircleShape)
             .then(if (active) Modifier.background(c.rosa) else Modifier.border(2.dp, c.rosa, CircleShape))
             .toggleable(value = active, role = Role.Switch, onValueChange = { onToggle() })
             .padding(horizontal = 14.dp),
@@ -101,7 +102,7 @@ internal fun FavoritePill(active: Boolean, onToggle: () -> Unit) {
 internal fun AccentPill(label: String, color: Color, icon: ImageVector? = null, onClick: () -> Unit) {
     val c = LocalAppColors.current
     Row(
-        Modifier.height(44.dp).clip(CircleShape).background(color).clickable(role = Role.Button, onClick = onClick).padding(horizontal = 16.dp),
+        Modifier.height(48.dp).clip(CircleShape).background(color).clickable(role = Role.Button, onClick = onClick).padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {

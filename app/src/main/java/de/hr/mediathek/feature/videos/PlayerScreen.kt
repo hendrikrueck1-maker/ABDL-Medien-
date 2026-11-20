@@ -1,5 +1,6 @@
 package de.hr.mediathek.feature.videos
 
+import androidx.compose.material.icons.outlined.StarBorder
 import android.os.Handler
 import android.os.Looper
 import android.view.View
@@ -358,10 +359,10 @@ private fun ReadyPlayer(
                     Row(Modifier.selectableGroup()) {
                         (1..5).forEach { star ->
                             Box(
-                                Modifier.size(44.dp).selectable(selected = star == state.rating, role = Role.RadioButton, onClick = { viewModel.setRating(star); poke() }),
+                                Modifier.size(48.dp).selectable(selected = star == state.rating, role = Role.RadioButton, onClick = { viewModel.setRating(star); poke() }),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(Icons.Filled.Star, stringResource(R.string.video_rate, star), tint = if (star <= state.rating) c.gold else c.muted)
+                                Icon(if (star <= state.rating) Icons.Filled.Star else Icons.Outlined.StarBorder, stringResource(R.string.video_rate, star), tint = if (star <= state.rating) c.gold else c.onCardVariant)
                             }
                         }
                     }
@@ -477,7 +478,7 @@ private fun RoundTool(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
 private fun MarkToggle(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, active: Boolean, color: Color, onToggle: () -> Unit) {
     val c = LocalAppColors.current
     Row(
-        Modifier.height(44.dp).clip(CircleShape)
+        Modifier.height(48.dp).clip(CircleShape)
             .then(if (active) Modifier.background(color) else Modifier.border(2.dp, color, CircleShape))
             .toggleable(value = active, role = Role.Switch, onValueChange = { onToggle() })
             .padding(horizontal = 14.dp),

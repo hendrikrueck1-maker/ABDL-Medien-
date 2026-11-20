@@ -2,6 +2,7 @@
 
 package de.hr.mediathek.feature.videos
 
+import androidx.compose.material.icons.outlined.StarBorder
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
@@ -442,12 +443,12 @@ fun VideosScreen(
                         val cat = categories.firstOrNull { it.uuid == filter.categoryUuid }
                         PillChip(cat?.name ?: stringResource(R.string.video_chip_category), cat != null) { showFilter = true }
                     }
-                    OutlineAccentButton(onClick = { showViewSettings = true }, color = c.mint, modifier = Modifier.height(44.dp)) { Text(stringResource(R.string.view_button)) }
+                    OutlineAccentButton(onClick = { showViewSettings = true }, color = c.mint, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.view_button)) }
                     val activeCount = activeFilterCount(filter)
                     if (activeCount > 0) {
-                        AccentButton(onClick = { showFilter = true }, color = c.mint, modifier = Modifier.height(44.dp)) { Text(stringResource(R.string.filter_button_active, activeCount)) }
+                        AccentButton(onClick = { showFilter = true }, color = c.mint, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.filter_button_active, activeCount)) }
                     } else {
-                        OutlineAccentButton(onClick = { showFilter = true }, color = c.mint, modifier = Modifier.height(44.dp)) { Text(stringResource(R.string.filter_button)) }
+                        OutlineAccentButton(onClick = { showFilter = true }, color = c.mint, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.filter_button)) }
                     }
                 }
                 if (foldersOn && path.isNotEmpty() && !wide) {
@@ -504,7 +505,7 @@ private fun PillChip(label: String, active: Boolean, onClick: () -> Unit) {
     val c = LocalAppColors.current
     Box(
         Modifier
-            .height(44.dp)
+            .height(48.dp)
             .clip(CircleShape)
             .background(if (active) c.mint else c.bar)
             .clickable(onClickLabel = label, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
@@ -798,7 +799,7 @@ private fun VideoTexts(video: MediaFileEntity, offline: Boolean, showDetails: Bo
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         if (video.rating > 0) {
             repeat(5) { i ->
-                Icon(Icons.Filled.Star, contentDescription = null, tint = if (i < video.rating.coerceIn(0, 5)) c.gold else c.muted, modifier = Modifier.size(16.dp))
+                Icon(if (i < video.rating.coerceIn(0, 5)) Icons.Filled.Star else Icons.Outlined.StarBorder, contentDescription = null, tint = if (i < video.rating.coerceIn(0, 5)) c.gold else c.onCardVariant, modifier = Modifier.size(16.dp))
             }
         } else {
             Text(stringResource(R.string.video_not_rated), style = MaterialTheme.typography.bodySmall, color = c.onCardVariant)

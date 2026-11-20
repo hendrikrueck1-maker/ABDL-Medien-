@@ -107,7 +107,7 @@ internal fun StoryImagePanel(
                 )
             }
             Row(
-                Modifier.height(44.dp).clip(CircleShape).background(c.card)
+                Modifier.height(48.dp).clip(CircleShape).background(c.card)
                     .clickable(onClickLabel = stringResource(R.string.reader_folder_choose), role = Role.Button) { chooseFolder = true }
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -161,7 +161,7 @@ internal fun StoryImagePanel(
             RoundIconButton(Icons.Filled.SkipNext, stringResource(R.string.img_next)) { onNext() }
             Spacer(Modifier.weight(1f))
             Row(
-                Modifier.height(44.dp).clip(CircleShape)
+                Modifier.height(48.dp).clip(CircleShape)
                     .then(if (random) Modifier.background(c.mint) else Modifier.border(2.dp, c.mint, CircleShape))
                     .toggleable(value = random, role = Role.Switch, onValueChange = onRandom)
                     .padding(horizontal = 12.dp),
@@ -173,7 +173,7 @@ internal fun StoryImagePanel(
                 Text(stringResource(R.string.img_random_short), style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1)
             }
             Box(
-                Modifier.height(44.dp).clip(CircleShape).background(c.card)
+                Modifier.height(48.dp).clip(CircleShape).background(c.card)
                     .clickable(onClickLabel = stringResource(R.string.img_interval), role = Role.Button) {
                         onInterval(SLIDE_INTERVALS.firstOrNull { it > seconds } ?: SLIDE_INTERVALS.first())
                     }.padding(horizontal = 14.dp),

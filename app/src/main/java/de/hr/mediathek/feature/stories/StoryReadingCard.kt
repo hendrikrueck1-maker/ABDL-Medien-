@@ -1,5 +1,6 @@
 package de.hr.mediathek.feature.stories
 
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
@@ -97,11 +98,11 @@ internal fun PageStars(rating: Int, page: PageColors, onRate: (Int) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         for (i in 1..5) {
             Box(
-                Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.RadioButton) { onRate(i) }
+                Modifier.size(48.dp).clip(CircleShape).clickable(role = Role.RadioButton) { onRate(i) }
                     .semantics { contentDescription = "$i Sterne" },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Star, null, tint = if (i <= rating) page.star else page.fg.copy(alpha = 0.3f), modifier = Modifier.size(26.dp))
+                Icon(if (i <= rating) Icons.Filled.Star else Icons.Outlined.StarBorder, null, tint = if (i <= rating) page.star else page.fg.copy(alpha = 0.7f), modifier = Modifier.size(26.dp))
             }
         }
     }

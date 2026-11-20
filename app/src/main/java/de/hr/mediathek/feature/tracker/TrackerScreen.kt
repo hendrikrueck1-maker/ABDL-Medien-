@@ -150,7 +150,7 @@ private fun PeriodSwitch(period: StatPeriod, onPeriod: (StatPeriod) -> Unit) {
         )) {
             val active = period == p
             Box(
-                Modifier.defaultMinSize(minWidth = 64.dp, minHeight = 44.dp).clip(CircleShape)
+                Modifier.defaultMinSize(minWidth = 64.dp, minHeight = 48.dp).clip(CircleShape)
                     .background(if (active) c.lavendel else Color.Transparent)
                     .clickable(role = Role.RadioButton) { onPeriod(p) }.padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center,
