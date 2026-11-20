@@ -19,6 +19,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.hr.mediathek.core.ui.theme.LocalAppColors
 import de.hr.mediathek.data.db.MediaFileDao
+import de.hr.mediathek.data.db.SettingDao
+import de.hr.mediathek.data.db.SettingEntity
 import de.hr.mediathek.data.db.SourceDao
 import de.hr.mediathek.data.images.ImageLoader
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,31 +28,73 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Wählt beim Start der App ein zufälliges Bild aus der Bildersammlung als Hintergrund. */
+/**
+ * Hintergrundbild der App: beim Start ein zufälliges Bild, auf Wunsch ein festes ("Als Hintergrund").
+ * Das feste Bild bleibt, bis „Neues Hintergrundbild“ gedrückt wird.
+ */
 @HiltViewModel
 class AppBackgroundViewModel @Inject constructor(
     private val dao: MediaFileDao,
     private val sources: SourceDao,
+    private val settings: SettingDao,
     private val loader: ImageLoader,
 ) : ViewModel() {
     private val _image = MutableStateFlow<Bitmap?>(null)
     val image: StateFlow<Bitmap?> = _image
 
+    /** Das aktuell fixierte Bild; null, wenn der Zufall gilt. */
+    private val _pinned = MutableStateFlow<String?>(null)
+    val pinned: StateFlow<String?> = _pinned
+
     init {
-        reload()
+        viewModelScope.launch {
+            val saved = settings.get(K_PIN)?.takeIf { it.isNotBlank() }
+            if (saved != null && show(saved)) {
+                _pinned.value = saved
+            } else {
+                showRandom()
+            }
+        }
     }
 
-    /** Lädt ein neues Zufallsbild (beim Start und für den Button „Neues Hintergrundbild“). */
+    /** Neues Zufallsbild (beim Start und für „Neues Hintergrundbild“); hebt die Fixierung auf. */
     fun reload() {
         viewModelScope.launch {
-            val uuid = dao.randomImageUuid() ?: return@launch
-            val media = dao.getByUuid(uuid) ?: return@launch
-            val docId = media.documentIdCache ?: return@launch
-            val tree = sources.getByUuid(media.sourceUuid)?.treeUri?.let { Uri.parse(it) } ?: return@launch
-            val uri = DocumentsContract.buildDocumentUriUsingTree(tree, docId)
-            val info = loader.info(uri) ?: return@launch
-            _image.value = loader.decodeSampled(uri, info, 1920) ?: _image.value
+            _pinned.value = null
+            settings.set(SettingEntity(K_PIN, ""))
+            showRandom()
         }
+    }
+
+    /** Fixiert dieses Bild als Hintergrund, bis „Neues Hintergrundbild“ gedrückt wird. */
+    fun pin(uuid: String) {
+        viewModelScope.launch {
+            if (show(uuid)) {
+                _pinned.value = uuid
+                settings.set(SettingEntity(K_PIN, uuid))
+            }
+        }
+    }
+
+    private suspend fun showRandom() {
+        val uuid = dao.randomImageUuid() ?: return
+        show(uuid)
+    }
+
+    private suspend fun show(uuid: String): Boolean {
+        val media = dao.getByUuid(uuid) ?: return false
+        val docId = media.documentIdCache ?: return false
+        val tree = sources.getByUuid(media.sourceUuid)?.treeUri?.let { Uri.parse(it) } ?: return false
+        val uri = DocumentsContract.buildDocumentUriUsingTree(tree, docId)
+        val info = loader.info(uri) ?: return false
+        val bitmap = loader.decodeSampled(uri, info, 1920) ?: return false
+        _image.value = bitmap
+        return true
+    }
+
+    private companion object {
+        /** Beginnt mit "ui_": gehört zu den Geräteeinstellungen und wandert nicht ins Backup. */
+        const val K_PIN = "ui_background_uuid"
     }
 }
 

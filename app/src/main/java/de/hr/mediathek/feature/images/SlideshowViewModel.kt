@@ -8,13 +8,20 @@ import androidx.lifecycle.viewModelScope
 import androidx.sqlite.db.SimpleSQLiteQuery
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.hr.mediathek.data.db.MediaFileDao
+import de.hr.mediathek.data.db.MediaFileEntity
 import de.hr.mediathek.data.db.SettingDao
 import de.hr.mediathek.data.db.SettingEntity
 import de.hr.mediathek.data.db.SourceDao
 import de.hr.mediathek.data.images.ImageLoader
 import de.hr.mediathek.data.images.SlideshowOrder
 import de.hr.mediathek.feature.videos.VideoQuery
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -29,6 +36,8 @@ data class SlideshowState(
     val random: Boolean = true,
     val paused: Boolean = false,
     val currentUuid: String? = null,
+    /** Platz des aktuellen Bildes in der Auswahl (ab 1). */
+    val position: Int = 0,
     /** Zähler, der bei jedem Bildwechsel steigt; damit startet der Wechsel-Timer auch bei gleichem Bild neu. */
     val tick: Int = 0,
 )
@@ -44,6 +53,11 @@ class SlideshowViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(SlideshowState())
     val state: StateFlow<SlideshowState> = _state
+
+    /** Das gerade gezeigte Bild mit Bewertung und Markierungen (aktualisiert sich bei Änderungen). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val current: Flow<MediaFileEntity?> = _state.map { it.currentUuid }.distinctUntilChanged()
+        .flatMapLatest { id -> if (id == null) flowOf(null) else dao.observeByUuid(id) }
 
     private var uuids: List<String> = emptyList()
     private var order: SlideshowOrder? = null
@@ -87,7 +101,7 @@ class SlideshowViewModel @Inject constructor(
         if (uuids.isEmpty()) return
         val o = SlideshowOrder(uuids.size, _state.value.random, startIndex)
         order = o
-        _state.update { it.copy(started = true, paused = false, currentUuid = uuids[o.current], tick = it.tick + 1) }
+        _state.update { it.copy(started = true, paused = false, currentUuid = uuids[o.current], position = o.current + 1, tick = it.tick + 1) }
     }
 
     fun stop() {
@@ -98,12 +112,24 @@ class SlideshowViewModel @Inject constructor(
     fun next() = move { it.next() }
     fun previous() = move { it.previous() }
 
+    fun rate(media: MediaFileEntity, stars: Int) {
+        viewModelScope.launch { dao.setRating(media.uuid, if (media.rating == stars) 0 else stars, System.currentTimeMillis()) }
+    }
+
+    fun toggleFavorite(media: MediaFileEntity) {
+        viewModelScope.launch { dao.setFavorite(media.uuid, !media.favorite, System.currentTimeMillis()) }
+    }
+
+    fun toggleMarkedDelete(media: MediaFileEntity) {
+        viewModelScope.launch { dao.setMarkedDelete(media.uuid, !media.markedDelete, System.currentTimeMillis()) }
+    }
+
     fun togglePause() = _state.update { it.copy(paused = !it.paused) }
 
     private fun move(step: (SlideshowOrder) -> Int) {
         val o = order ?: return
         val index = step(o)
-        _state.update { it.copy(currentUuid = uuids[index], tick = it.tick + 1) }
+        _state.update { it.copy(currentUuid = uuids[index], position = index + 1, tick = it.tick + 1) }
     }
 
     /** Adresse eines Bildes der Diashow; null, wenn Datei oder Quelle nicht verfügbar ist. */

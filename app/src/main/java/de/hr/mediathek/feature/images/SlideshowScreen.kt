@@ -7,7 +7,39 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.activity.ComponentActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
+import android.view.accessibility.AccessibilityManager
+import de.hr.mediathek.core.ui.AppBackgroundViewModel
+import de.hr.mediathek.core.ui.theme.LocalAppColors
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -115,10 +147,28 @@ private fun Playing(state: SlideshowState, viewModel: SlideshowViewModel, onClos
         onDispose { activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
     BackHandler(onBack = onClose)
+    val c = LocalAppColors.current
+    val media by viewModel.current.collectAsStateWithLifecycle(initialValue = null)
+    val background: AppBackgroundViewModel = hiltViewModel(LocalContext.current as ComponentActivity)
+    val pinnedUuid by background.pinned.collectAsStateWithLifecycle()
 
-    var controls by remember { mutableStateOf(false) }
+    var controls by remember { mutableStateOf(true) }
+    var pokes by remember { mutableIntStateOf(0) }
+    val poke = { pokes++; controls = true }
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
     var failures by remember { mutableStateOf(0) }
+    var dragX by remember { mutableFloatStateOf(0f) }
+
+    // Bedienleiste nach 3 s ausblenden (nicht mit Screenreader).
+    val touchExploration = remember(activity) {
+        activity?.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled == true
+    }
+    LaunchedEffect(controls, pokes) {
+        if (controls && !touchExploration) {
+            delay(3000)
+            controls = false
+        }
+    }
 
     // Bild laden; nicht lesbare Bilder werden übersprungen (bei lauter Fehlern endet die Diashow).
     LaunchedEffect(state.tick) {
@@ -144,8 +194,16 @@ private fun Playing(state: SlideshowState, viewModel: SlideshowViewModel, onClos
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black)
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { controls = !controls },
+            .background(c.bgFullscreen)
+            .pointerInput(Unit) { detectTapGestures(onTap = { if (controls) controls = false else poke() }) }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragStart = { dragX = 0f },
+                    onDragEnd = {
+                        if (dragX < -SWIPE_PX) { viewModel.next(); poke() } else if (dragX > SWIPE_PX) { viewModel.previous(); poke() }
+                    },
+                ) { _, delta -> dragX += delta }
+            },
     ) {
         Crossfade(
             targetState = bitmap,
@@ -153,33 +211,84 @@ private fun Playing(state: SlideshowState, viewModel: SlideshowViewModel, onClos
             label = "slide",
         ) { current ->
             if (current != null) {
-                Image(current.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+                Image(current.asImageBitmap(), contentDescription = media?.displayName, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
             }
         }
-        if (controls || state.paused) {
-            // Dunkle, fast deckende Leiste mit hellen Knöpfen: auf jedem Bild gut lesbar.
-            Row(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp)
-                    .background(Color.Black.copy(alpha = 0.82f), RoundedCornerShape(28.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
-                Button(onClick = viewModel::previous, colors = colors) { Text("◀", style = MaterialTheme.typography.titleMedium) }
-                Button(onClick = viewModel::togglePause, colors = colors) {
-                    Text(
-                        stringResource(if (state.paused) R.string.slideshow_resume else R.string.slideshow_pause),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
+        AnimatedVisibility(visible = controls, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp)) {
+                // Oben links: zurück, Titel, Position.
+                OverlayPill(Modifier.align(Alignment.TopStart).widthIn(max = 420.dp)) {
+                    RoundIconButton(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.diag_back)) { onClose() }
+                    Column(Modifier.padding(end = 12.dp)) {
+                        val folder = media?.relativePath?.substringBeforeLast('/', "")?.substringAfterLast('/').orEmpty()
+                        Text(
+                            stringResource(R.string.img_slideshow_label, folder.ifEmpty { media?.displayName.orEmpty() }),
+                            style = MaterialTheme.typography.titleSmall, color = c.onCard, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            stringResource(R.string.img_position, state.position, state.total) + " · " +
+                                stringResource(if (state.random) R.string.img_random_on else R.string.img_random_off),
+                            style = MaterialTheme.typography.bodySmall, color = c.onCardVariant, maxLines = 1,
+                        )
+                    }
                 }
-                Button(onClick = viewModel::next, colors = colors) { Text("▶", style = MaterialTheme.typography.titleMedium) }
-                Button(
-                    onClick = onClose,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6FA8), contentColor = Color.Black),
-                ) { Text(stringResource(R.string.slideshow_end), style = MaterialTheme.typography.titleMedium) }
+                // Oben rechts: Bewertung, Favorit, Hintergrund.
+                media?.let { m ->
+                    OverlayPill(Modifier.align(Alignment.TopEnd)) {
+                        StarRow(m.rating) { viewModel.rate(m, it); poke() }
+                        FavoritePill(m.favorite) { viewModel.toggleFavorite(m); poke() }
+                        val isBg = pinnedUuid == m.uuid
+                        AccentPill(
+                            stringResource(if (isBg) R.string.img_is_background else R.string.img_as_background),
+                            c.lavendel,
+                        ) { background.pin(m.uuid); poke() }
+                    }
+                }
+                // Unten Mitte: Steuerung.
+                OverlayPill(Modifier.align(Alignment.BottomCenter)) {
+                    RoundIconButton(Icons.Filled.SkipPrevious, stringResource(R.string.img_prev)) { viewModel.previous(); poke() }
+                    Box(
+                        Modifier.size(width = 96.dp, height = 56.dp).clip(CircleShape).background(c.hellblau)
+                            .clickable(
+                                onClickLabel = stringResource(if (state.paused) R.string.slideshow_resume else R.string.slideshow_pause),
+                                role = Role.Button,
+                            ) { viewModel.togglePause(); poke() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (state.paused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                            stringResource(if (state.paused) R.string.slideshow_resume else R.string.slideshow_pause),
+                            tint = c.onAccent, modifier = Modifier.size(32.dp),
+                        )
+                    }
+                    RoundIconButton(Icons.Filled.SkipNext, stringResource(R.string.img_next)) { viewModel.next(); poke() }
+                    Spacer(Modifier.width(8.dp))
+                    // Zufall (mint, aktiv gefüllt) und Intervall.
+                    Row(
+                        Modifier.height(48.dp).clip(CircleShape)
+                            .then(if (state.random) Modifier.background(c.mint) else Modifier.border(2.dp, c.mint, CircleShape))
+                            .toggleable(value = state.random, role = Role.Switch, onValueChange = { viewModel.setRandom(it); poke() })
+                            .padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        val tint = if (state.random) c.onAccent else c.mint
+                        Icon(Icons.Filled.Shuffle, null, tint = tint)
+                        Text(stringResource(R.string.img_random_short), style = MaterialTheme.typography.labelLarge, color = tint)
+                    }
+                    Box(
+                        Modifier.height(48.dp).clip(CircleShape).background(c.card)
+                            .clickable(onClickLabel = stringResource(R.string.img_interval), role = Role.Button) {
+                                val next = INTERVALS.getOrNull(INTERVALS.indexOf(state.intervalSec) + 1) ?: INTERVALS.first()
+                                viewModel.setInterval(next); poke()
+                            }.padding(horizontal = 16.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { Text(stringResource(R.string.slideshow_seconds, state.intervalSec), style = MaterialTheme.typography.labelLarge, color = c.onCard) }
+                    media?.let { m ->
+                        Spacer(Modifier.width(8.dp))
+                        DeleteMarkToggle(m.markedDelete) { viewModel.toggleMarkedDelete(m); poke() }
+                    }
+                }
             }
         }
     }
@@ -187,3 +296,4 @@ private fun Playing(state: SlideshowState, viewModel: SlideshowViewModel, onClos
 
 private const val MAX_PX = 2560
 private const val MAX_FAILURES_IN_ROW = 10
+private const val SWIPE_PX = 120f

@@ -470,4 +470,15 @@
     <string name="slideshow_from_here">▶ Diashow</string>
     <!-- Geschichten -->
     <string name="story_recent_sources">Zuletzt verwendet</string>
+    <string name="img_slideshow_label">Diashow · %1$s</string>
+    <string name="img_position">Bild %1$d von %2$d</string>
+    <string name="img_random_on">Zufall an</string>
+    <string name="img_random_off">Zufall aus</string>
+    <string name="img_as_background">Als Hintergrund</string>
+    <string name="img_is_background">Ist Hintergrund</string>
+    <string name="img_prev">Voriges Bild</string>
+    <string name="img_next">Nächstes Bild</string>
+    <string name="img_interval">Intervall</string>
+    <string name="img_viewer_label">Bild · %1$s</string>
+    <string name="img_random_short">Zufall</string>
 </resources>

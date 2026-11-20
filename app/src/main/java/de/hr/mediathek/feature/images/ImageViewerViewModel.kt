@@ -65,6 +65,10 @@ class ImageViewerViewModel @Inject constructor(
         viewModelScope.launch { dao.setFavorite(media.uuid, !media.favorite, System.currentTimeMillis()) }
     }
 
+    fun toggleMarkedDelete(media: MediaFileEntity) {
+        viewModelScope.launch { dao.setMarkedDelete(media.uuid, !media.markedDelete, System.currentTimeMillis()) }
+    }
+
     /** Zweiter Tipp auf denselben Stern entfernt die Bewertung. */
     fun rate(media: MediaFileEntity, stars: Int) {
         viewModelScope.launch {

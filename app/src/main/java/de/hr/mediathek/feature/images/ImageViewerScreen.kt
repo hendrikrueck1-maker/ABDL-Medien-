@@ -4,7 +4,22 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.net.Uri
 import android.widget.ImageView
+import androidx.activity.ComponentActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
+import android.view.accessibility.AccessibilityManager
+import de.hr.mediathek.core.ui.AppBackgroundViewModel
+import de.hr.mediathek.core.ui.theme.LocalAppColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -25,7 +40,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -92,7 +106,20 @@ private fun Pages(state: ViewerState.Ready, viewModel: ImageViewerViewModel, onB
     val pager = rememberPagerState(initialPage = state.startIndex) { state.uuids.size }
     var zoomed by remember { mutableStateOf(false) }
     var chrome by remember { mutableStateOf(true) }
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    var pokes by remember { mutableIntStateOf(0) }
+    val poke = { pokes++; chrome = true }
+    val background: AppBackgroundViewModel = hiltViewModel(LocalContext.current as ComponentActivity)
+    val pinnedUuid by background.pinned.collectAsStateWithLifecycle()
+    // Leiste nach 3 s ausblenden (nicht mit Screenreader).
+    val ctx = LocalContext.current
+    val touchExploration = remember { ctx.getSystemService(AccessibilityManager::class.java)?.isTouchExplorationEnabled == true }
+    LaunchedEffect(chrome, pokes, pager.currentPage) {
+        if (chrome && !touchExploration) {
+            delay(3000)
+            chrome = false
+        }
+    }
+    Box(Modifier.fillMaxSize().background(LocalAppColors.current.bgFullscreen)) {
         HorizontalPager(
             state = pager,
             userScrollEnabled = !zoomed,
@@ -106,47 +133,58 @@ private fun Pages(state: ViewerState.Ready, viewModel: ImageViewerViewModel, onB
             ImagePage(
                 media = media,
                 viewModel = viewModel,
-                onTap = { chrome = !chrome },
+                onTap = { if (chrome) chrome = false else poke() },
                 onZoomed = { if (current) zoomed = it },
             )
         }
-        if (chrome) {
+        AnimatedVisibility(visible = chrome, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
             val uuid = state.uuids.getOrNull(pager.currentPage)
             val media by remember(uuid) { uuid?.let { viewModel.observe(it) } ?: kotlinx.coroutines.flow.flowOf(null) }
                 .collectAsStateWithLifecycle(initialValue = null)
-            TopBar(media, pager.currentPage + 1, state.uuids.size, viewModel, onBack) { uuid?.let(onSlideshow) }
+            Overlays(media, pager.currentPage + 1, state.uuids.size, viewModel, onBack, background, pinnedUuid, poke) {
+                uuid?.let(onSlideshow)
+            }
         }
     }
 }
 
 @Composable
-private fun TopBar(media: MediaFileEntity?, index: Int, total: Int, viewModel: ImageViewerViewModel, onBack: () -> Unit, onSlideshow: () -> Unit) {
-    Column(
-        Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(onClick = onBack) { Text(stringResource(R.string.diag_back), color = Color.White) }
-            Text(
-                media?.displayName ?: "",
-                color = Color.White,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                modifier = Modifier.weight(1f),
-            )
-            Text("$index / $total", color = Color.White, style = MaterialTheme.typography.bodySmall)
+private fun Overlays(
+    media: MediaFileEntity?,
+    index: Int,
+    total: Int,
+    viewModel: ImageViewerViewModel,
+    onBack: () -> Unit,
+    background: AppBackgroundViewModel,
+    pinnedUuid: String?,
+    poke: () -> Unit,
+    onSlideshow: () -> Unit,
+) {
+    val c = LocalAppColors.current
+    Box(Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp)) {
+        OverlayPill(Modifier.align(Alignment.TopStart).widthIn(max = 420.dp)) {
+            RoundIconButton(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.diag_back)) { onBack() }
+            Column(Modifier.padding(end = 12.dp)) {
+                Text(
+                    stringResource(R.string.img_viewer_label, media?.displayName.orEmpty()),
+                    style = MaterialTheme.typography.titleSmall, color = c.onCard, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+                Text(stringResource(R.string.img_position, index, total), style = MaterialTheme.typography.bodySmall, color = c.onCardVariant, maxLines = 1)
+            }
         }
         if (media != null) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                (1..5).forEach { star ->
-                    TextButton(onClick = { viewModel.rate(media, star) }) {
-                        Text(if (star <= media.rating) "★" else "☆", color = Color(0xFFFFC107), style = MaterialTheme.typography.titleLarge)
-                    }
-                }
-                OutlinedButton(onClick = { viewModel.toggleFavorite(media) }) {
-                    Text(stringResource(if (media.favorite) R.string.video_fav_unset else R.string.video_fav_set), color = Color.White)
-                }
+            OverlayPill(Modifier.align(Alignment.TopEnd)) {
+                StarRow(media.rating) { viewModel.rate(media, it); poke() }
+                FavoritePill(media.favorite) { viewModel.toggleFavorite(media); poke() }
+                AccentPill(
+                    stringResource(if (pinnedUuid == media.uuid) R.string.img_is_background else R.string.img_as_background),
+                    c.lavendel,
+                ) { background.pin(media.uuid); poke() }
+            }
+            OverlayPill(Modifier.align(Alignment.BottomCenter)) {
                 // Startet die Diashow ab diesem Bild mit den zuletzt gewählten Einstellungen.
-                OutlinedButton(onClick = onSlideshow) { Text(stringResource(R.string.slideshow_from_here), color = Color.White) }
+                AccentPill(stringResource(R.string.slideshow_from_here), c.hellblau, Icons.Filled.PlayArrow) { onSlideshow() }
+                DeleteMarkToggle(media.markedDelete) { viewModel.toggleMarkedDelete(media); poke() }
             }
         }
     }
