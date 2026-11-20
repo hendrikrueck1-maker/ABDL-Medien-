@@ -19,6 +19,8 @@ class StoryRepository @Inject constructor(private val dao: StoryDao) {
     fun recentSources(): Flow<List<String>> = dao.observeRecentSources()
     fun recentUrls(): Flow<List<String>> = dao.observeRecentUrls()
     fun tagNames(uuid: String): Flow<List<String>> = dao.observeTagNames(uuid)
+    fun seriesParts(seriesUuid: String): Flow<List<de.hr.mediathek.data.db.SeriesPart>> = dao.observeSeriesParts(seriesUuid)
+    suspend fun seriesName(seriesUuid: String): String? = dao.seriesName(seriesUuid)
 
     suspend fun get(uuid: String): StoryEntity? = dao.get(uuid)
     suspend fun text(uuid: String): String = dao.getText(uuid) ?: ""

@@ -214,6 +214,9 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
             de.hr.mediathek.feature.stories.StoryReaderScreen(
                 onBack = { navController.popBackStack() },
                 onEdit = { navController.navigate("story-edit/$it") },
+                onOpenStory = { id ->
+                    navController.navigate("story/$id") { popUpTo("story/{uuid}") { inclusive = true } }
+                },
             )
         }
         composable("story-edit/{uuid}", arguments = listOf(navArgument("uuid") { type = NavType.StringType })) {

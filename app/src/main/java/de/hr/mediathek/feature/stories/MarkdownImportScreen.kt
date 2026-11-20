@@ -49,17 +49,24 @@ fun MarkdownImportScreen(onBack: () -> Unit, viewModel: MarkdownImportViewModel 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { viewModel.reset(); onBack() }, enabled = !busy) { Text("← Zurück") }
-            Text("Markdown-Import", style = MaterialTheme.typography.titleLarge)
+            Text("Import: PWA, Markdown, JSON", style = MaterialTheme.typography.titleLarge)
         }
         Text(
-            "Liest alle *.md-Dateien mit YAML-Frontmatter (title, category, tags, status, author, createdAt …). " +
-                "Mehrfaches Importieren ist sicher: Der Dateiname dient als Kennung, vorhandene Geschichten werden aktualisiert, " +
+            "Erkennt automatisch: den Katalog der Geschichten-PWA (data/index.json mit shard_*.json, samt Serien), " +
+                "eigene Geschichten (user-stories/*.json), Markdown-Dateien mit YAML-Frontmatter und die Sicherung " +
+                "geschichten-backup.json (Bewertungen, ♂/♀/⚥, Weiterschreiben, eigene Geschichten).",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            "Reihenfolge: zuerst Ordner oder ZIP mit dem Katalog (z. B. das ZIP des GitHub-Repos „Geschichten“), danach die " +
+                "Sicherung als JSON. Mehrfaches Importieren ist sicher: Die ID bzw. der Dateiname ist die Kennung, " +
                 "gleicher Text wird übersprungen.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (state.phase == MdPhase.IDLE) {
-            Button(onClick = { folderPicker.launch(null) }, modifier = Modifier.fillMaxWidth()) { Text("Ordner wählen (content/stories)") }
+            Button(onClick = { folderPicker.launch(null) }, modifier = Modifier.fillMaxWidth()) { Text("Ordner wählen") }
             OutlinedButton(
                 onClick = { zipPicker.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
                 modifier = Modifier.fillMaxWidth(),
@@ -67,7 +74,7 @@ fun MarkdownImportScreen(onBack: () -> Unit, viewModel: MarkdownImportViewModel 
             OutlinedButton(
                 onClick = { jsonPicker.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) },
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("JSON-Datei wählen") }
+            ) { Text("JSON-Datei wählen (Sicherung, Liste)") }
             state.message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
         if (busy) {

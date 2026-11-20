@@ -17,10 +17,32 @@ data class ParsedStory(
     val publishedAt: Long?,
     val body: String,
     val hash: String,
+    /** Quelle/Plattform (z. B. "Germandiaperstories"); null bei Markdown-Dateien. */
+    val sourceText: String? = null,
+    /** Bewertung 1–5, wenn die Quelle eine kennt; null = nicht anfassen. */
+    val rating: Int? = null,
+    /** "Weiterschreiben"-Markierung, wenn die Quelle sie kennt; null = nicht anfassen. */
+    val continueFlag: Boolean? = null,
+    val series: SeriesRef? = null,
+    /** true (Katalog der Geschichten-PWA): beim erneuten Import Kategorie, Tags und Bewertung der App nicht überschreiben. */
+    val preserveUserData: Boolean = false,
+)
+
+/** Zugehörigkeit zu einer Serie (mehrteilige Geschichte). [position] ist die laufende Nummer des Teils. */
+data class SeriesRef(val name: String, val position: Int?)
+
+/** Nur Metadaten einer bereits importierten Geschichte ändern (z. B. Bewertung aus der PWA-Sicherung). */
+data class StoryPatch(
+    val slug: String,
+    val rating: Int? = null,
+    val category: StoryCategory? = null,
+    val continueFlag: Boolean? = null,
+    val addTags: List<String> = emptyList(),
 )
 
 sealed interface ParseResult {
     data class Ok(val story: ParsedStory, val warnings: List<String> = emptyList()) : ParseResult
+    data class Patch(val patch: StoryPatch) : ParseResult
     data class Fail(val reason: String) : ParseResult
 }
 
@@ -32,6 +54,8 @@ class ImportSource(
     val label: String,
     val total: Int,
     val items: Sequence<ImportItem>,
+    /** Hinweise, die schon vor dem Import feststehen (z. B. nicht übernommene Felder). */
+    val preNotes: List<ImportIssue> = emptyList(),
     private val onClose: () -> Unit = {},
 ) : AutoCloseable {
     override fun close() = onClose()

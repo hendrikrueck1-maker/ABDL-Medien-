@@ -17,6 +17,8 @@ data class ExistingStory(
     val publishedAt: Long?,
     /** Normalisierte Tag-Namen. */
     val tags: Set<String>,
+    val rating: Int = 0,
+    val continueFlag: Boolean = false,
 )
 
 /** Speicherzugriff des Importers; getrennt, damit die Logik ohne Datenbank getestet werden kann. */
@@ -28,6 +30,9 @@ interface ImportStore {
     suspend fun duplicateOf(story: ParsedStory): String?
     suspend fun insert(story: ParsedStory)
     suspend fun update(existing: ExistingStory, story: ParsedStory)
+
+    /** Ändert nur Bewertung, Kategorie, Markierung und fügt Tags hinzu. */
+    suspend fun patch(existing: ExistingStory, patch: StoryPatch)
 }
 
 /**
@@ -46,6 +51,7 @@ class StoryImporter(private val store: ImportStore, private val batchSize: Int =
         data class Duplicate(val of: String) : Outcome
         data class Note(val text: String) : Outcome
         data class Failed(val reason: String) : Outcome
+        data object Missing : Outcome
     }
 
     private class Slot(val name: String, val result: ParseResult)
@@ -61,11 +67,20 @@ class StoryImporter(private val store: ImportStore, private val batchSize: Int =
         val seenSlugs = HashMap<String, String>()
         var done = 0
         var cancelled = false
+        val missing = ArrayList<String>()
+        notes += source.preNotes
 
-        fun report() = ImportReport(
-            source.total, created, updated, unchanged, duplicates, notes, errors,
-            System.currentTimeMillis() - started, cancelled,
-        )
+        fun report(): ImportReport {
+            val allNotes = if (missing.isEmpty()) notes else notes + ImportIssue(
+                "${missing.size} Einträge der Sicherung",
+                "gehören zu Geschichten, die nicht in der App sind (zuerst den Katalog importieren; Duplikate des Katalogs werden übersprungen). Beispiele: " +
+                    missing.take(8).joinToString(", "),
+            )
+            return ImportReport(
+                source.total, created, updated, unchanged, duplicates, allNotes, errors,
+                System.currentTimeMillis() - started, cancelled,
+            )
+        }
 
         try {
             val iterator = source.items.iterator()
@@ -92,6 +107,7 @@ class StoryImporter(private val store: ImportStore, private val batchSize: Int =
                         is Outcome.Duplicate -> duplicates += ImportIssue(slot.name, "gleicher Text wie „${outcome.of}“")
                         is Outcome.Note -> notes += ImportIssue(slot.name, outcome.text)
                         is Outcome.Failed -> errors += ImportIssue(slot.name, outcome.reason)
+                        Outcome.Missing -> missing += slot.name
                     }
                     (slot.result as? ParseResult.Ok)?.warnings?.forEach { notes += ImportIssue(slot.name, it) }
                     done++
@@ -122,6 +138,7 @@ class StoryImporter(private val store: ImportStore, private val batchSize: Int =
             prefail[i] ?: when (val r = slot.result) {
                 is ParseResult.Fail -> Outcome.Failed(r.reason)
                 is ParseResult.Ok -> apply(r.story)
+                is ParseResult.Patch -> applyPatch(r.patch)
             }
         }
         return try {
@@ -141,14 +158,31 @@ class StoryImporter(private val store: ImportStore, private val batchSize: Int =
         }
     }
 
+    private suspend fun applyPatch(patch: StoryPatch): Outcome {
+        val existing = store.find(patch.slug) ?: return Outcome.Missing
+        if (existing.trashed) return Outcome.Note("${patch.slug}: ${ImportReport.TRASH_NOTE}, Änderungen nicht übernommen")
+        val tags = patch.addTags.map { de.hr.mediathek.data.tag.TagNames.normalize(it) }
+        val same = (patch.rating == null || existing.rating == patch.rating) &&
+            (patch.category == null || existing.category == patch.category) &&
+            (patch.continueFlag == null || existing.continueFlag == patch.continueFlag) &&
+            existing.tags.containsAll(tags)
+        if (same) return Outcome.Unchanged
+        store.patch(existing, patch)
+        return Outcome.Updated
+    }
+
     private suspend fun apply(story: ParsedStory): Outcome {
         val existing = store.find(story.slug)
         if (existing != null) {
             if (existing.trashed) return Outcome.Note("${ImportReport.TRASH_NOTE} und wurde nicht wiederhergestellt")
-            val same = existing.hash == story.hash && existing.title == story.title && existing.category == story.category &&
-                existing.author == story.author && existing.status == story.status &&
-                existing.publishedAt == story.publishedAt &&
-                existing.tags == story.tags.map { de.hr.mediathek.data.tag.TagNames.normalize(it) }.toSet()
+            val tagSet = story.tags.map { de.hr.mediathek.data.tag.TagNames.normalize(it) }.toSet()
+            val same = existing.hash == story.hash && existing.title == story.title &&
+                (story.rating == null || existing.rating == story.rating) &&
+                (story.continueFlag == null || existing.continueFlag == story.continueFlag) &&
+                if (story.preserveUserData) true else (
+                    existing.category == story.category && existing.author == story.author &&
+                        existing.status == story.status && existing.publishedAt == story.publishedAt && existing.tags == tagSet
+                    )
             if (same) return Outcome.Unchanged
             if (existing.hash != story.hash) store.duplicateOf(story)?.let { return Outcome.Duplicate(it) }
             store.update(existing, story)

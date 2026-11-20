@@ -46,7 +46,7 @@ import kotlinx.coroutines.flow.debounce
 
 @OptIn(FlowPreview::class)
 @Composable
-fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, viewModel: StoryReaderViewModel = hiltViewModel()) {
+fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, onOpenStory: (String) -> Unit = {}, viewModel: StoryReaderViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     var showSettings by remember { mutableStateOf(false) }
@@ -82,6 +82,37 @@ fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, viewModel: S
                 story.status?.takeIf { it != "published" }?.let { statusLabel(it) },
                 tags.takeIf { it.isNotEmpty() }?.joinToString(" · ") { "#$it" },
             ).joinToString("  ·  ")
+            val series by viewModel.series.collectAsStateWithLifecycle()
+            var showParts by remember { mutableStateOf(false) }
+            series?.let { sr ->
+                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { onOpenStory(sr.parts[sr.index - 1].uuid) }, enabled = sr.index > 0) { Text("◀", color = fg) }
+                    Text(
+                        "${sr.name} · Teil ${sr.index + 1} von ${sr.parts.size}",
+                        color = fg, style = MaterialTheme.typography.labelLarge, maxLines = 1,
+                        modifier = Modifier.weight(1f).clickable { showParts = true }.padding(8.dp),
+                    )
+                    TextButton(onClick = { onOpenStory(sr.parts[sr.index + 1].uuid) }, enabled = sr.index < sr.parts.lastIndex) { Text("▶", color = fg) }
+                }
+                if (showParts) {
+                    AlertDialog(
+                        onDismissRequest = { showParts = false },
+                        confirmButton = { TextButton(onClick = { showParts = false }) { Text("Schließen") } },
+                        title = { Text(sr.name) },
+                        text = {
+                            LazyColumn {
+                                itemsIndexed(sr.parts) { i, part ->
+                                    Text(
+                                        (if (i == sr.index) "▶ " else "· ") + part.title,
+                                        fontWeight = if (i == sr.index) FontWeight.Bold else FontWeight.Normal,
+                                        modifier = Modifier.fillMaxWidth().clickable { showParts = false; if (i != sr.index) onOpenStory(part.uuid) }.padding(vertical = 10.dp),
+                                    )
+                                }
+                            }
+                        },
+                    )
+                }
+            }
             if (info.isNotEmpty()) {
                 Text(info, color = fg.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp))
             }

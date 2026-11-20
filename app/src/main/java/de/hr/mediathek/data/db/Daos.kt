@@ -764,6 +764,8 @@ data class StoryRow(
     val deletedAt: Long?,
 )
 
+data class SeriesPart(val uuid: String, val title: String, val seriesOrder: Int?)
+
 @Dao
 interface StoryDao {
     @Query(
@@ -806,6 +808,22 @@ interface StoryDao {
     /** Markdown-Import: Geschichte zur stabilen Kennung (auch aus dem Papierkorb, der Slug ist eindeutig). */
     @Query("SELECT * FROM story WHERE slug = :slug LIMIT 1")
     suspend fun getBySlug(slug: String): StoryEntity?
+
+    @Query("SELECT * FROM series WHERE name = :name AND deletedAt IS NULL LIMIT 1")
+    suspend fun seriesByName(name: String): SeriesEntity?
+
+    @Insert
+    suspend fun insertSeries(series: SeriesEntity): Long
+
+    /** Teile einer Serie in Lesereihenfolge (für die Vor/Zurück-Leiste im Leser). */
+    @Query(
+        "SELECT uuid, title, seriesOrder FROM story WHERE seriesUuid = :seriesUuid AND deletedAt IS NULL " +
+            "ORDER BY COALESCE(seriesOrder, 1000000), createdAt, title",
+    )
+    fun observeSeriesParts(seriesUuid: String): Flow<List<SeriesPart>>
+
+    @Query("SELECT name FROM series WHERE uuid = :uuid")
+    suspend fun seriesName(uuid: String): String?
 
     /** Aktive Geschichte mit gleichem Import-Hash, die nicht zum angegebenen Slug gehört. */
     @Query(

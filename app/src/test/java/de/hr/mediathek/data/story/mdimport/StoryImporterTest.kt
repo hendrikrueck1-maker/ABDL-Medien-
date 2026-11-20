@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** Speicher im Arbeitsspeicher; ahmt Unique-Slug und Duplikaterkennung nach. */
-private class FakeStore(private val failOn: Set<String> = emptySet()) : ImportStore {
+class FakeStore(private val failOn: Set<String> = emptySet()) : ImportStore {
     class Row(var story: ParsedStory, val uuid: String, var trashed: Boolean = false)
 
     val rows = LinkedHashMap<String, Row>()
@@ -31,6 +31,7 @@ private class FakeStore(private val failOn: Set<String> = emptySet()) : ImportSt
         ExistingStory(
             it.uuid, it.trashed, it.story.hash, it.story.title, it.story.category, it.story.author, it.story.status,
             it.story.publishedAt, it.story.tags.map { t -> TagNames.normalize(t) }.toSet(),
+            it.story.rating ?: 0, it.story.continueFlag ?: false,
         )
     }
 
@@ -44,7 +45,18 @@ private class FakeStore(private val failOn: Set<String> = emptySet()) : ImportSt
     }
 
     override suspend fun update(existing: ExistingStory, story: ParsedStory) {
-        rows.getValue(story.slug).story = story
+        val row = rows.getValue(story.slug)
+        row.story = if (story.preserveUserData) story.copy(category = row.story.category, tags = row.story.tags, rating = row.story.rating) else story
+    }
+
+    override suspend fun patch(existing: ExistingStory, patch: StoryPatch) {
+        val row = rows.getValue(patch.slug)
+        row.story = row.story.copy(
+            rating = patch.rating ?: row.story.rating,
+            category = patch.category ?: row.story.category,
+            continueFlag = patch.continueFlag ?: row.story.continueFlag,
+            tags = (row.story.tags + patch.addTags).distinctBy { TagNames.normalize(it) },
+        )
     }
 }
 

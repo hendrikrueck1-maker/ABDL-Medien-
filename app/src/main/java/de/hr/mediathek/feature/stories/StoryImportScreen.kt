@@ -62,7 +62,7 @@ fun StoryImportScreen(onBack: () -> Unit, onMarkdown: () -> Unit, viewModel: Sto
             }) { Text("Dateien wählen") }
             OutlinedButton(onClick = { folderPicker.launch(null) }) { Text("Ordner wählen") }
         }
-        OutlinedButton(onClick = onMarkdown) { Text("Markdown-Import (Ordner, ZIP, JSON) …") }
+        OutlinedButton(onClick = onMarkdown) { Text("Import aus Geschichten-PWA, Markdown, JSON …") }
         state.importedCount?.let { Text("$it Geschichten importiert.", color = MaterialTheme.colorScheme.primary) }
         if (state.loading) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

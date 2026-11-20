@@ -93,7 +93,7 @@ object StoryBuilder {
             return t
         }
 
-        val created = time("createdAt") ?: dateFromName(slug) ?: now
+        val created = time("createdAt") ?: time("date") ?: dateFromName(slug) ?: now
         val updated = time("updatedAt") ?: created
         val published = time("publishedAt")
         val status = scalar(fields["status"])?.lowercase() ?: "draft"

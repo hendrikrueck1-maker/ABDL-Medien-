@@ -12,6 +12,8 @@ import de.hr.mediathek.data.story.TextCleaner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -35,6 +37,9 @@ data class ReaderUiState(
     val loaded: Boolean = false,
 )
 
+/** Mehrteilige Geschichte: Name, alle Teile in Reihenfolge und Position des aktuellen Teils. */
+data class SeriesUi(val name: String, val parts: List<de.hr.mediathek.data.db.SeriesPart>, val index: Int)
+
 @HiltViewModel
 class StoryReaderViewModel @Inject constructor(
     handle: SavedStateHandle,
@@ -49,6 +54,18 @@ class StoryReaderViewModel @Inject constructor(
     val tags: StateFlow<List<String>> = repository.tagNames(uuid)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    private val seriesUuid = MutableStateFlow<String?>(null)
+    private val seriesName = MutableStateFlow("")
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val series: StateFlow<SeriesUi?> = seriesUuid
+        .flatMapLatest { id -> if (id == null) kotlinx.coroutines.flow.flowOf(emptyList()) else repository.seriesParts(id) }
+        .combine(seriesName) { parts, name ->
+            val i = parts.indexOfFirst { it.uuid == uuid }
+            if (parts.size >= 2 && i >= 0) SeriesUi(name, parts, i) else null
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     private val _settings = MutableStateFlow(ReaderSettings())
     val settings: StateFlow<ReaderSettings> = _settings
 
@@ -57,6 +74,10 @@ class StoryReaderViewModel @Inject constructor(
             val story = repository.get(uuid)
             val paragraphs = withContext(Dispatchers.Default) { TextCleaner.paragraphs(repository.text(uuid)) }
             _state.value = ReaderUiState(story, paragraphs, true)
+            story?.seriesUuid?.let { id ->
+                seriesName.value = repository.seriesName(id) ?: ""
+                seriesUuid.value = id
+            }
             _settings.value = ReaderSettings(
                 fontSize = settingDao.get(K_SIZE)?.toFloatOrNull() ?: 18f,
                 lineSpacing = settingDao.get(K_LINE)?.toFloatOrNull() ?: 1.5f,
