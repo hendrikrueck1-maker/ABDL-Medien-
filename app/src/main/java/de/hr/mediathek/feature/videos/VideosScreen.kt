@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package de.hr.mediathek.feature.videos
 
 import android.graphics.Bitmap
@@ -56,6 +58,27 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import de.hr.mediathek.R
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material3.Surface
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import de.hr.mediathek.core.ui.AccentButton
+import de.hr.mediathek.core.ui.AppCard
+import de.hr.mediathek.core.ui.OutlineAccentButton
+import de.hr.mediathek.core.ui.theme.CategoryChipColors
+import de.hr.mediathek.core.ui.theme.LocalAppColors
 import de.hr.mediathek.core.ui.bounceClick
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.aspectRatio
@@ -124,29 +147,50 @@ fun VideosScreen(
     val trashResult by viewModel.trashResult.collectAsStateWithLifecycle()
     var confirmTrash by remember { mutableStateOf(0) } // 0 = zu, 1 = erste Rückfrage, 2 = zweite ab 10 Dateien
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+    val wide = LocalConfiguration.current.screenWidthDp >= 600
+    val c = LocalAppColors.current
+    Column(Modifier.fillMaxSize().padding(if (wide) 20.dp else 14.dp), verticalArrangement = Arrangement.spacedBy(if (wide) 16.dp else 10.dp)) {
         if (selected.isEmpty()) {
-            Row(
-                Modifier.padding(top = 12.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.nav_videos),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f),
-                )
-                Button(onClick = { viewModel.openRandom(onOpen) { noRandom = true } }) { Text(stringResource(R.string.video_random)) }
-                Box {
-                    IconButton(onClick = { moreMenu = true }) {
-                        Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.menu_more))
+            AppCard(Modifier.fillMaxWidth(), bar = true, padding = PaddingValues(horizontal = 24.dp, vertical = 14.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(if (wide) 1f else 1f)) {
+                        Text(stringResource(R.string.nav_videos), style = if (wide) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = c.onCard)
+                        Text(
+                            (if (foldersOn && path.isNotEmpty()) path.replace("/", " › ") + " · " else "") + stringResource(R.string.lib_count_videos, items.itemCount),
+                            style = MaterialTheme.typography.bodySmall, color = c.onCardVariant, maxLines = 1,
+                        )
                     }
-                    DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
-                        DropdownMenuItem(text = { Text(stringResource(R.string.playlist_title)) }, onClick = { moreMenu = false; showPlaylistDialog = true })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.dup_title)) }, onClick = { moreMenu = false; onOpenDuplicates() })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.trash_title)) }, onClick = { moreMenu = false; onOpenTrash() })
+                    if (wide) {
+                        OutlinedTextField(
+                            value = filter.search,
+                            onValueChange = { text -> viewModel.update { it.copy(search = text) } },
+                            placeholder = { Text(stringResource(R.string.video_search_in_folder)) },
+                            singleLine = true,
+                            shape = CircleShape,
+                            modifier = Modifier.width(320.dp),
+                        )
                     }
+                    AccentButton(onClick = { viewModel.openRandom(onOpen) { noRandom = true } }, color = c.mint) { Text(stringResource(R.string.video_random)) }
+                    Box {
+                        IconButton(onClick = { moreMenu = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.menu_more), tint = c.onCard)
+                        }
+                        DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.playlist_title)) }, onClick = { moreMenu = false; showPlaylistDialog = true })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.dup_title)) }, onClick = { moreMenu = false; onOpenDuplicates() })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.trash_title)) }, onClick = { moreMenu = false; onOpenTrash() })
+                        }
+                    }
+                }
+                if (!wide) {
+                    OutlinedTextField(
+                        value = filter.search,
+                        onValueChange = { text -> viewModel.update { it.copy(search = text) } },
+                        placeholder = { Text(stringResource(R.string.video_search)) },
+                        singleLine = true,
+                        shape = CircleShape,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         } else {
@@ -184,31 +228,8 @@ fun VideosScreen(
                 onDeleteMark = { viewModel.markDeleteSelected(flags.del < selected.size) },
                 onRate = viewModel::rateSelected,
                 actions = moreActions,
-                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                modifier = Modifier,
             )
-        }
-        Row(
-            Modifier.padding(bottom = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = filter.search,
-                onValueChange = { text -> viewModel.update { it.copy(search = text) } },
-                label = { Text(stringResource(R.string.video_search)) },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            OutlinedButton(onClick = { showViewSettings = true }) { Text(stringResource(R.string.view_button)) }
-            val activeCount = activeFilterCount(filter)
-            if (activeCount > 0) {
-                Button(onClick = { showFilter = true }) { Text(stringResource(R.string.filter_button_active, activeCount)) }
-            } else {
-                OutlinedButton(onClick = { showFilter = true }) { Text(stringResource(R.string.filter_button)) }
-            }
-        }
-        if (foldersOn && path.isNotEmpty()) {
-            PathBar(path = path, onGoTo = viewModel.browser::goTo)
         }
         filter.playlistUuid?.let { pl ->
             Row(Modifier.padding(vertical = 4.dp)) {
@@ -390,46 +411,167 @@ fun VideosScreen(
             )
         }
 
-        if (items.itemCount == 0 && folders.isEmpty()) {
-            Text(
-                stringResource(if (foldersOn && path.isNotEmpty()) R.string.lib_empty_folder else R.string.video_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 24.dp),
-            )
-        }
         val tiles = viewSettings.layout == CardLayout.TILES
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = if (tiles) 200.dp else 320.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            items(folders, key = { "f:" + it.path }) { folder ->
-                VideoFolderCard(folder, filter, tiles, viewModel)
+        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            if (wide) {
+                FolderTreeCard(
+                    path = path,
+                    folders = if (foldersOn) folders else emptyList(),
+                    categories = categories.map { FilterLabel(it.uuid, it.name) },
+                    activeCategory = filter.categoryUuid,
+                    onGoTo = viewModel.browser::goTo,
+                    onEnter = viewModel.browser::enter,
+                    onCategory = { id -> viewModel.update { it.copy(categoryUuid = if (it.categoryUuid == id) null else id) } },
+                    modifier = Modifier.width(280.dp).fillMaxHeight(),
+                )
             }
-            items(count = items.itemCount, key = { index -> items.peek(index)?.uuid ?: index }) { index ->
-                val video = items[index]
-                if (video != null) {
-                    VideoCard(
-                        video = video,
-                        viewModel = viewModel,
-                        selected = video.uuid in selected,
-                        tiles = tiles,
-                        showDetails = viewSettings.showDetails,
-                        compressed = video.uuid in compressedUuids,
-                        onClick = {
-                            if (selected.isNotEmpty()) {
-                                viewModel.toggleSelected(video.uuid)
-                            } else {
-                                viewModel.rememberContext()
-                                onOpen(video.uuid)
-                            }
-                        },
-                        onLongClick = { viewModel.toggleSelected(video.uuid) },
-                    )
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PillChip(stringResource(R.string.video_chip_all), filter.format == null && !filter.favoriteOnly && !filter.peeOnly) {
+                        viewModel.update { it.copy(format = null, favoriteOnly = false, peeOnly = false) }
+                    }
+                    PillChip("MP4", filter.format == "mp4") { viewModel.update { it.copy(format = if (it.format == "mp4") null else "mp4") } }
+                    PillChip("MKV", filter.format == "mkv") { viewModel.update { it.copy(format = if (it.format == "mkv") null else "mkv") } }
+                    PillChip(stringResource(R.string.video_chip_favorites), filter.favoriteOnly) { viewModel.update { it.copy(favoriteOnly = !it.favoriteOnly) } }
+                    PillChip(stringResource(R.string.video_chip_pee), filter.peeOnly) { viewModel.update { it.copy(peeOnly = !it.peeOnly) } }
+                    if (!wide) {
+                        val cat = categories.firstOrNull { it.uuid == filter.categoryUuid }
+                        PillChip(cat?.name ?: stringResource(R.string.video_chip_category), cat != null) { showFilter = true }
+                    }
+                    OutlineAccentButton(onClick = { showViewSettings = true }, color = c.mint, modifier = Modifier.height(44.dp)) { Text(stringResource(R.string.view_button)) }
+                    val activeCount = activeFilterCount(filter)
+                    if (activeCount > 0) {
+                        AccentButton(onClick = { showFilter = true }, color = c.mint, modifier = Modifier.height(44.dp)) { Text(stringResource(R.string.filter_button_active, activeCount)) }
+                    } else {
+                        OutlineAccentButton(onClick = { showFilter = true }, color = c.mint, modifier = Modifier.height(44.dp)) { Text(stringResource(R.string.filter_button)) }
+                    }
+                }
+                if (foldersOn && path.isNotEmpty() && !wide) {
+                    PathBar(path = path, onGoTo = viewModel.browser::goTo)
+                }
+                if (items.itemCount == 0 && folders.isEmpty()) {
+                    AppCard(Modifier.fillMaxWidth()) {
+                        Text(
+                            stringResource(if (foldersOn && path.isNotEmpty()) R.string.lib_empty_folder else R.string.video_empty),
+                            style = MaterialTheme.typography.bodyMedium, color = c.onCard,
+                        )
+                    }
+                }
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = if (tiles) 220.dp else 320.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    items(folders, key = { "f:" + it.path }) { folder ->
+                        VideoFolderCard(folder, filter, tiles, viewModel)
+                    }
+                    items(count = items.itemCount, key = { index -> items.peek(index)?.uuid ?: index }) { index ->
+                        val video = items[index]
+                        if (video != null) {
+                            VideoCard(
+                                video = video,
+                                viewModel = viewModel,
+                                selected = video.uuid in selected,
+                                tiles = tiles,
+                                showDetails = viewSettings.showDetails,
+                                compressed = video.uuid in compressedUuids,
+                                onClick = {
+                                    if (selected.isNotEmpty()) {
+                                        viewModel.toggleSelected(video.uuid)
+                                    } else {
+                                        viewModel.rememberContext()
+                                        onOpen(video.uuid)
+                                    }
+                                },
+                                onLongClick = { viewModel.toggleSelected(video.uuid) },
+                            )
+                        }
+                    }
                 }
             }
         }
+    }
+}
+
+/** Filter-Chip als Pille: inaktiv dunkel mit heller Schrift, aktiv in Mint mit dunkler Schrift. */
+@Composable
+private fun PillChip(label: String, active: Boolean, onClick: () -> Unit) {
+    val c = LocalAppColors.current
+    Box(
+        Modifier
+            .height(44.dp)
+            .clip(CircleShape)
+            .background(if (active) c.mint else c.bar)
+            .clickable(onClickLabel = label, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .padding(horizontal = 18.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(label, style = MaterialTheme.typography.labelLarge, color = if (active) c.onAccent else c.onCard, maxLines = 1) }
+}
+
+/** Ordnerbaum entlang des aktuellen Pfads (aktiver Ordner als Mint-Pille) und die eigenen Kategorien als Chips. */
+@Composable
+private fun FolderTreeCard(
+    path: String,
+    folders: List<FolderItem>,
+    categories: List<FilterLabel>,
+    activeCategory: String?,
+    onGoTo: (String) -> Unit,
+    onEnter: (String) -> Unit,
+    onCategory: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val c = LocalAppColors.current
+    val segments = if (path.isEmpty()) emptyList() else path.split("/")
+    AppCard(modifier) {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.video_folders), style = MaterialTheme.typography.titleMedium, color = c.onCard)
+            TreeRow(stringResource(R.string.video_root_folder), 0, segments.isEmpty()) { onGoTo("") }
+            segments.forEachIndexed { i, seg ->
+                TreeRow(seg, i + 1, i == segments.lastIndex) { onGoTo(segments.take(i + 1).joinToString("/")) }
+            }
+            for (f in folders) TreeRow(f.name, segments.size + 1, false) { onEnter(f.name) }
+            if (categories.isNotEmpty()) {
+                Text(stringResource(R.string.video_my_categories), style = MaterialTheme.typography.titleMedium, color = c.onCard, modifier = Modifier.padding(top = 12.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    categories.forEachIndexed { i, cat ->
+                        val (bg, fg) = CategoryChipColors[i % CategoryChipColors.size]
+                        Box(
+                            Modifier
+                                .clip(CircleShape)
+                                .background(bg)
+                                .border(if (cat.uuid == activeCategory) 2.dp else 0.dp, fg, CircleShape)
+                                .clickable { onCategory(cat.uuid) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                        ) { Text(cat.name, style = MaterialTheme.typography.labelMedium, color = fg) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TreeRow(name: String, depth: Int, active: Boolean, onClick: () -> Unit) {
+    val c = LocalAppColors.current
+    Row(
+        Modifier
+            .padding(start = (depth * 14).dp)
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clip(CircleShape)
+            .background(if (active) c.mint else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(Icons.Filled.Folder, null, tint = if (active) c.onAccent else c.onCardVariant, modifier = Modifier.size(20.dp))
+        Text(name, style = MaterialTheme.typography.bodyMedium, color = if (active) c.onAccent else c.onCard, maxLines = 1)
     }
 }
 
@@ -596,29 +738,31 @@ private fun VideoCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
+    val c = LocalAppColors.current
     val offline = video.status != MediaStatus.ONLINE
     val progress = watchProgress(video)
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-        ),
+    val shape = RoundedCornerShape(26.dp)
+    Surface(
+        shape = shape,
+        color = c.card,
         modifier = Modifier
             .fillMaxWidth()
             .alpha(if (offline) 0.5f else 1f)
+            .then(if (selected) Modifier.border(3.dp, c.rosa, shape) else Modifier)
             // Offline-Dateien bleiben sichtbar und lassen sich auswählen/bewerten, aber nicht abspielen.
             .bounceClick(onLongClick = onLongClick, onClick = onClick),
     ) {
         if (tiles) {
-            Column {
+            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Thumbnail(video.uuid, viewModel, progress, video.durationMs, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
-                Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     VideoTexts(video, offline, showDetails, compressed, progress)
                 }
             }
         } else {
-            Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Thumbnail(video.uuid, viewModel, progress, video.durationMs, Modifier.width(128.dp).height(72.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     VideoTexts(video, offline, showDetails, compressed, progress)
                 }
             }
@@ -626,32 +770,44 @@ private fun VideoCard(
     }
 }
 
+/** Markierung mit Form, Farbe und Wort (nie nur Farbe). */
+@Composable
+private fun MarkPill(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, fill: Color?, outline: Color?, text: Color) {
+    val c = LocalAppColors.current
+    Row(
+        Modifier
+            .clip(CircleShape)
+            .then(if (fill != null) Modifier.background(fill) else Modifier)
+            .then(if (outline != null) Modifier.border(2.dp, outline, CircleShape) else Modifier)
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(icon, null, tint = text, modifier = Modifier.size(14.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = text)
+    }
+}
+
 @Composable
 private fun VideoTexts(video: MediaFileEntity, offline: Boolean, showDetails: Boolean, compressed: Boolean, progress: Float?) {
-    Text(
-        video.displayName,
-        style = MaterialTheme.typography.titleSmall,
-        maxLines = 2,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    val c = LocalAppColors.current
+    Text(video.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 2, color = c.onCard)
     if (showDetails) {
-        Text(
-            metaLine(video),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text(metaLine(video), style = MaterialTheme.typography.bodySmall, color = c.onCardVariant)
     }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        repeat(video.rating.coerceIn(0, 5)) {
-            Icon(Icons.Filled.Star, contentDescription = null, tint = androidx.compose.ui.graphics.Color(0xFFFFC107), modifier = Modifier.height(16.dp))
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        if (video.rating > 0) {
+            repeat(5) { i ->
+                Icon(Icons.Filled.Star, contentDescription = null, tint = if (i < video.rating.coerceIn(0, 5)) c.gold else c.muted, modifier = Modifier.size(16.dp))
+            }
+        } else {
+            Text(stringResource(R.string.video_not_rated), style = MaterialTheme.typography.bodySmall, color = c.onCardVariant)
         }
-        if (video.favorite) {
-            Icon(Icons.Filled.Favorite, contentDescription = stringResource(R.string.video_favorite), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.height(16.dp))
-        }
-        if (video.markedPee) Text("💧", style = MaterialTheme.typography.labelLarge)
-        if (video.markedDelete) Text("🗑", style = MaterialTheme.typography.labelLarge)
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (video.favorite) MarkPill(stringResource(R.string.mark_fav), Icons.Filled.Favorite, c.rosa, null, c.onAccent)
+        if (video.markedPee) MarkPill(stringResource(R.string.mark_pee), Icons.Filled.WaterDrop, c.hellblau, null, c.onAccent)
+        if (video.markedDelete) MarkPill(stringResource(R.string.mark_delete), Icons.Filled.Delete, null, c.warnung, c.warnung)
         if (compressed) Badge(stringResource(R.string.badge_compressed))
         if (video.seenState == SeenState.SEEN) {
             Badge(stringResource(R.string.badge_seen))
@@ -695,24 +851,28 @@ private fun formatSize(bytes: Long): String = when {
 private fun Thumbnail(uuid: String, viewModel: VideosViewModel, progress: Float?, durationMs: Long?, modifier: Modifier) {
     val file = remember(uuid) { viewModel.thumbnailOf(uuid) }
     val bitmap = de.hr.mediathek.feature.library.rememberThumbBitmap(file)
-    Box(modifier, contentAlignment = Alignment.Center) {
+    val c = LocalAppColors.current
+    Box(
+        modifier.clip(RoundedCornerShape(18.dp)).background(c.cardInset).border(2.dp, c.mint, RoundedCornerShape(18.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
         val b = bitmap
         if (b != null) {
             Image(b.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
-            Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = c.onCardVariant)
         }
         // Die Laufzeit steht immer unten links im Eck, unabhängig vom Schalter für die Details.
         if (durationMs != null && durationMs > 0) {
             Text(
                 formatDuration(durationMs),
                 style = MaterialTheme.typography.labelSmall,
-                color = androidx.compose.ui.graphics.Color.White,
+                color = c.onCard,
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 4.dp, bottom = if (progress != null) 8.dp else 4.dp)
-                    .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.75f), androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
-                    .padding(horizontal = 6.dp, vertical = 1.dp),
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 8.dp, bottom = if (progress != null) 12.dp else 8.dp)
+                    .background(c.onAccent, CircleShape)
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
             )
         }
         if (progress != null) {

@@ -34,6 +34,18 @@
     <string name="nav_search">Suche</string>
     <string name="nav_settings">Einstellungen</string>
 
+    <string name="video_search_in_folder">In diesem Ordner suchen</string>
+    <string name="video_chip_all">Alle</string>
+    <string name="video_chip_favorites">Favoriten</string>
+    <string name="video_chip_pee">Pee</string>
+    <string name="video_chip_category">Kategorie</string>
+    <string name="video_folders">Ordner</string>
+    <string name="video_root_folder">Grundordner</string>
+    <string name="video_my_categories">Meine Kategorien</string>
+    <string name="video_not_rated">noch nicht bewertet</string>
+    <string name="mark_fav">Fav</string>
+    <string name="mark_pee">Pee</string>
+    <string name="mark_delete">Löschen</string>
     <string name="home_title">Übersicht</string>
     <string name="home_new_background">Neues Hintergrundbild</string>
     <string name="home_new_background_short">Hintergrundbild wechseln</string>
