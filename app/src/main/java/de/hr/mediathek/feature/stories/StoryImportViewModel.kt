@@ -75,7 +75,7 @@ class StoryImportViewModel @Inject constructor(
         val source = raw.rawText ?: TextDecoder.decode(raw.bytes!!, enc!!)
         val cleaned = TextCleaner.clean(source, CleanOptions(smoothing, repeating))
         val duplicate = if (cleaned.text.isBlank()) null else repository.duplicateTitle(cleaned.text)
-        return ImportItem(id, raw, enc, smoothing, repeating, selected && cleaned.text.isNotBlank(), cleaned.text, cleaned.removed, duplicate)
+        return ImportItem(id, raw, enc, smoothing, repeating, selected && cleaned.text.isNotBlank(), cleaned.text, cleaned.removedLines, duplicate)
     }
 
     private fun rebuild(id: Int, encoding: TextEncoding? = null, smooth: Boolean? = null, removeRepeating: Boolean? = null) {
