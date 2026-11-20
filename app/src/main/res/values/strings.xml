@@ -390,6 +390,12 @@
     <string name="settings_group_media">Medien</string>
     <string name="settings_row_package">Mobil-Paket</string>
     <string name="settings_row_package_hint">Auswahl auf SD-Karte für das Handy packen oder ein Paket einbinden</string>
+    <string name="settings_row_stats">Gesamtstatistik</string>
+    <string name="settings_row_stats_hint">Anzahl, Speicher, Bewertungen und Ungesehenes je Bereich</string>
+    <string name="settings_row_privacy">Datenschutz</string>
+    <string name="settings_row_privacy_hint">Bildschirm schützen, Dateinamen, Fehlerprotokoll-Vorschau</string>
+    <string name="settings_row_background">Hintergrundbetrieb</string>
+    <string name="settings_row_background_hint">Akku-Optimierung und letzte Sicherung</string>
     <string name="settings_group_data">Daten</string>
     <string name="settings_group_app">App</string>
     <string name="settings_row_sources">Medienquellen und Vorschaubilder</string>

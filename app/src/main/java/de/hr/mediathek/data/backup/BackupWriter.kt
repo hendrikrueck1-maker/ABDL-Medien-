@@ -68,7 +68,7 @@ class BackupWriter @Inject constructor(
         sql.query("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").use { c ->
             while (c.moveToNext()) {
                 val name = c.getString(0)
-                if (name in EXCLUDED_TABLES || name.startsWith("sqlite_")) continue
+                if (name in EXCLUDED_TABLES || name.startsWith("sqlite_") || name.startsWith("search_index")) continue
                 result += name
             }
         }
@@ -90,7 +90,7 @@ class BackupWriter @Inject constructor(
         val where = when (table) {
             "media_file" -> " WHERE $userData"
             "media_alias" -> " WHERE mediaUuid IN (SELECT uuid FROM media_file WHERE $userData)"
-            "setting" -> " WHERE `key` NOT LIKE 'thumb\\_%' ESCAPE '\\' AND `key` NOT LIKE 'compress\\_%' ESCAPE '\\'"
+            "setting" -> " WHERE `key` NOT LIKE 'thumb\\_%' ESCAPE '\\' AND `key` NOT LIKE 'compress\\_%' ESCAPE '\\' AND `key` NOT LIKE 'search\\_sig\\_%' ESCAPE '\\'"
             else -> ""
         }
         return "SELECT $cols FROM `$table`$where"

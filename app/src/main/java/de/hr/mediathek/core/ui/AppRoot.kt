@@ -180,6 +180,19 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
                 onOpenProduct = { navController.navigate("product/$it") },
             )
         }
+        composable(Destination.Search.route) {
+            de.hr.mediathek.feature.search.SearchScreen(onOpen = { kind, uuid ->
+                when (kind) {
+                    "VIDEO" -> navController.navigate("player/$uuid")
+                    "IMAGE" -> navController.navigate("image/$uuid")
+                    "STORY" -> navController.navigate("story/$uuid")
+                    else -> navController.navigate("product/$uuid")
+                }
+            })
+        }
+        composable("overall-stats") { de.hr.mediathek.feature.overview.OverallStatsScreen(onBack = { navController.popBackStack() }) }
+        composable("privacy") { de.hr.mediathek.feature.overview.PrivacyScreen(onBack = { navController.popBackStack() }) }
+        composable("background") { de.hr.mediathek.feature.overview.BackgroundScreen(onBack = { navController.popBackStack() }) }
         composable("packages") { de.hr.mediathek.feature.pkg.PackageScreen(onBack = { navController.popBackStack() }) }
         composable("trash") { TrashScreen(onBack = { navController.popBackStack() }) }
         composable("duplicates") { DuplicatesScreen(onBack = { navController.popBackStack() }) }
@@ -206,7 +219,7 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         Destination.entries
             .filter {
                 it != Destination.Home && it != Destination.Settings && it != Destination.Videos &&
-                    it != Destination.Images && it != Destination.Stories && it != Destination.Products && it != Destination.Tracker
+                    it != Destination.Images && it != Destination.Stories && it != Destination.Products && it != Destination.Tracker && it != Destination.Search
             }
             .forEach { destination ->
                 composable(destination.route) {

@@ -1008,3 +1008,41 @@ interface PackageDao {
     @Query("SELECT COUNT(*) FROM media_alias WHERE mediaUuid = :mediaUuid AND fingerprint = :fp")
     suspend fun aliasCount(mediaUuid: String, fp: String): Int
 }
+
+data class MediaStats(
+    val count: Int, val bytes: Long, val avgRating: Double?, val unrated: Int, val unseen: Int, val favorites: Int, val offline: Int,
+)
+
+data class StoryStats(val count: Int, val avgRating: Double?, val unrated: Int, val favorites: Int, val continueCount: Int)
+
+data class ProductStats(val count: Int, val avgStars: Double?, val unrated: Int, val favorites: Int)
+
+@Dao
+interface StatsDao {
+    @Query(
+        "SELECT COUNT(*) AS count, COALESCE(SUM(size), 0) AS bytes, AVG(CASE WHEN rating > 0 THEN rating END) AS avgRating, " +
+            "COALESCE(SUM(CASE WHEN rating = 0 THEN 1 ELSE 0 END), 0) AS unrated, " +
+            "COALESCE(SUM(CASE WHEN seenState = 'UNSEEN' THEN 1 ELSE 0 END), 0) AS unseen, " +
+            "COALESCE(SUM(CASE WHEN favorite = 1 THEN 1 ELSE 0 END), 0) AS favorites, " +
+            "COALESCE(SUM(CASE WHEN status = 'OFFLINE' THEN 1 ELSE 0 END), 0) AS offline " +
+            "FROM media_file WHERE type = :type AND deletedAt IS NULL AND status != 'TRASHED'",
+    )
+    suspend fun media(type: String): MediaStats
+
+    @Query(
+        "SELECT COUNT(*) AS count, AVG(CASE WHEN rating > 0 THEN rating END) AS avgRating, " +
+            "COALESCE(SUM(CASE WHEN rating = 0 THEN 1 ELSE 0 END), 0) AS unrated, " +
+            "COALESCE(SUM(CASE WHEN favorite = 1 THEN 1 ELSE 0 END), 0) AS favorites, " +
+            "COALESCE(SUM(CASE WHEN continueFlag = 1 THEN 1 ELSE 0 END), 0) AS continueCount FROM story WHERE deletedAt IS NULL",
+    )
+    suspend fun stories(): StoryStats
+
+    @Query(
+        "SELECT COUNT(*) AS count, AVG(stars) AS avgStars, COALESCE(SUM(CASE WHEN stars IS NULL THEN 1 ELSE 0 END), 0) AS unrated, " +
+            "COALESCE(SUM(CASE WHEN favorite = 1 THEN 1 ELSE 0 END), 0) AS favorites FROM product WHERE deletedAt IS NULL",
+    )
+    suspend fun products(): ProductStats
+
+    @Query("SELECT COUNT(*) FROM tracker_entry WHERE deletedAt IS NULL")
+    suspend fun trackerEntries(): Int
+}

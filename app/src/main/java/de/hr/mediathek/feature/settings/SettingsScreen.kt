@@ -67,6 +67,15 @@ fun SettingsScreen(onOpenRoute: (String) -> Unit, viewModel: UpdateViewModel = h
         SettingsRow(R.string.settings_row_backup, R.string.settings_row_backup_hint, GlassTint.MINT) {
             onOpenRoute(AppRoutes.storage(StorageSection.BACKUP))
         }
+        SettingsRow(R.string.settings_row_stats, R.string.settings_row_stats_hint, GlassTint.MINT) {
+            onOpenRoute("overall-stats")
+        }
+        SettingsRow(R.string.settings_row_privacy, R.string.settings_row_privacy_hint, GlassTint.MINT) {
+            onOpenRoute("privacy")
+        }
+        SettingsRow(R.string.settings_row_background, R.string.settings_row_background_hint, GlassTint.MINT) {
+            onOpenRoute("background")
+        }
         SettingsRow(R.string.settings_open_errorlog, R.string.settings_row_errorlog_hint, GlassTint.MINT) {
             onOpenRoute(AppRoutes.ERROR_LOG)
         }

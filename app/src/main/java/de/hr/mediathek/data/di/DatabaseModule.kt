@@ -28,6 +28,11 @@ object DatabaseModule {
         // Migrationen sind Pflicht, kein fallbackToDestructiveMigration: Daten gehen bei Updates nie verloren.
         return Room.databaseBuilder(context, MediathekDatabase::class.java, MediathekDatabase.NAME)
             .addMigrations(*MIGRATIONS)
+            .addCallback(object : androidx.room.RoomDatabase.Callback() {
+                override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    de.hr.mediathek.data.search.SearchIndexer.createTable(db)
+                }
+            })
             .build()
     }
 
@@ -45,6 +50,7 @@ object DatabaseModule {
     @Provides fun provideProductDao(db: MediathekDatabase): de.hr.mediathek.data.db.ProductDao = db.productDao()
     @Provides fun provideCriterionDao(db: MediathekDatabase): de.hr.mediathek.data.db.CriterionDao = db.criterionDao()
     @Provides fun provideBrandDao(db: MediathekDatabase): de.hr.mediathek.data.db.BrandDao = db.brandDao()
+    @Provides fun provideStatsDao(db: MediathekDatabase): de.hr.mediathek.data.db.StatsDao = db.statsDao()
     @Provides fun providePackageDao(db: MediathekDatabase): de.hr.mediathek.data.db.PackageDao = db.packageDao()
     @Provides fun provideTrackerDao(db: MediathekDatabase): de.hr.mediathek.data.db.TrackerDao = db.trackerDao()
     @Provides fun provideThumbnailDao(db: MediathekDatabase): ThumbnailDao = db.thumbnailDao()
