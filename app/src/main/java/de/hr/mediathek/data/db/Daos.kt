@@ -124,6 +124,9 @@ data class SourceCount(val sourceUuid: String, val total: Int, val offline: Int)
 /** Ein Unterordner mit der Zahl der Dateien darin (für die Ordneransicht). */
 data class FolderRow(val name: String, val cnt: Int)
 
+/** Zähler der Markierungen in einer Auswahl. */
+data class FlagCounts(val fav: Int, val pee: Int, val del: Int)
+
 @Dao
 interface MediaFileDao {
     @Query(
@@ -271,6 +274,13 @@ interface MediaFileDao {
 
     @Query("UPDATE media_file SET markedPee = :marked, updatedAt = :now, userUpdatedAt = :now WHERE uuid IN (:uuids)")
     suspend fun setMarkedPeeBulk(uuids: List<String>, marked: Boolean, now: Long)
+
+    /** Wie viele der gewählten Einträge Favorit, Tropfen oder Löschmarkierung tragen (für die Schalter der Auswahlleiste). */
+    @Query(
+        "SELECT COALESCE(SUM(favorite), 0) AS fav, COALESCE(SUM(markedPee), 0) AS pee, " +
+            "COALESCE(SUM(markedDelete), 0) AS del FROM media_file WHERE uuid IN (:uuids)",
+    )
+    fun observeFlagCounts(uuids: List<String>): Flow<FlagCounts>
 
     @Query("UPDATE media_file SET playCount = playCount + 1, lastPlayedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
     suspend fun incrementPlayCount(uuid: String, now: Long)
@@ -761,6 +771,19 @@ interface StoryDao {
             "FROM story WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC",
     )
     fun observeDeleted(): Flow<List<StoryRow>>
+
+    /** Zuletzt verwendete Quellen und Adressen als Schnellauswahl im Editor. */
+    @Query(
+        "SELECT sourceText FROM story WHERE deletedAt IS NULL AND sourceText IS NOT NULL AND sourceText != '' " +
+            "GROUP BY sourceText ORDER BY MAX(updatedAt) DESC LIMIT 15",
+    )
+    fun observeRecentSources(): Flow<List<String>>
+
+    @Query(
+        "SELECT sourceUrl FROM story WHERE deletedAt IS NULL AND sourceUrl IS NOT NULL AND sourceUrl != '' " +
+            "GROUP BY sourceUrl ORDER BY MAX(updatedAt) DESC LIMIT 15",
+    )
+    fun observeRecentUrls(): Flow<List<String>>
 
     @Query("SELECT * FROM story WHERE uuid = :uuid")
     suspend fun get(uuid: String): StoryEntity?

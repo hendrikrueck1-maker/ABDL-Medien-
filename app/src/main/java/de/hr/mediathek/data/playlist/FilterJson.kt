@@ -16,6 +16,9 @@ object FilterJson {
         o.put("sort", filter.sort.name)
         o.put("search", filter.search)
         o.put("favoriteOnly", filter.favoriteOnly)
+        // Der Tropfen und die Löschmarkierung gelten wie der Favorit; alte Listen ohne diese Felder bleiben gültig.
+        if (filter.peeOnly) o.put("peeOnly", true)
+        if (filter.markedDeleteOnly) o.put("markedDeleteOnly", true)
         o.put("minRating", filter.minRating)
         o.put("seen", filter.seen.name)
         o.put("onlineOnly", filter.onlineOnly)
@@ -37,6 +40,8 @@ object FilterJson {
                     .let { if (it == VideoSort.PLAYLIST_ORDER) VideoSort.ADDED_DESC else it },
                 search = o.optString("search", ""),
                 favoriteOnly = o.optBoolean("favoriteOnly", false),
+                peeOnly = o.optBoolean("peeOnly", false),
+                markedDeleteOnly = o.optBoolean("markedDeleteOnly", false),
                 minRating = o.optInt("minRating", 0),
                 seen = runCatching { SeenFilter.valueOf(o.optString("seen")) }.getOrDefault(SeenFilter.ALL),
                 onlineOnly = o.optBoolean("onlineOnly", false),

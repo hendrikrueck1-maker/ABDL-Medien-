@@ -43,6 +43,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.hr.mediathek.R
+import de.hr.mediathek.core.ui.bounceClick
 import de.hr.mediathek.data.prefs.BrowseMode
 import de.hr.mediathek.data.prefs.CardLayout
 import de.hr.mediathek.data.prefs.ViewSettings
@@ -107,10 +108,30 @@ fun activeFilterCount(f: VideoFilter): Int {
 /** Filter zurücksetzen, aber Suche, Sortierung und Playlist behalten. */
 fun VideoFilter.clearedFilters(): VideoFilter = VideoFilter(sort = sort, search = search, playlistUuid = playlistUuid)
 
+/**
+ * Kleiner Speicher-Cache für Vorschaubilder: Kehrt man aus dem Player zur Liste zurück, stehen die Bilder
+ * sofort da, statt dass jedes Bild erneut von der Platte gelesen und dekodiert wird (das ruckelte).
+ */
+object ThumbMemory {
+    private val cache = object : android.util.LruCache<String, Bitmap>(32 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
+    }
+
+    fun get(path: String): Bitmap? = cache.get(path)
+
+    fun load(path: String): Bitmap? {
+        cache.get(path)?.let { return it }
+        val decoded = BitmapFactory.decodeFile(path) ?: return null
+        cache.put(path, decoded)
+        return decoded
+    }
+}
+
 @Composable
 fun rememberThumbBitmap(file: File?): Bitmap? {
-    val bitmap by produceState<Bitmap?>(initialValue = null, file?.path) {
-        value = file?.let { f -> withContext(Dispatchers.IO) { BitmapFactory.decodeFile(f.path) } }
+    val path = file?.path
+    val bitmap by produceState<Bitmap?>(initialValue = path?.let { ThumbMemory.get(it) }, path) {
+        value = path?.let { p -> ThumbMemory.get(p) ?: withContext(Dispatchers.IO) { ThumbMemory.load(p) } }
     }
     return bitmap
 }
@@ -139,7 +160,7 @@ fun PathBar(path: String, onGoTo: (String) -> Unit, modifier: Modifier = Modifie
     ) {
         TextButton(onClick = { onGoTo("") }) { Text(stringResource(R.string.lib_all_folders)) }
         parts.forEachIndexed { index, name ->
-            Text("›", color = MaterialTheme.colorScheme.outline)
+            Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
             TextButton(onClick = { onGoTo(parts.take(index + 1).joinToString("/")) }) { Text(name, maxLines = 1) }
         }
     }
@@ -157,14 +178,14 @@ fun FolderCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth().bounceClick(onClick = onClick),
     ) {
         if (tiles) {
             Column {
                 Collage(previews, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
                 Column(Modifier.padding(8.dp)) {
                     Text(item.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(countLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                    Text(countLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         } else {
@@ -172,7 +193,7 @@ fun FolderCard(
                 Collage(previews, Modifier.width(128.dp).height(72.dp))
                 Column(Modifier.weight(1f)) {
                     Text(item.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(countLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                    Text(countLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -347,6 +368,24 @@ fun FilterDialog(
                             )
                         }
                     }
+                }
+                SectionTitle(stringResource(R.string.filter_marks))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = filter.favoriteOnly,
+                        onClick = { onChange { it.copy(favoriteOnly = !it.favoriteOnly) } },
+                        label = { Text(stringResource(R.string.filter_mark_favorite)) },
+                    )
+                    FilterChip(
+                        selected = filter.peeOnly,
+                        onClick = { onChange { it.copy(peeOnly = !it.peeOnly) } },
+                        label = { Text(stringResource(R.string.filter_mark_pee)) },
+                    )
+                    FilterChip(
+                        selected = filter.markedDeleteOnly,
+                        onClick = { onChange { it.copy(markedDeleteOnly = !it.markedDeleteOnly) } },
+                        label = { Text(stringResource(R.string.filter_mark_delete)) },
+                    )
                 }
                 SectionTitle(stringResource(R.string.filter_rating))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -10,6 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.launch
+import de.hr.mediathek.data.story.ChapterDetector
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -44,6 +50,10 @@ fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, viewModel: S
     val state by viewModel.state.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     var showSettings by remember { mutableStateOf(false) }
+    var showChapters by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    // Kapitel aus den Überschriften im Text; erst ab zwei Kapiteln gibt es die Kapitelansicht.
+    val chapters = remember(state.paragraphs) { ChapterDetector.detect(state.paragraphs) }
 
     val (bg, fg) = when (settings.theme) {
         ReaderTheme.LIGHT -> Color(0xFFFAFAFA) to Color(0xFF1B1B1B)
@@ -61,6 +71,7 @@ fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, viewModel: S
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) { Text("←", color = fg) }
             Text(story?.title ?: "", color = fg, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), maxLines = 1)
+            if (chapters.size >= 2) TextButton(onClick = { showChapters = true }) { Text("☰ Kapitel", color = fg) }
             TextButton(onClick = { showSettings = true }) { Text("Aa", color = fg) }
             TextButton(onClick = { story?.let { onEdit(it.uuid) } }) { Text("✏ Bearbeiten", color = fg) }
         }
@@ -88,17 +99,97 @@ fun StoryReaderScreen(onBack: () -> Unit, onEdit: (String) -> Unit, viewModel: S
             DisposableEffect(listState) {
                 onDispose { viewModel.saveProgress(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
             }
+            // Welches Kapitel gerade oben im Bild steht.
+            val currentChapter by remember(chapters) {
+                derivedStateOf {
+                    val first = listState.firstVisibleItemIndex
+                    chapters.indexOfLast { it.paragraphIndex <= first }.coerceAtLeast(0)
+                }
+            }
+            if (chapters.size >= 2) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = {
+                        val inside = listState.firstVisibleItemIndex > chapters[currentChapter].paragraphIndex
+                        val target = if (inside) currentChapter else (currentChapter - 1).coerceAtLeast(0)
+                        scope.launch { listState.animateScrollToItem(chapters[target].paragraphIndex) }
+                    }) { Text("◀", color = fg) }
+                    Text(
+                        "Kapitel ${currentChapter + 1} von ${chapters.size} · " + chapters[currentChapter].title,
+                        color = fg,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f).clickable { showChapters = true },
+                    )
+                    TextButton(
+                        onClick = {
+                            val target = (currentChapter + 1).coerceAtMost(chapters.size - 1)
+                            scope.launch { listState.animateScrollToItem(chapters[target].paragraphIndex) }
+                        },
+                        enabled = currentChapter < chapters.size - 1,
+                    ) { Text("▶", color = fg) }
+                }
+            }
             LazyColumn(
                 state = listState,
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy((settings.fontSize * 0.6f).dp),
             ) {
-                itemsIndexed(state.paragraphs) { _, p ->
-                    Text(
-                        p, color = fg, fontFamily = family, fontSize = settings.fontSize.sp,
-                        lineHeight = (settings.fontSize * settings.lineSpacing).sp,
-                    )
+                itemsIndexed(state.paragraphs) { index, p ->
+                    if (ChapterDetector.isHeading(p, chapters, index)) {
+                        // Kapitelüberschrift: größer, fett und mit Luft nach oben.
+                        Text(
+                            p.trim().trimStart('#', '*', '=', ' ').trimEnd('*', '=', ' '),
+                            color = fg, fontFamily = family, fontWeight = FontWeight.Bold,
+                            fontSize = (settings.fontSize + 5f).sp,
+                            modifier = Modifier.padding(top = (settings.fontSize * 1.2f).dp),
+                        )
+                    } else {
+                        Text(
+                            p, color = fg, fontFamily = family, fontSize = settings.fontSize.sp,
+                            lineHeight = (settings.fontSize * settings.lineSpacing).sp,
+                        )
+                    }
                 }
+            }
+            if (showChapters) {
+                AlertDialog(
+                    onDismissRequest = { showChapters = false },
+                    confirmButton = { TextButton(onClick = { showChapters = false }) { Text("Schließen") } },
+                    title = { Text("Kapitel (${chapters.size})") },
+                    text = {
+                        LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            itemsIndexed(chapters) { i, chapter ->
+                                val isCurrent = i == currentChapter
+                                val done = i < currentChapter
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            showChapters = false
+                                            scope.launch { listState.animateScrollToItem(chapter.paragraphIndex) }
+                                        }
+                                        .padding(vertical = 10.dp, horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        if (done) "✓" else if (isCurrent) "▶" else "·",
+                                        color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(end = 10.dp),
+                                    )
+                                    Text(
+                                        chapter.title,
+                                        maxLines = 2,
+                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    )
+                                }
+                            }
+                        }
+                    },
+                )
             }
         }
     }

@@ -253,7 +253,11 @@ private fun TestPreview(result: de.hr.mediathek.data.compress.TestResult, onDism
     )
 }
 
-/** Serie: Stufe wählen, Pflicht-Testlauf am ersten Video prüfen und bestätigen, dann alle einreihen. */
+/**
+ * Serie: Stufe wählen, am ersten Video einen Testlauf machen und dann alle einreihen.
+ * Der Testlauf ist empfohlen. Wer ihn überspringen will oder wem er fehlschlägt, bestätigt das mit einem Haken;
+ * so bleibt "Alle einreihen" nie ohne erkennbaren Grund gesperrt.
+ */
 @Composable
 fun SeriesDialog(
     count: Int,
@@ -264,11 +268,9 @@ fun SeriesDialog(
     onDismiss: () -> Unit,
 ) {
     var level by remember { mutableStateOf(CompressionLevel.BALANCED) }
-    var accepted by remember { mutableStateOf(false) }
-    val testOk = test is TestState.Ready && test.level == level
-    // Schlägt der Testlauf fehl, darf die Serie trotzdem gestartet werden, wenn der Nutzer das ausdrücklich bestätigt.
     var withoutTest by remember { mutableStateOf(false) }
-    val testFailed = test is TestState.Failed
+    val testOk = test is TestState.Ready && test.level == level
+    val running = test is TestState.Running
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.compress_series_title, count)) },
@@ -277,10 +279,7 @@ fun SeriesDialog(
                 CompressionLevel.entries.forEach { l ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = level == l, onClick = {
-                            if (level != l) {
-                                onClearTest()
-                                accepted = false
-                            }
+                            if (level != l) onClearTest()
                             level = l
                         })
                         Text(stringResource(levelName(l)), style = MaterialTheme.typography.bodyMedium)
@@ -288,24 +287,20 @@ fun SeriesDialog(
                 }
                 if (level == CompressionLevel.STRONG) Warning(stringResource(R.string.compress_strong_warning))
                 Text(stringResource(R.string.compress_series_info), style = MaterialTheme.typography.bodySmall)
-                TestPanel(test, onRun = { accepted = false; onRunTest(level) }, level = level)
+                TestPanel(test, onRun = { onRunTest(level) }, level = level)
                 if (testOk) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = accepted, onCheckedChange = { accepted = it })
-                        Text(stringResource(R.string.compress_series_accept), style = MaterialTheme.typography.bodyMedium)
-                    }
-                } else if (testFailed) {
+                    Text(stringResource(R.string.compress_series_test_ok), style = MaterialTheme.typography.bodyMedium)
+                } else if (!running) {
+                    Text(stringResource(R.string.compress_series_need_test), style = MaterialTheme.typography.bodySmall)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(checked = withoutTest, onCheckedChange = { withoutTest = it })
-                        Text(stringResource(R.string.compress_series_without_test), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.compress_series_skip_test), style = MaterialTheme.typography.bodyMedium)
                     }
-                } else {
-                    Text(stringResource(R.string.compress_series_need_test), style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onStart(level) }, enabled = (testOk && accepted) || (testFailed && withoutTest)) {
+            TextButton(onClick = { onStart(level) }, enabled = !running && (testOk || withoutTest)) {
                 Text(stringResource(R.string.compress_series_start))
             }
         },

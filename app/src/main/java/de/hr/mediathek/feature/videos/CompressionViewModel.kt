@@ -147,11 +147,19 @@ class CompressionViewModel @Inject constructor(
         repo.clearTest()
     }
 
+    /** Ergebnis der letzten Serie: eingereiht und insgesamt; null = keine Rückmeldung offen. */
+    private val _seriesResult = MutableStateFlow<Pair<Int, Int>?>(null)
+    val seriesResult: StateFlow<Pair<Int, Int>?> = _seriesResult
+
+    fun dismissSeriesResult() {
+        _seriesResult.value = null
+    }
+
     fun startSeries(level: CompressionLevel) {
         val uuids = _series.value ?: return
         clearTest()
         _series.value = null
-        viewModelScope.launch { _queued.value = repo.enqueueAll(uuids, level) > 0 }
+        viewModelScope.launch { _seriesResult.value = repo.enqueueAll(uuids, level) to uuids.size }
     }
 
     override fun onCleared() {

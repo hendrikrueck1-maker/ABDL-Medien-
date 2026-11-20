@@ -1,6 +1,16 @@
 package de.hr.mediathek.feature.videos
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -101,7 +111,7 @@ fun TrashScreen(onBack: () -> Unit, viewModel: TrashViewModel = hiltViewModel())
 }
 
 @Composable
-fun DuplicatesScreen(onBack: () -> Unit, viewModel: TrashViewModel = hiltViewModel()) {
+fun DuplicatesScreen(onBack: () -> Unit, onOpen: (String) -> Unit = {}, viewModel: TrashViewModel = hiltViewModel()) {
     val groups by viewModel.duplicateGroups.collectAsStateWithLifecycle()
     val message by viewModel.message.collectAsStateWithLifecycle()
     var confirm by remember { mutableStateOf<String?>(null) }
@@ -124,18 +134,50 @@ fun DuplicatesScreen(onBack: () -> Unit, viewModel: TrashViewModel = hiltViewMod
             Card(colors = de.hr.mediathek.core.ui.glassCardColors(MaterialTheme.colorScheme.secondaryContainer), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     group.forEach { m ->
-                        Column {
-                            Text(m.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 2)
-                            Text(m.relativePath, style = MaterialTheme.typography.bodySmall, maxLines = 2)
-                            // Wer Bewertung/Favorit hat, soll das beim Aufräumen sehen.
-                            val info = buildList {
-                                if (m.rating > 0) add("★".repeat(m.rating))
-                                if (m.favorite) add(stringResource(R.string.video_favorite))
-                                if (m.status != MediaStatus.ONLINE) add(stringResource(R.string.video_offline))
-                            }.joinToString(" · ")
-                            if (info.isNotEmpty()) Text(info, style = MaterialTheme.typography.labelMedium)
-                            OutlinedButton(onClick = { confirm = m.uuid }, enabled = m.status == MediaStatus.ONLINE) {
-                                Text(stringResource(R.string.dup_to_trash))
+                        val offline = m.status != MediaStatus.ONLINE
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            // Ein Tipp auf das Vorschaubild oder den Namen spielt das Video ab.
+                            val thumb = de.hr.mediathek.feature.library.rememberThumbBitmap(remember(m.uuid) { viewModel.thumbnailOf(m.uuid) })
+                            Box(
+                                Modifier
+                                    .width(128.dp)
+                                    .height(72.dp)
+                                    .clip(MaterialTheme.shapes.small)
+                                    .background(Color.Black.copy(alpha = 0.25f))
+                                    .clickable(enabled = !offline) {
+                                        viewModel.prepareOpen()
+                                        onOpen(m.uuid)
+                                    },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (thumb != null) {
+                                    Image(thumb.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+                                }
+                                Text("▶", color = Color.White, style = MaterialTheme.typography.titleLarge)
+                            }
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(m.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 2)
+                                Text(m.relativePath, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                                // Wer Bewertung/Favorit hat, soll das beim Aufräumen sehen.
+                                val info = buildList {
+                                    if (m.rating > 0) add("★".repeat(m.rating))
+                                    if (m.favorite) add(stringResource(R.string.video_favorite))
+                                    if (m.markedPee) add("💧")
+                                    if (offline) add(stringResource(R.string.video_offline))
+                                }.joinToString(" · ")
+                                if (info.isNotEmpty()) Text(info, style = MaterialTheme.typography.labelMedium)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            viewModel.prepareOpen()
+                                            onOpen(m.uuid)
+                                        },
+                                        enabled = !offline,
+                                    ) { Text(stringResource(R.string.dup_play)) }
+                                    OutlinedButton(onClick = { confirm = m.uuid }, enabled = !offline) {
+                                        Text(stringResource(R.string.dup_to_trash))
+                                    }
+                                }
                             }
                         }
                     }

@@ -21,6 +21,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import de.hr.mediathek.core.ui.PopBox
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -76,6 +80,8 @@ fun PlayerScreen(
     viewModel: PlayerViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Videos laufen immer im Vollbild; die Systemleisten bleiben auch während des Ladens weg, damit nichts springt.
+    ImmersiveMode(true)
 
     when (val s = state) {
         PlayerState.Loading -> CenterText(stringResource(R.string.player_loading), onBack)
@@ -111,18 +117,15 @@ private fun ReadyPlayer(
     val lifecycleOwner = LocalLifecycleOwner.current
     var error by remember { mutableStateOf<String?>(null) }
     var speedIndex by remember { mutableIntStateOf(0) }
-    var showTracks by remember { mutableStateOf(false) }
-    var fullscreen by rememberSaveable { mutableStateOf(false) }
     var showOriginal by remember { mutableStateOf(false) }
     var confirmDeleteOriginal by remember { mutableStateOf(false) }
     var controlsVisible by remember { mutableStateOf(true) }
-    ImmersiveMode(fullscreen)
-    BackHandler(enabled = fullscreen) { fullscreen = false }
-
     val player = remember(state.uri) {
         ExoPlayer.Builder(context)
             // Nur Plattform-Decoder; Pause beim Abziehen der Kopfhörer.
             .setHandleAudioBecomingNoisy(true)
+            // Das Freigeben der Decoder darf den Hauptthread nicht lange blockieren (sonst ruckelt der Wechsel zur Liste).
+            .setReleaseTimeoutMs(150)
             .setAudioAttributes(androidx.media3.common.AudioAttributes.DEFAULT, true)
             .build()
             .apply {
@@ -135,13 +138,8 @@ private fun ReadyPlayer(
 
     val errorUnsupported = stringResource(R.string.player_error_unsupported)
     val errorGeneric = stringResource(R.string.player_error_generic)
-    var tracks by remember(player) { mutableStateOf(player.currentTracks) }
     DisposableEffect(player) {
         val listener = object : Player.Listener {
-            override fun onTracksChanged(t: androidx.media3.common.Tracks) {
-                tracks = t
-            }
-
             override fun onPlaybackStateChanged(playbackState: Int) {
                 // Am Ende automatisch zum nächsten Video der Liste (Playlist, Filter oder Zufall).
                 if (playbackState == Player.STATE_ENDED) {
@@ -174,9 +172,11 @@ private fun ReadyPlayer(
             lifecycleOwner.lifecycle.removeObserver(observer)
             player.removeListener(listener)
             viewModel.saveProgress(player.currentPosition, player.duration)
-            // Erst anhalten, das Freigeben der Decoder kurz verzögern: so ruckelt der Wechsel zurück zur Liste nicht.
+            // Sofort anhalten und die Decoder im Hintergrund abbauen (stop), das eigentliche release() erst danach:
+            // so blockiert nichts, während die Liste wieder erscheint.
             player.playWhenReady = false
-            Handler(Looper.getMainLooper()).postDelayed({ player.release() }, 450)
+            player.stop()
+            Handler(Looper.getMainLooper()).postDelayed({ player.release() }, 1_200)
         }
     }
 
@@ -188,7 +188,6 @@ private fun ReadyPlayer(
         }
     }
 
-    if (showTracks) TrackDialog(player, tracks) { showTracks = false }
     if (showOriginal) {
         AlertDialog(
             onDismissRequest = { showOriginal = false },
@@ -240,7 +239,6 @@ private fun ReadyPlayer(
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { visibility -> controlsVisible = visibility == View.VISIBLE },
                     )
-                    setFullscreenButtonClickListener { isFullscreen -> fullscreen = isFullscreen }
                 }
             },
             update = { it.player = player },
@@ -286,83 +284,64 @@ private fun ReadyPlayer(
                 if (viewModel.hasContext) {
                     OutlinedButton(onClick = { viewModel.next(onNext) }) { Text(stringResource(R.string.player_next), color = Color.White) }
                 }
-                OutlinedButton(onClick = { showTracks = true }) { Text(stringResource(R.string.player_tracks), color = Color.White) }
-                OutlinedButton(onClick = { fullscreen = !fullscreen }) { Text(stringResource(R.string.player_fullscreen), color = Color.White) }
                 if (state.hasOriginal || state.isOriginal) {
                     OutlinedButton(onClick = { showOriginal = true }) { Text(stringResource(R.string.player_original_button), color = Color.White) }
                 }
-                IconButton(onClick = viewModel::toggleFavorite) {
-                    Icon(
-                        Icons.Filled.Favorite,
-                        contentDescription = stringResource(R.string.video_favorite),
-                        tint = if (state.favorite) Color(0xFFFF6FA8) else Color.Gray,
-                    )
-                }
-                IconButton(onClick = viewModel::toggleMarkedPee) {
-                    Text("💧", fontSize = 22.sp, modifier = Modifier.alpha(if (state.markedPee) 1f else 0.3f))
-                }
-                IconButton(onClick = viewModel::toggleMarkedDelete) {
-                    Text("🗑", fontSize = 22.sp, modifier = Modifier.alpha(if (state.markedDelete) 1f else 0.3f))
-                }
-                (1..5).forEach { star ->
-                    IconButton(onClick = { viewModel.setRating(star) }, modifier = Modifier.size(48.dp)) {
-                        Icon(
-                            Icons.Filled.Star,
-                            contentDescription = stringResource(R.string.video_rate, star),
-                            tint = if (star <= state.rating) Color(0xFFFFC107) else Color.Gray,
-                        )
-                    }
-                }
             }
+        }
+        // Markierungen hochkant am linken Rand: Favorit, Tropfen, zum Löschen, darunter die fünf Sterne.
+        AnimatedVisibility(
+            visible = controlsVisible || error != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.CenterStart),
+        ) {
+            MarkRail(state, viewModel)
         }
     }
 }
 
-@OptIn(UnstableApi::class)
 @Composable
-private fun TrackDialog(player: Player, tracks: androidx.media3.common.Tracks, onDismiss: () -> Unit) {
-    val audio = tracks.groups.filter { it.type == androidx.media3.common.C.TRACK_TYPE_AUDIO && it.isSupported }
-    val text = tracks.groups.filter { it.type == androidx.media3.common.C.TRACK_TYPE_TEXT && it.isSupported }
-    val textDisabled = player.trackSelectionParameters.disabledTrackTypes.contains(androidx.media3.common.C.TRACK_TYPE_TEXT)
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.player_tracks)) },
-        text = {
-            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(stringResource(R.string.player_audio), style = MaterialTheme.typography.titleSmall)
-                if (audio.size <= 1) Text(stringResource(R.string.player_single_track), style = MaterialTheme.typography.bodySmall)
-                audio.forEachIndexed { i, group ->
-                    TextButton(onClick = {
-                        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                            .setOverrideForType(androidx.media3.common.TrackSelectionOverride(group.mediaTrackGroup, 0))
-                            .build()
-                        onDismiss()
-                    }) { Text(trackLabel(group, i) + if (group.isSelected) " ✓" else "") }
-                }
-                Text(stringResource(R.string.player_subtitles), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
-                TextButton(onClick = {
-                    player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                        .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, true).build()
-                    onDismiss()
-                }) { Text(stringResource(R.string.player_subtitles_off) + if (textDisabled || text.none { it.isSelected }) " ✓" else "") }
-                text.forEachIndexed { i, group ->
-                    TextButton(onClick = {
-                        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                            .setTrackTypeDisabled(androidx.media3.common.C.TRACK_TYPE_TEXT, false)
-                            .setOverrideForType(androidx.media3.common.TrackSelectionOverride(group.mediaTrackGroup, 0))
-                            .build()
-                        onDismiss()
-                    }) { Text(trackLabel(group, i) + if (group.isSelected && !textDisabled) " ✓" else "") }
+private fun MarkRail(state: PlayerState.Ready, viewModel: PlayerViewModel) {
+    Column(
+        Modifier
+            .padding(start = 8.dp)
+            .background(Color.Black.copy(alpha = 0.62f), RoundedCornerShape(28.dp))
+            .verticalScroll(rememberScrollState())
+            .padding(vertical = 6.dp, horizontal = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+    ) {
+        IconButton(onClick = viewModel::toggleFavorite, modifier = Modifier.size(48.dp)) {
+            PopBox(active = state.favorite) {
+                Icon(
+                    Icons.Filled.Favorite,
+                    contentDescription = stringResource(R.string.video_favorite),
+                    tint = if (state.favorite) Color(0xFFFF6FA8) else Color(0xFF9E9E9E),
+                )
+            }
+        }
+        IconButton(onClick = viewModel::toggleMarkedPee, modifier = Modifier.size(48.dp)) {
+            PopBox(active = state.markedPee) {
+                Text("💧", fontSize = 22.sp, modifier = Modifier.alpha(if (state.markedPee) 1f else 0.35f))
+            }
+        }
+        IconButton(onClick = viewModel::toggleMarkedDelete, modifier = Modifier.size(48.dp)) {
+            PopBox(active = state.markedDelete) {
+                Text("🗑", fontSize = 22.sp, modifier = Modifier.alpha(if (state.markedDelete) 1f else 0.35f))
+            }
+        }
+        HorizontalDivider(Modifier.padding(horizontal = 10.dp, vertical = 4.dp).width(28.dp), color = Color.White.copy(alpha = 0.3f))
+        (1..5).forEach { star ->
+            IconButton(onClick = { viewModel.setRating(star) }, modifier = Modifier.size(44.dp)) {
+                PopBox(active = star <= state.rating) {
+                    Icon(
+                        Icons.Filled.Star,
+                        contentDescription = stringResource(R.string.video_rate, star),
+                        tint = if (star <= state.rating) Color(0xFFFFC107) else Color(0xFF9E9E9E),
+                    )
                 }
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.storage_message_ok)) } },
-    )
-}
-
-private fun trackLabel(group: androidx.media3.common.Tracks.Group, index: Int): String {
-    val f = group.mediaTrackGroup.getFormat(0)
-    val language = f.language?.takeIf { it != "und" }?.let { java.util.Locale(it).displayLanguage }
-    val parts = listOfNotNull(f.label, language, f.channelCount.takeIf { it > 0 }?.let { "$it Kanäle" })
-    return if (parts.isEmpty()) "Spur ${index + 1}" else parts.joinToString(" · ")
+        }
+    }
 }

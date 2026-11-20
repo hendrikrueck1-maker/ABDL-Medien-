@@ -10,7 +10,9 @@ import de.hr.mediathek.data.story.StoryRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -34,6 +36,12 @@ class StoryEditorViewModel @Inject constructor(
     private val _state = MutableStateFlow(EditorState())
     val state: StateFlow<EditorState> = _state
     private var saveJob: Job? = null
+
+    /** Zuletzt verwendete Quellen und Adressen, als Tasten zum Schnellauswählen. */
+    val recentSources: StateFlow<List<String>> = repository.recentSources()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val recentUrls: StateFlow<List<String>> = repository.recentUrls()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
         viewModelScope.launch {

@@ -2,11 +2,14 @@ package de.hr.mediathek.feature.images
 
 import android.net.Uri
 import android.provider.DocumentsContract
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.sqlite.db.SimpleSQLiteQuery
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.hr.mediathek.data.db.MediaFileDao
+import de.hr.mediathek.data.db.SettingDao
+import de.hr.mediathek.data.db.SettingEntity
 import de.hr.mediathek.data.db.SourceDao
 import de.hr.mediathek.data.images.ImageLoader
 import de.hr.mediathek.data.images.SlideshowOrder
@@ -32,6 +35,8 @@ data class SlideshowState(
 
 @HiltViewModel
 class SlideshowViewModel @Inject constructor(
+    savedState: SavedStateHandle,
+    private val settingDao: SettingDao,
     private val dao: MediaFileDao,
     private val sources: SourceDao,
     private val context: ImageContext,
@@ -44,21 +49,43 @@ class SlideshowViewModel @Inject constructor(
     private var order: SlideshowOrder? = null
     private val trees = HashMap<String, Uri?>()
 
+    /** Gesetzt, wenn die Diashow aus der Bildansicht gestartet wurde: dann geht es ohne Einrichtung gleich los. */
+    private val startUuid: String? = savedState.get<String>("start")?.takeIf { it.isNotBlank() }
+    val fromViewer: Boolean = startUuid != null
+
     init {
         viewModelScope.launch {
+            // Die zuletzt gewählten Einstellungen bleiben erhalten.
+            val interval = settingDao.get(K_INTERVAL)?.toIntOrNull()?.takeIf { it > 0 } ?: 5
+            val crossfade = settingDao.get(K_CROSSFADE)?.let { it == "1" } ?: true
+            val random = settingDao.get(K_RANDOM)?.let { it == "1" } ?: true
             val built = VideoQuery.buildOrderedUuids(context.filter, context.seed, type = "IMAGE")
             uuids = dao.uuids(SimpleSQLiteQuery(built.sql, built.args.toTypedArray()))
-            _state.update { it.copy(loading = false, total = uuids.size) }
+            _state.update {
+                it.copy(loading = false, total = uuids.size, intervalSec = interval, crossfade = crossfade, random = random)
+            }
+            if (startUuid != null && uuids.isNotEmpty()) start(uuids.indexOf(startUuid).coerceAtLeast(0))
         }
     }
 
-    fun setInterval(seconds: Int) = _state.update { it.copy(intervalSec = seconds) }
-    fun setCrossfade(on: Boolean) = _state.update { it.copy(crossfade = on) }
-    fun setRandom(on: Boolean) = _state.update { it.copy(random = on) }
+    fun setInterval(seconds: Int) {
+        _state.update { it.copy(intervalSec = seconds) }
+        viewModelScope.launch { settingDao.set(SettingEntity(K_INTERVAL, seconds.toString())) }
+    }
 
-    fun start() {
+    fun setCrossfade(on: Boolean) {
+        _state.update { it.copy(crossfade = on) }
+        viewModelScope.launch { settingDao.set(SettingEntity(K_CROSSFADE, if (on) "1" else "0")) }
+    }
+
+    fun setRandom(on: Boolean) {
+        _state.update { it.copy(random = on) }
+        viewModelScope.launch { settingDao.set(SettingEntity(K_RANDOM, if (on) "1" else "0")) }
+    }
+
+    fun start(startIndex: Int = 0) {
         if (uuids.isEmpty()) return
-        val o = SlideshowOrder(uuids.size, _state.value.random)
+        val o = SlideshowOrder(uuids.size, _state.value.random, startIndex)
         order = o
         _state.update { it.copy(started = true, paused = false, currentUuid = uuids[o.current], tick = it.tick + 1) }
     }
@@ -87,5 +114,11 @@ class SlideshowViewModel @Inject constructor(
         val tree = trees.getOrPut(media.sourceUuid) { sources.getByUuid(media.sourceUuid)?.treeUri?.let { Uri.parse(it) } }
             ?: return null
         return DocumentsContract.buildDocumentUriUsingTree(tree, docId)
+    }
+
+    private companion object {
+        const val K_INTERVAL = "slideshow_interval"
+        const val K_CROSSFADE = "slideshow_crossfade"
+        const val K_RANDOM = "slideshow_random"
     }
 }

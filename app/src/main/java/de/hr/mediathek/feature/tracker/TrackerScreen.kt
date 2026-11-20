@@ -1,5 +1,6 @@
 package de.hr.mediathek.feature.tracker
 
+import de.hr.mediathek.core.ui.bounceClick
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -69,7 +70,7 @@ fun TileCard(tile: Tile, viewModel: TrackerViewModel, onTap: () -> Unit, onLongT
     val bmp by produceState<ImageBitmap?>(null, tile.uuid) { value = viewModel.photoOf(tile.uuid)?.asImageBitmap() }
     Card(
         colors = glassCardColors(MaterialTheme.colorScheme.primaryContainer),
-        modifier = modifier.fillMaxWidth().combinedClickable(onClick = onTap, onLongClick = onLongTap),
+        modifier = modifier.fillMaxWidth().bounceClick(onLongClick = onLongTap, onClick = onTap),
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(1.4f)) {
             val b = bmp

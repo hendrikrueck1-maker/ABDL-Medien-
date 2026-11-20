@@ -11,6 +11,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -59,7 +61,7 @@ fun AppBackground(content: @Composable () -> Unit) {
     val image by viewModel.image.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         image?.let {
-            Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(14.dp))
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = 0.84f)))
         }
         content()

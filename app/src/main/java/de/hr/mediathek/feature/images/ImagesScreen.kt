@@ -17,6 +17,7 @@ import de.hr.mediathek.feature.library.PathBar
 import de.hr.mediathek.feature.library.ViewSettingsDialog
 import de.hr.mediathek.feature.library.activeFilterCount
 import de.hr.mediathek.feature.library.clearedFilters
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import de.hr.mediathek.feature.videos.VideoFilter
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -392,9 +393,9 @@ private fun ImageCell(
         bitmap?.let {
             Image(it.asImageBitmap(), contentDescription = image.displayName, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
-        Row(Modifier.align(Alignment.BottomStart).padding(4.dp)) {
+        Row(Modifier.align(Alignment.BottomStart).padding(4.dp).then(if (image.rating > 0) Modifier.background(Color.Black.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).padding(horizontal = 4.dp) else Modifier), verticalAlignment = Alignment.CenterVertically) {
             if (image.rating > 0) {
-                Icon(Icons.Filled.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.padding(end = 2.dp))
+                Icon(Icons.Filled.Star, contentDescription = null, tint = Color(0xFFFFC107), modifier = Modifier.padding(end = 2.dp).size(18.dp))
                 Text("${image.rating}", color = Color.White, style = MaterialTheme.typography.labelMedium)
             }
         }
@@ -407,7 +408,7 @@ private fun ImageCell(
             )
         }
         if (offline) {
-            Text(stringResource(R.string.video_offline), color = Color.White, style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.Center))
+            Text(stringResource(R.string.video_offline), color = Color.White, style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.Center).background(Color.Black.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp))
         }
         if (selected) {
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)))

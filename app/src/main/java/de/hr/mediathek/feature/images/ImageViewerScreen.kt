@@ -54,6 +54,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hr.mediathek.R
+import de.hr.mediathek.core.ui.ImmersiveMode
 import de.hr.mediathek.data.db.MediaFileEntity
 import de.hr.mediathek.data.db.MediaStatus
 import de.hr.mediathek.data.images.ImageInfo
@@ -63,12 +64,14 @@ import kotlin.math.max
 import kotlin.math.min
 
 @Composable
-fun ImageViewerScreen(onBack: () -> Unit, viewModel: ImageViewerViewModel = hiltViewModel()) {
+fun ImageViewerScreen(onBack: () -> Unit, onSlideshow: (String) -> Unit = {}, viewModel: ImageViewerViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Bilder immer im Vollbild; ein Tipp blendet die Leiste ein und aus.
+    ImmersiveMode(true)
     when (val s = state) {
         ViewerState.Loading -> Centered(stringResource(R.string.player_loading), onBack)
         ViewerState.NotFound -> Centered(stringResource(R.string.image_not_found), onBack)
-        is ViewerState.Ready -> Pages(s, viewModel, onBack)
+        is ViewerState.Ready -> Pages(s, viewModel, onBack, onSlideshow)
     }
 }
 
@@ -85,7 +88,7 @@ private fun Centered(text: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun Pages(state: ViewerState.Ready, viewModel: ImageViewerViewModel, onBack: () -> Unit) {
+private fun Pages(state: ViewerState.Ready, viewModel: ImageViewerViewModel, onBack: () -> Unit, onSlideshow: (String) -> Unit) {
     val pager = rememberPagerState(initialPage = state.startIndex) { state.uuids.size }
     var zoomed by remember { mutableStateOf(false) }
     var chrome by remember { mutableStateOf(true) }
@@ -111,13 +114,13 @@ private fun Pages(state: ViewerState.Ready, viewModel: ImageViewerViewModel, onB
             val uuid = state.uuids.getOrNull(pager.currentPage)
             val media by remember(uuid) { uuid?.let { viewModel.observe(it) } ?: kotlinx.coroutines.flow.flowOf(null) }
                 .collectAsStateWithLifecycle(initialValue = null)
-            TopBar(media, pager.currentPage + 1, state.uuids.size, viewModel, onBack)
+            TopBar(media, pager.currentPage + 1, state.uuids.size, viewModel, onBack) { uuid?.let(onSlideshow) }
         }
     }
 }
 
 @Composable
-private fun TopBar(media: MediaFileEntity?, index: Int, total: Int, viewModel: ImageViewerViewModel, onBack: () -> Unit) {
+private fun TopBar(media: MediaFileEntity?, index: Int, total: Int, viewModel: ImageViewerViewModel, onBack: () -> Unit, onSlideshow: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
@@ -140,8 +143,10 @@ private fun TopBar(media: MediaFileEntity?, index: Int, total: Int, viewModel: I
                     }
                 }
                 OutlinedButton(onClick = { viewModel.toggleFavorite(media) }) {
-                    Text(stringResource(if (media.favorite) R.string.video_fav_unset else R.string.video_fav_set))
+                    Text(stringResource(if (media.favorite) R.string.video_fav_unset else R.string.video_fav_set), color = Color.White)
                 }
+                // Startet die Diashow ab diesem Bild mit den zuletzt gewählten Einstellungen.
+                OutlinedButton(onClick = onSlideshow) { Text(stringResource(R.string.slideshow_from_here), color = Color.White) }
             }
         }
     }

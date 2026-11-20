@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hr.mediathek.R
+import de.hr.mediathek.core.ui.ImmersiveMode
 import kotlinx.coroutines.delay
 
 private val INTERVALS = listOf(3, 5, 10, 20, 30, 60)
@@ -51,10 +52,17 @@ private val INTERVALS = listOf(3, 5, 10, 20, 30, 60)
 @Composable
 fun SlideshowScreen(onBack: () -> Unit, viewModel: SlideshowViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    if (!state.started) {
-        Setup(state, viewModel, onBack)
+    // Aus der Bildansicht gestartet: nach "Beenden" zurück zum Bild statt in die Einrichtung.
+    val close: () -> Unit = { if (viewModel.fromViewer) onBack() else viewModel.stop() }
+    if (viewModel.fromViewer && !state.loading && state.total == 0) {
+        LaunchedEffect(Unit) { onBack() }
+    }
+    if (state.started) {
+        Playing(state, viewModel, onClose = close)
+    } else if (viewModel.fromViewer) {
+        Box(Modifier.fillMaxSize().background(Color.Black))
     } else {
-        Playing(state, viewModel, onClose = { viewModel.stop() })
+        Setup(state, viewModel, onBack)
     }
 }
 
@@ -99,7 +107,8 @@ private fun Setup(state: SlideshowState, viewModel: SlideshowViewModel, onBack: 
 
 @Composable
 private fun Playing(state: SlideshowState, viewModel: SlideshowViewModel, onClose: () -> Unit) {
-    // Bildschirm bleibt nur während der Diashow an.
+    // Diashow immer im Vollbild; der Bildschirm bleibt nur währenddessen an.
+    ImmersiveMode(true)
     val activity = LocalContext.current as? android.app.Activity
     DisposableEffect(Unit) {
         activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)

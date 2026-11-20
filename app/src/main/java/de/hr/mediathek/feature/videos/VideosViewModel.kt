@@ -10,6 +10,7 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.hr.mediathek.data.category.CategoryRepository
 import de.hr.mediathek.data.db.CategoryEntity
+import de.hr.mediathek.data.db.FlagCounts
 import de.hr.mediathek.data.db.MediaFileDao
 import de.hr.mediathek.data.db.MediaFileEntity
 import de.hr.mediathek.data.db.ThumbVariant
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -82,6 +84,11 @@ class VideosViewModel @Inject constructor(
     /** Mehrfachauswahl: UUIDs der markierten Videos. Leer = keine Auswahl. */
     private val _selected = MutableStateFlow<Set<String>>(emptySet())
     val selected: StateFlow<Set<String>> = _selected
+
+    /** Wie viele der gewählten Videos Favorit, Tropfen oder Löschmarkierung tragen; steuert die Schalter der Auswahlleiste. */
+    val selectionFlags: StateFlow<FlagCounts> = _selected
+        .flatMapLatest { ids -> if (ids.isEmpty()) flowOf(FlagCounts(0, 0, 0)) else dao.observeFlagCounts(ids.toList()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FlagCounts(0, 0, 0))
 
     /** Kategorien, die mindestens einem ausgewählten Video zugeordnet sind (für den Dialog). */
     private val _usedCategories = MutableStateFlow<Set<String>>(emptySet())

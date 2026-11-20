@@ -1,5 +1,15 @@
 package de.hr.mediathek.core.ui
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -62,14 +72,14 @@ fun AppRoot() {
     val isWide = LocalConfiguration.current.screenWidthDp >= WIDE_LAYOUT_MIN_WIDTH_DP
     // Player, Bildansicht und Diashow brauchen den ganzen Bildschirm; sie haben eigene Zurück-Knöpfe.
     val route = navController.currentRoute().orEmpty()
-    val fullScreenRoute = route.startsWith("player/") || route.startsWith("image/{") || route == "slideshow"
+    val fullScreenRoute = isFullScreenRoute(route)
 
     AppBackground {
     if (isWide) {
         Row(Modifier.fillMaxSize()) {
             if (!fullScreenRoute) AppNavigationRail(navController)
             Scaffold(Modifier.weight(1f), containerColor = Color.Transparent) { padding ->
-                AppNavHost(navController, Modifier.padding(padding))
+                ScreenPanel(fullScreenRoute, Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
             }
         }
     } else {
@@ -77,9 +87,34 @@ fun AppRoot() {
             containerColor = Color.Transparent,
             bottomBar = { if (!fullScreenRoute) AppBottomBar(navController) },
         ) { padding ->
-            AppNavHost(navController, Modifier.padding(padding))
+            ScreenPanel(fullScreenRoute, Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
         }
     }
+    }
+}
+
+private fun isFullScreenRoute(route: String?): Boolean =
+    route != null && (route.startsWith("player/") || route.startsWith("image/{") || route.startsWith("slideshow"))
+
+/**
+ * Heller, fast deckender Untergrund hinter jedem normalen Bildschirm: Schrift liegt nie direkt auf dem Hintergrundbild
+ * und bleibt lesbar. Darauf steigen zarte Seifenblasen auf. Vollbild-Seiten (Player, Bilder) bleiben unverändert;
+ * der Inhalt behält dabei seinen Platz im Baum, damit beim Wechsel nichts neu aufgebaut wird.
+ */
+@Composable
+private fun ScreenPanel(fullScreen: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val panel = if (fullScreen) {
+        Modifier.fillMaxSize()
+    } else {
+        Modifier
+            .fillMaxSize()
+            .padding(horizontal = 6.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.90f))
+    }
+    Box(modifier.then(panel)) {
+        if (!fullScreen) FloatingBubbles()
+        content()
     }
 }
 
@@ -89,6 +124,20 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         navController = navController,
         startDestination = Destination.Home.route,
         modifier = modifier,
+        // Kurze Übergänge: Die frühere lange Überblendung ließ Player und Liste gleichzeitig laufen und ruckeln.
+        enterTransition = {
+            if (isFullScreenRoute(targetState.destination.route)) {
+                fadeIn(tween(120))
+            } else {
+                fadeIn(tween(200)) + scaleIn(
+                    initialScale = 0.96f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+                )
+            }
+        },
+        exitTransition = { fadeOut(tween(90)) },
+        popEnterTransition = { fadeIn(tween(140)) },
+        popExitTransition = { fadeOut(tween(90)) },
     ) {
         composable(Destination.Home.route) {
             HomeScreen(
@@ -129,8 +178,16 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         composable(
             route = "image/{uuid}",
             arguments = listOf(navArgument("uuid") { type = NavType.StringType }),
-        ) { de.hr.mediathek.feature.images.ImageViewerScreen(onBack = { navController.popBackStack() }) }
-        composable("slideshow") { de.hr.mediathek.feature.images.SlideshowScreen(onBack = { navController.popBackStack() }) }
+        ) {
+            de.hr.mediathek.feature.images.ImageViewerScreen(
+                onBack = { navController.popBackStack() },
+                onSlideshow = { navController.navigate("slideshow?start=$it") },
+            )
+        }
+        composable(
+            route = "slideshow?start={start}",
+            arguments = listOf(navArgument("start") { type = NavType.StringType; nullable = true; defaultValue = null }),
+        ) { de.hr.mediathek.feature.images.SlideshowScreen(onBack = { navController.popBackStack() }) }
         composable("image-duplicates") {
             de.hr.mediathek.feature.images.ImageDuplicatesScreen(
                 onBack = { navController.popBackStack() },
@@ -195,7 +252,12 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         composable("background") { de.hr.mediathek.feature.overview.BackgroundScreen(onBack = { navController.popBackStack() }) }
         composable("packages") { de.hr.mediathek.feature.pkg.PackageScreen(onBack = { navController.popBackStack() }) }
         composable("trash") { TrashScreen(onBack = { navController.popBackStack() }) }
-        composable("duplicates") { DuplicatesScreen(onBack = { navController.popBackStack() }) }
+        composable("duplicates") {
+            DuplicatesScreen(
+                onBack = { navController.popBackStack() },
+                onOpen = { navController.navigate("player/$it") },
+            )
+        }
         composable(
             route = "player/{uuid}?original={original}",
             arguments = listOf(

@@ -31,6 +31,8 @@ import java.util.Date
 @Composable
 fun StoryEditorScreen(onBack: () -> Unit, viewModel: StoryEditorViewModel = hiltViewModel()) {
     val s by viewModel.state.collectAsStateWithLifecycle()
+    val recentSources by viewModel.recentSources.collectAsStateWithLifecycle()
+    val recentUrls by viewModel.recentUrls.collectAsStateWithLifecycle()
     DisposableEffect(Unit) { onDispose { viewModel.flush() } }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -63,10 +65,12 @@ fun StoryEditorScreen(onBack: () -> Unit, viewModel: StoryEditorViewModel = hilt
                     value = s.source, onValueChange = { v -> viewModel.change { it.copy(source = v) } },
                     label = { Text("Quelle / Website") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                 )
+                QuickPick(recentSources, s.source, { it }) { pick -> viewModel.change { it.copy(source = pick) } }
                 OutlinedTextField(
                     value = s.url, onValueChange = { v -> viewModel.change { it.copy(url = v) } },
                     label = { Text("Adresse (URL)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                 )
+                QuickPick(recentUrls, s.url, ::shortUrl) { pick -> viewModel.change { it.copy(url = pick) } }
                 OutlinedTextField(
                     value = s.text, onValueChange = { v -> viewModel.change { it.copy(text = v) } },
                     label = { Text("Text (hier einfügen oder schreiben)") },
@@ -92,5 +96,27 @@ fun StoryEditorScreen(onBack: () -> Unit, viewModel: StoryEditorViewModel = hilt
                 }
             },
         )
+    }
+}
+
+/** Kurze Anzeige einer Adresse auf der Schnellauswahl-Taste: ohne Protokoll, "www." und Schrägstrich am Ende. */
+private fun shortUrl(url: String): String {
+    val short = url.removePrefix("https://").removePrefix("http://").removePrefix("www.").trimEnd('/')
+    return if (short.length > 34) short.take(33) + "…" else short
+}
+
+/** Tasten mit den zuletzt verwendeten Einträgen; ein Tipp übernimmt den Wert, die gewählte Taste ist hervorgehoben. */
+@Composable
+private fun QuickPick(items: List<String>, current: String, label: (String) -> String, onPick: (String) -> Unit) {
+    if (items.isEmpty()) return
+    Row(
+        Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("🕘", style = MaterialTheme.typography.titleMedium)
+        items.forEach { item ->
+            FilterChip(selected = item == current, onClick = { onPick(item) }, label = { Text(label(item), maxLines = 1) })
+        }
     }
 }

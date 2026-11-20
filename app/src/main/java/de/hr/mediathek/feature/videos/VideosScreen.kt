@@ -3,6 +3,7 @@ package de.hr.mediathek.feature.videos
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material3.AlertDialog
@@ -55,6 +56,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import de.hr.mediathek.R
+import de.hr.mediathek.core.ui.bounceClick
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -106,6 +108,7 @@ fun VideosScreen(
     val queued by compression.queued.collectAsStateWithLifecycle()
     val test by compression.test.collectAsStateWithLifecycle()
     val series by compression.series.collectAsStateWithLifecycle()
+    val seriesResult by compression.seriesResult.collectAsStateWithLifecycle()
     var compressTarget by remember { mutableStateOf<String?>(null) }
     var rateMenu by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
@@ -147,45 +150,17 @@ fun VideosScreen(
                 }
             }
         } else {
-            Row(
-                Modifier.padding(top = 8.dp, bottom = 4.dp).horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.video_selected, selected.size),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                OutlinedButton(onClick = { viewModel.favoriteSelected(true) }) { Text(stringResource(R.string.video_fav_set)) }
-                OutlinedButton(onClick = { viewModel.favoriteSelected(false) }) { Text(stringResource(R.string.video_fav_unset)) }
-                OutlinedButton(onClick = { viewModel.markDeleteSelected(true) }) { Text(stringResource(R.string.mark_delete_set)) }
-                OutlinedButton(onClick = { viewModel.markDeleteSelected(false) }) { Text(stringResource(R.string.mark_delete_unset)) }
-                OutlinedButton(onClick = { viewModel.markPeeSelected(true) }) { Text(stringResource(R.string.mark_pee_set)) }
-                OutlinedButton(onClick = { viewModel.markPeeSelected(false) }) { Text(stringResource(R.string.mark_pee_unset)) }
-                Box {
-                    OutlinedButton(onClick = { rateMenu = true }) { Text(stringResource(R.string.video_rate_action)) }
-                    DropdownMenu(expanded = rateMenu, onDismissRequest = { rateMenu = false }) {
-                        (0..5).forEach { r ->
-                            DropdownMenuItem(
-                                text = { Text(if (r == 0) stringResource(R.string.video_rate_none) else "★".repeat(r)) },
-                                onClick = {
-                                    rateMenu = false
-                                    viewModel.rateSelected(r)
-                                },
-                            )
-                        }
-                    }
-                }
-                OutlinedButton(onClick = {
+            val flags by viewModel.selectionFlags.collectAsStateWithLifecycle()
+            val moreActions = buildList {
+                add(SelectionAction(stringResource(R.string.video_category_action)) {
                     viewModel.loadUsedCategories()
                     showCategoryDialog = true
-                }) { Text(stringResource(R.string.video_category_action)) }
-                OutlinedButton(onClick = {
+                })
+                add(SelectionAction(stringResource(R.string.tag_action)) {
                     viewModel.loadUsedTags()
                     showTagDialog = true
-                }) { Text(stringResource(R.string.tag_action)) }
-                OutlinedButton(onClick = {
+                })
+                add(SelectionAction(stringResource(R.string.compress_action)) {
                     if (selected.size == 1) {
                         val id = selected.first()
                         compressTarget = id
@@ -193,14 +168,24 @@ fun VideosScreen(
                     } else {
                         compression.beginSeries(selected.toList())
                     }
-                }) { Text(stringResource(R.string.compress_action)) }
-                OutlinedButton(onClick = { showPlaylistPick = true }) { Text(stringResource(R.string.playlist_add_action)) }
+                })
+                add(SelectionAction(stringResource(R.string.playlist_add_action)) { showPlaylistPick = true })
                 if (filter.playlistUuid != null) {
-                    OutlinedButton(onClick = viewModel::removeSelectedFromCurrentPlaylist) { Text(stringResource(R.string.playlist_remove_action)) }
+                    add(SelectionAction(stringResource(R.string.playlist_remove_action), viewModel::removeSelectedFromCurrentPlaylist))
                 }
-                OutlinedButton(onClick = { confirmTrash = 1 }) { Text(stringResource(R.string.trash_action)) }
-                TextButton(onClick = viewModel::clearSelection) { Text(stringResource(R.string.video_clear_selection)) }
+                add(SelectionAction(stringResource(R.string.trash_action)) { confirmTrash = 1 })
             }
+            SelectionBar(
+                count = selected.size,
+                flags = flags,
+                onClose = viewModel::clearSelection,
+                onFavorite = { viewModel.favoriteSelected(flags.fav < selected.size) },
+                onPee = { viewModel.markPeeSelected(flags.pee < selected.size) },
+                onDeleteMark = { viewModel.markDeleteSelected(flags.del < selected.size) },
+                onRate = viewModel::rateSelected,
+                actions = moreActions,
+                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+            )
         }
         Row(
             Modifier.padding(bottom = 12.dp),
@@ -371,6 +356,23 @@ fun VideosScreen(
                     viewModel.clearSelection()
                 },
                 onDismiss = compression::dismissSeries,
+            )
+        }
+        seriesResult?.let { (done, total) ->
+            AlertDialog(
+                onDismissRequest = compression::dismissSeriesResult,
+                text = {
+                    Text(
+                        when {
+                            done == 0 -> stringResource(R.string.compress_series_result_none)
+                            done < total -> stringResource(R.string.compress_series_result, done, total) + "\n" +
+                                stringResource(R.string.compress_series_result_skipped, total - done)
+                            else -> stringResource(R.string.compress_series_result, done, total) + "\n" +
+                                stringResource(R.string.compress_queued)
+                        },
+                    )
+                },
+                confirmButton = { TextButton(onClick = compression::dismissSeriesResult) { Text(stringResource(R.string.storage_message_ok)) } },
             )
         }
         queued?.let { ok ->
@@ -604,21 +606,18 @@ private fun VideoCard(
             .fillMaxWidth()
             .alpha(if (offline) 0.5f else 1f)
             // Offline-Dateien bleiben sichtbar und lassen sich auswählen/bewerten, aber nicht abspielen.
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick,
-            ),
+            .bounceClick(onLongClick = onLongClick, onClick = onClick),
     ) {
         if (tiles) {
             Column {
-                Thumbnail(video.uuid, viewModel, progress, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+                Thumbnail(video.uuid, viewModel, progress, video.durationMs, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
                 Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     VideoTexts(video, offline, showDetails, compressed, progress)
                 }
             }
         } else {
             Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Thumbnail(video.uuid, viewModel, progress, Modifier.width(128.dp).height(72.dp))
+                Thumbnail(video.uuid, viewModel, progress, video.durationMs, Modifier.width(128.dp).height(72.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     VideoTexts(video, offline, showDetails, compressed, progress)
                 }
@@ -672,7 +671,6 @@ private fun watchProgress(video: MediaFileEntity): Float? {
 
 private fun metaLine(video: MediaFileEntity): String {
     val parts = ArrayList<String>()
-    video.durationMs?.let { parts += formatDuration(it) }
     if (video.width != null && video.height != null) parts += "${video.width}×${video.height}"
     parts += formatSize(video.size)
     video.displayName.substringAfterLast('.', "").takeIf { it.isNotEmpty() && it.length <= 5 }?.let { parts += it.uppercase() }
@@ -694,18 +692,28 @@ private fun formatSize(bytes: Long): String = when {
 }
 
 @Composable
-private fun Thumbnail(uuid: String, viewModel: VideosViewModel, progress: Float?, modifier: Modifier) {
-    val bitmap by produceState<Bitmap?>(initialValue = null, uuid) {
-        value = withContext(Dispatchers.IO) {
-            viewModel.thumbnailOf(uuid)?.let { BitmapFactory.decodeFile(it.path) }
-        }
-    }
+private fun Thumbnail(uuid: String, viewModel: VideosViewModel, progress: Float?, durationMs: Long?, modifier: Modifier) {
+    val file = remember(uuid) { viewModel.thumbnailOf(uuid) }
+    val bitmap = de.hr.mediathek.feature.library.rememberThumbBitmap(file)
     Box(modifier, contentAlignment = Alignment.Center) {
         val b = bitmap
         if (b != null) {
             Image(b.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
-            Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+            Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        // Die Laufzeit steht immer unten links im Eck, unabhängig vom Schalter für die Details.
+        if (durationMs != null && durationMs > 0) {
+            Text(
+                formatDuration(durationMs),
+                style = MaterialTheme.typography.labelSmall,
+                color = androidx.compose.ui.graphics.Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 4.dp, bottom = if (progress != null) 8.dp else 4.dp)
+                    .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.75f), androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 1.dp),
+            )
         }
         if (progress != null) {
             LinearProgressIndicator(

@@ -164,7 +164,7 @@
     <string name="compress_test_showing_compressed">Du siehst die komprimierte Version.</string>
     <string name="compress_series_title">%1$d Videos komprimieren</string>
     <string name="compress_series_info">Videos, bei denen Inhalte verloren gingen (weitere Tonspuren, Untertitel, HDR) oder die schon klein sind, werden übersprungen und als nicht komprimierbar markiert.</string>
-    <string name="compress_series_need_test">Vor einer Serie ist ein Testlauf Pflicht. Er läuft am ersten gewählten Video.</string>
+    <string name="compress_series_need_test">Empfohlen: erst einen Testlauf am ersten gewählten Video machen. Du kannst ihn auch überspringen.</string>
     <string name="compress_series_accept">Die Qualität im Testlauf passt für mich</string>
     <string name="compress_series_start">Alle einreihen</string>
     <string name="compress_only_charging">Nur beim Laden komprimieren</string>
@@ -407,4 +407,30 @@
     <string name="settings_row_errorlog_hint">Zeigt aufgetretene Fehler</string>
     <string name="settings_row_diag">Diagnose</string>
     <string name="settings_row_diag_hint">Prüfungen für Einlesen, Umwandeln und PDF</string>
+
+    <!-- Marken im Filter -->
+    <string name="filter_marks">Markierungen</string>
+    <string name="filter_mark_favorite">♥ Favorit</string>
+    <string name="filter_mark_pee">💧 Tropfen</string>
+    <string name="filter_mark_delete">🗑 Zum Löschen</string>
+    <!-- Auswahlleiste -->
+    <string name="sel_close">Auswahl beenden</string>
+    <string name="sel_favorite">Favorit</string>
+    <string name="sel_pee">Tropfen</string>
+    <string name="sel_delete_mark">Zum Löschen markieren</string>
+    <string name="sel_rate">Bewerten</string>
+    <string name="sel_more">Mehr</string>
+    <string name="sel_count">%1$d ausgewählt</string>
+    <!-- Serie komprimieren -->
+    <string name="compress_series_skip_test">Ohne Testlauf einreihen</string>
+    <string name="compress_series_test_ok">Der Testlauf hat geklappt. Mit „Alle einreihen“ geht es los.</string>
+    <string name="compress_series_result">%1$d von %2$d Videos eingereiht.</string>
+    <string name="compress_series_result_skipped">%1$d übersprungen: dafür läuft oder wartet schon eine Komprimierung.</string>
+    <string name="compress_series_result_none">Es wurde nichts eingereiht. Für diese Videos läuft oder wartet schon eine Komprimierung.</string>
+    <!-- Duplikate -->
+    <string name="dup_play">▶ Abspielen</string>
+    <!-- Diashow -->
+    <string name="slideshow_from_here">▶ Diashow</string>
+    <!-- Geschichten -->
+    <string name="story_recent_sources">Zuletzt verwendet</string>
 </resources>

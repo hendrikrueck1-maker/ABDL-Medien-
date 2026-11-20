@@ -1,5 +1,6 @@
 package de.hr.mediathek.feature.stories
 
+import de.hr.mediathek.core.ui.bounceClick
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -94,7 +95,7 @@ fun StoriesScreen(
             items(list, key = { it.uuid }) { row ->
                 Card(
                     colors = glassCardColors(MaterialTheme.colorScheme.surfaceContainer),
-                    modifier = Modifier.fillMaxWidth().clickable(enabled = !filter.trash) { onOpen(row.uuid) },
+                    modifier = Modifier.fillMaxWidth().bounceClick(enabled = !filter.trash) { onOpen(row.uuid) },
                 ) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(row.title, style = MaterialTheme.typography.titleMedium)

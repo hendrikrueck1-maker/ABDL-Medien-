@@ -1,5 +1,6 @@
 package de.hr.mediathek.feature.home
 
+import de.hr.mediathek.core.ui.bounceClick
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -72,7 +73,7 @@ private fun SuggestionCard(
     }
     Card(
         colors = CardDefaults.cardColors(containerColor = color),
-        modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.large).bounceClick(onClick = onClick),
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black.copy(alpha = 0.25f))) {
             bitmap?.let {
@@ -134,7 +135,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .aspectRatio(1.2f)
                         .clip(MaterialTheme.shapes.large)
-                        .clickable { onOpen(destination) },
+                        .bounceClick { onOpen(destination) },
                 ) {
                     Column(
                         modifier = Modifier.fillMaxSize(),
