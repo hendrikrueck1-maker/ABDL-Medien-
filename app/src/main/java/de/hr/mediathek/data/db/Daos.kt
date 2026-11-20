@@ -832,3 +832,103 @@ interface StoryDao {
     @Query("SELECT COUNT(*) FROM story WHERE deletedAt IS NULL")
     fun observeCount(): Flow<Int>
 }
+
+data class ProductRow(
+    val uuid: String,
+    val title: String,
+    val brandUuid: String?,
+    val sizeLabel: String?,
+    val stars: Int?,
+    val favorite: Boolean,
+    val unitPriceMin: Double?,
+    val unitPriceMax: Double?,
+    val unitPriceOverride: Double?,
+    val createdAt: Long,
+)
+
+@Dao
+interface ProductDao {
+    @Query(
+        "SELECT uuid, title, brandUuid, sizeLabel, stars, favorite, unitPriceMin, unitPriceMax, unitPriceOverride, createdAt " +
+            "FROM product WHERE deletedAt IS NULL",
+    )
+    fun observeActive(): Flow<List<ProductRow>>
+
+    @Query("SELECT * FROM product WHERE deletedAt IS NULL")
+    suspend fun allActive(): List<ProductEntity>
+
+    @Query("SELECT * FROM product WHERE uuid = :uuid")
+    suspend fun get(uuid: String): ProductEntity?
+
+    @Query("SELECT * FROM product WHERE uuid = :uuid")
+    fun observe(uuid: String): Flow<ProductEntity?>
+
+    @Insert
+    suspend fun insert(product: ProductEntity): Long
+
+    @Update
+    suspend fun update(product: ProductEntity)
+
+    @Query("UPDATE product SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun softDelete(uuid: String, now: Long)
+
+    @Query("SELECT uuid FROM product WHERE deletedAt IS NULL AND lower(title) = lower(:title) LIMIT 1")
+    suspend fun uuidByTitle(title: String): String?
+
+    @Query("SELECT * FROM product_criterion_value WHERE productUuid = :uuid AND deletedAt IS NULL")
+    suspend fun values(uuid: String): List<ProductCriterionValueEntity>
+
+    @Insert
+    suspend fun insertValue(value: ProductCriterionValueEntity): Long
+
+    @Update
+    suspend fun updateValue(value: ProductCriterionValueEntity)
+
+    @Query("SELECT * FROM product_photo WHERE productUuid = :uuid AND deletedAt IS NULL ORDER BY kind, rowIndex, sortOrder")
+    fun observePhotos(uuid: String): Flow<List<ProductPhotoEntity>>
+
+    @Query("SELECT * FROM product_photo WHERE productUuid = :uuid AND deletedAt IS NULL ORDER BY kind, rowIndex, sortOrder")
+    suspend fun photos(uuid: String): List<ProductPhotoEntity>
+
+    @Query("SELECT * FROM product_photo WHERE deletedAt IS NULL AND kind = 'PACKAGE' ORDER BY sortOrder")
+    suspend fun allPackagePhotos(): List<ProductPhotoEntity>
+
+    @Insert
+    suspend fun insertPhoto(photo: ProductPhotoEntity): Long
+
+    @Query("UPDATE product_photo SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun softDeletePhoto(uuid: String, now: Long)
+
+    @Query("SELECT * FROM product_photo WHERE uuid = :uuid")
+    suspend fun photo(uuid: String): ProductPhotoEntity?
+}
+
+@Dao
+interface CriterionDao {
+    @Query("SELECT * FROM criterion_catalog ORDER BY sortOrder")
+    suspend fun all(): List<CriterionCatalogEntity>
+
+    @Query("SELECT COUNT(*) FROM criterion_catalog")
+    suspend fun count(): Int
+
+    @Insert
+    suspend fun insertAll(items: List<CriterionCatalogEntity>)
+}
+
+@Dao
+interface BrandDao {
+    @Query("SELECT * FROM brand WHERE deletedAt IS NULL ORDER BY name COLLATE NOCASE")
+    fun observeAll(): Flow<List<BrandEntity>>
+
+    @Query("SELECT * FROM brand WHERE deletedAt IS NULL ORDER BY name COLLATE NOCASE")
+    suspend fun all(): List<BrandEntity>
+
+    @Query("SELECT COUNT(*) FROM brand")
+    suspend fun count(): Int
+
+    @Insert
+    suspend fun insert(brand: BrandEntity): Long
+
+    @Update
+    suspend fun update(brand: BrandEntity)
+}

@@ -156,6 +156,18 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         composable("story-edit/{uuid}", arguments = listOf(navArgument("uuid") { type = NavType.StringType })) {
             de.hr.mediathek.feature.stories.StoryEditorScreen(onBack = { navController.popBackStack() })
         }
+        composable(Destination.Products.route) {
+            de.hr.mediathek.feature.products.ProductsScreen(
+                onOpen = { navController.navigate("product/$it") },
+                onImport = { navController.navigate("product-import") },
+            )
+        }
+        composable("product-import") {
+            de.hr.mediathek.feature.products.ProductImportScreen(onBack = { navController.popBackStack() })
+        }
+        composable("product/{uuid}", arguments = listOf(navArgument("uuid") { type = NavType.StringType })) {
+            de.hr.mediathek.feature.products.ProductDetailScreen(onBack = { navController.popBackStack() })
+        }
         composable("trash") { TrashScreen(onBack = { navController.popBackStack() }) }
         composable("duplicates") { DuplicatesScreen(onBack = { navController.popBackStack() }) }
         composable(
@@ -181,7 +193,7 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         Destination.entries
             .filter {
                 it != Destination.Home && it != Destination.Settings && it != Destination.Videos &&
-                    it != Destination.Images && it != Destination.Stories
+                    it != Destination.Images && it != Destination.Stories && it != Destination.Products
             }
             .forEach { destination ->
                 composable(destination.route) {
