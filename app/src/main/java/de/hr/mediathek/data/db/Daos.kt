@@ -932,3 +932,21 @@ interface BrandDao {
     @Update
     suspend fun update(brand: BrandEntity)
 }
+
+@Dao
+interface TrackerDao {
+    @Query("SELECT * FROM tracker_entry WHERE deletedAt IS NULL ORDER BY instant DESC")
+    fun observeAll(): Flow<List<TrackerEntryEntity>>
+
+    @Query("SELECT * FROM tracker_entry WHERE uuid = :uuid")
+    suspend fun get(uuid: String): TrackerEntryEntity?
+
+    @Insert
+    suspend fun insert(entry: TrackerEntryEntity): Long
+
+    @Update
+    suspend fun update(entry: TrackerEntryEntity)
+
+    @Query("UPDATE tracker_entry SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun softDelete(uuid: String, now: Long)
+}

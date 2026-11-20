@@ -168,6 +168,18 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         composable("product/{uuid}", arguments = listOf(navArgument("uuid") { type = NavType.StringType })) {
             de.hr.mediathek.feature.products.ProductDetailScreen(onBack = { navController.popBackStack() })
         }
+        composable(Destination.Tracker.route) {
+            de.hr.mediathek.feature.tracker.TrackerScreen(
+                onOpenProduct = { navController.navigate("product/$it") },
+                onStats = { navController.navigate("tracker-stats") },
+            )
+        }
+        composable("tracker-stats") {
+            de.hr.mediathek.feature.tracker.TrackerStatsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenProduct = { navController.navigate("product/$it") },
+            )
+        }
         composable("trash") { TrashScreen(onBack = { navController.popBackStack() }) }
         composable("duplicates") { DuplicatesScreen(onBack = { navController.popBackStack() }) }
         composable(
@@ -193,7 +205,7 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         Destination.entries
             .filter {
                 it != Destination.Home && it != Destination.Settings && it != Destination.Videos &&
-                    it != Destination.Images && it != Destination.Stories && it != Destination.Products
+                    it != Destination.Images && it != Destination.Stories && it != Destination.Products && it != Destination.Tracker
             }
             .forEach { destination ->
                 composable(destination.route) {

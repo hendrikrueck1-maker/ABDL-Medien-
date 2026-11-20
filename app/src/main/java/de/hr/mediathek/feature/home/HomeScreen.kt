@@ -42,6 +42,7 @@ private val moduleTiles = listOf(
     Destination.Images,
     Destination.Videos,
     Destination.Products,
+    Destination.Tracker,
 )
 
 @Composable
@@ -160,6 +161,9 @@ fun HomeScreen(
                         )
                     }
                 }
+            }
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                de.hr.mediathek.feature.tracker.QuickAddRow(onOpenTracker = { onOpen(Destination.Tracker) })
             }
             if (suggestions.isNotEmpty()) {
                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
