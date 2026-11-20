@@ -5,6 +5,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import de.hr.mediathek.core.ui.AccentButton
+import de.hr.mediathek.core.ui.AppCard
+import de.hr.mediathek.core.ui.OutlineAccentButton
+import de.hr.mediathek.core.ui.theme.LocalAppColors
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -50,10 +54,12 @@ fun ProductsScreen(
     val pdfPicker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { if (it != null) viewModel.exportPdf(it) }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Produkte", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = onImport) { Text("Import") }
-            Button(onClick = { scope.launch { onOpen(viewModel.createEmpty()) } }) { Text("Neu") }
+        AppCard(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Produkte", style = MaterialTheme.typography.headlineMedium, color = LocalAppColors.current.onCard, modifier = Modifier.weight(1f))
+                OutlineAccentButton(onClick = onImport, color = LocalAppColors.current.gold) { Text("Import") }
+                AccentButton(onClick = { scope.launch { onOpen(viewModel.createEmpty()) } }, color = LocalAppColors.current.gold) { Text("Neu") }
+            }
         }
         OutlinedTextField(
             value = filter.query, onValueChange = { q -> viewModel.update { it.copy(query = q) } },
@@ -92,11 +98,11 @@ fun ProductsScreen(
                                 listOfNotNull(item.brandName, item.unitPrice?.let { "%.2f € pro Stück".format(java.util.Locale.GERMANY, it) }).joinToString(" · "),
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Text(starsText(item.row.stars), color = MaterialTheme.colorScheme.primary)
+                            Text(starsText(item.row.stars), color = LocalAppColors.current.gold)
                         }
                         Text(
                             if (item.row.favorite) "★" else "☆", style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = LocalAppColors.current.gold,
                             modifier = Modifier.clickable { viewModel.toggleFavorite(item) }.padding(12.dp),
                         )
                     }

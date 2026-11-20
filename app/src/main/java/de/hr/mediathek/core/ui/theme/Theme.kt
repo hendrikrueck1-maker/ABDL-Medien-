@@ -32,7 +32,7 @@ private val NightScheme = AppColors().let { c ->
         surface = c.card, onSurface = c.onCard,
         surfaceVariant = c.cardInset, onSurfaceVariant = c.onCardVariant,
         surfaceTint = c.rosa,
-        inverseSurface = c.onCard, inverseOnSurface = c.onAccent, inversePrimary = c.rosa,
+        inverseSurface = c.onCard, inverseOnSurface = c.onAccent, inversePrimary = Color(0xFF4B2FA0),
         surfaceContainerLowest = c.bgFullscreen, surfaceContainerLow = c.bar, surfaceContainer = c.card,
         surfaceContainerHigh = c.bar, surfaceContainerHighest = c.cardInset,
         outline = Color(0xFF9A90BE), outlineVariant = c.cardInset,
@@ -75,7 +75,7 @@ private val PlayfulShapes = Shapes(
     small = RoundedCornerShape(20.dp),
     medium = RoundedCornerShape(28.dp),
     large = RoundedCornerShape(30.dp),
-    extraLarge = RoundedCornerShape(32.dp),
+    extraLarge = RoundedCornerShape(30.dp),
 )
 
 /** Zusatzfarben für die Kacheln der Bereiche (Flieder und Pfirsich neben Rosé, Blau, Mint). */

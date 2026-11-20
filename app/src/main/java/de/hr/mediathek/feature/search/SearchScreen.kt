@@ -2,6 +2,10 @@ package de.hr.mediathek.feature.search
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import de.hr.mediathek.core.ui.AppCard
+import de.hr.mediathek.core.ui.theme.LocalAppColors
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
@@ -25,24 +29,37 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 private val KINDS = listOf("VIDEO" to "Videos", "IMAGE" to "Bilder", "STORY" to "Geschichten", "PRODUCT" to "Produkte")
 
+@androidx.compose.runtime.Composable
+private fun kindColor(kind: String): androidx.compose.ui.graphics.Color {
+    val c = LocalAppColors.current
+    return when (kind) {
+        "VIDEO" -> c.mint
+        "IMAGE" -> c.hellblau
+        "STORY" -> c.rosa
+        else -> c.gold
+    }
+}
+
 private fun kindLabel(kind: String) = KINDS.firstOrNull { it.first == kind }?.second ?: kind
 
 @Composable
 fun SearchScreen(onOpen: (kind: String, uuid: String) -> Unit, viewModel: SearchViewModel = hiltViewModel()) {
     val s by viewModel.state.collectAsStateWithLifecycle()
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Suche", style = MaterialTheme.typography.headlineMedium)
-        OutlinedTextField(
-            value = s.query,
-            onValueChange = viewModel::setQuery,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text("Suchbegriffe, \"Phrase\", -ausschließen") },
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-            FilterChip(selected = s.kinds.isEmpty(), onClick = viewModel::clearKinds, label = { Text("Alle") })
-            for ((kind, label) in KINDS) {
-                FilterChip(selected = kind in s.kinds, onClick = { viewModel.toggleKind(kind) }, label = { Text(label) })
+        AppCard(Modifier.fillMaxWidth()) {
+            Text("Suche", style = MaterialTheme.typography.headlineMedium, color = LocalAppColors.current.onCard)
+            OutlinedTextField(
+                value = s.query,
+                onValueChange = viewModel::setQuery,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Suchbegriffe, \"Phrase\", -ausschließen") },
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                FilterChip(selected = s.kinds.isEmpty(), onClick = viewModel::clearKinds, label = { Text("Alle") })
+                for ((kind, label) in KINDS) {
+                    FilterChip(selected = kind in s.kinds, onClick = { viewModel.toggleKind(kind) }, label = { Text(label) })
+                }
             }
         }
         if (s.indexing) {
@@ -64,15 +81,17 @@ fun SearchScreen(onOpen: (kind: String, uuid: String) -> Unit, viewModel: Search
         } else if (s.searched && s.results.isEmpty()) {
             Text("Keine Treffer.", style = MaterialTheme.typography.bodyMedium)
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(s.results, key = { it.kind + it.uuid }) { hit ->
                     Column(
                         Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                            .background(LocalAppColors.current.card)
                             .clickable { viewModel.remember(); onOpen(hit.kind, hit.uuid) }
-                            .padding(vertical = 8.dp),
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
                     ) {
                         Text(hit.title, style = MaterialTheme.typography.titleSmall, maxLines = 2)
-                        Text(kindLabel(hit.kind), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                        Text(kindLabel(hit.kind), style = MaterialTheme.typography.labelMedium, color = kindColor(hit.kind))
                         if (hit.kind == "STORY" || hit.kind == "PRODUCT") {
                             Text(hit.snippet, style = MaterialTheme.typography.bodySmall, maxLines = 2)
                         }
