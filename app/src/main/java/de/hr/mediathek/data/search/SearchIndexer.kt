@@ -74,7 +74,7 @@ class SearchIndexer @Inject constructor(
         args += parsed.match
         if (kinds.isNotEmpty()) {
             sb.append(" AND kind IN (").append(kinds.joinToString(",") { "?" }).append(')')
-            args += kinds
+            args.addAll(kinds)
         }
         for (ex in parsed.excluded) {
             sb.append(" AND uuid NOT IN (SELECT uuid FROM search_index WHERE search_index MATCH ?)")
