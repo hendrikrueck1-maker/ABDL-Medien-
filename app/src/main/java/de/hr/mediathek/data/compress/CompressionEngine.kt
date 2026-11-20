@@ -43,6 +43,7 @@ class CompressionEngine @Inject constructor(
         videoBitrate: Int,
         clipStartMs: Long = 0,
         clipLengthMs: Long = 0,
+        videoMime: String = MimeTypes.VIDEO_H265,
         onProgress: suspend (Float) -> Unit,
     ) {
         output.parentFile?.mkdirs()
@@ -54,7 +55,7 @@ class CompressionEngine @Inject constructor(
                 .setEnableFallback(false)
                 .build()
             val transformer = Transformer.Builder(context)
-                .setVideoMimeType(MimeTypes.VIDEO_H265)
+                .setVideoMimeType(videoMime)
                 .setEncoderFactory(encoderFactory)
                 .addListener(object : Transformer.Listener {
                     override fun onCompleted(composition: Composition, exportResult: ExportResult) {
@@ -79,14 +80,24 @@ class CompressionEngine @Inject constructor(
             transformer.start(EditedMediaItem.Builder(item).build(), output.absolutePath)
             val poller = launch {
                 val holder = ProgressHolder()
+                var lastValue = -1
+                var lastChange = System.currentTimeMillis()
                 while (isActive) {
                     if (transformer.getProgress(holder) == Transformer.PROGRESS_STATE_AVAILABLE) {
+                        if (holder.progress != lastValue) {
+                            lastValue = holder.progress
+                            lastChange = System.currentTimeMillis()
+                        }
                         try {
                             onProgress(holder.progress / 100f)
                         } catch (e: CancellationException) {
                             done.completeExceptionally(e)
                             return@launch
                         }
+                    }
+                    if (System.currentTimeMillis() - lastChange > STALL_TIMEOUT_MS) {
+                        done.completeExceptionally(IllegalStateException("Kodierung hängt (kein Fortschritt seit 15 Minuten)"))
+                        return@launch
                     }
                     delay(1000)
                 }
@@ -102,6 +113,8 @@ class CompressionEngine @Inject constructor(
         }
     }
 }
+
+private const val STALL_TIMEOUT_MS = 15L * 60 * 1000
 
 /** Kurze, inhaltsfreie Fehlerursache; bei Media3-Fehlern mit dem Fehlercode (z. B. ENCODER_INIT_FAILED). */
 @androidx.annotation.OptIn(UnstableApi::class)

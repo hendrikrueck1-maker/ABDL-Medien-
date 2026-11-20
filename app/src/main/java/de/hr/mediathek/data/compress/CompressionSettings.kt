@@ -18,8 +18,8 @@ class CompressionSettings @Inject constructor(
 ) {
     fun observePaused(): Flow<Boolean> = settings.observe(KEY_PAUSED).map { it == "1" }
 
-    /** Standard: nur beim Laden. */
-    fun observeOnlyCharging(): Flow<Boolean> = settings.observe(KEY_ONLY_CHARGING).map { it != "0" }
+    /** Standard: auch im Akkubetrieb (nur bei Einstellung \"1\" nur am Ladegerät). */
+    fun observeOnlyCharging(): Flow<Boolean> = settings.observe(KEY_ONLY_CHARGING).map { it == "1" }
 
     /** Standard: Originale bleiben im Ordner _alt und lassen sich weiter abspielen, bis du sie löschst. */
     fun observeKeepOriginals(): Flow<Boolean> = settings.observe(KEY_KEEP_ORIGINALS).map { it != "0" }
@@ -34,12 +34,12 @@ class CompressionSettings @Inject constructor(
 
     suspend fun mayRunNow(): Boolean {
         val paused = settings.get(KEY_PAUSED) == "1"
-        val onlyCharging = settings.get(KEY_ONLY_CHARGING) != "0"
+        val onlyCharging = settings.get(KEY_ONLY_CHARGING) == "1"
         val charging = context.getSystemService(BatteryManager::class.java)?.isCharging == true
         return CompressionRunPolicy.mayRun(paused, onlyCharging, charging)
     }
 
-    suspend fun onlyCharging(): Boolean = settings.get(KEY_ONLY_CHARGING) != "0"
+    suspend fun onlyCharging(): Boolean = settings.get(KEY_ONLY_CHARGING) == "1"
 
     private companion object {
         const val KEY_PAUSED = "compress_paused"

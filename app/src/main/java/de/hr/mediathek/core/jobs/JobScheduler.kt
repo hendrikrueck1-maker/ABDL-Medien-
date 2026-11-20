@@ -104,11 +104,26 @@ class JobScheduler @Inject constructor(
     /** Startet die Warteschlange; mit der Bedingung "nur beim Laden" wartet WorkManager auf das Ladegerät. */
     suspend fun triggerCompress() {
         val builder = OneTimeWorkRequestBuilder<JobWorker>()
+            .setInputData(androidx.work.workDataOf(JobWorker.KEY_COMPRESS to true))
         if (compressionSettings.onlyCharging()) {
             builder.setConstraints(androidx.work.Constraints.Builder().setRequiresCharging(true).build())
+        } else {
+            // Beschleunigt: darf auch aus dem Hintergrund als Vordergrunddienst starten; sonst normaler Auftrag.
+            builder.setExpedited(androidx.work.OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
         }
         WorkManager.getInstance(context)
             .enqueueUniqueWork(WORK_NAME_COMPRESS, ExistingWorkPolicy.APPEND_OR_REPLACE, builder.build())
+    }
+
+    /** "Jetzt starten": hebt Pause auf und startet ohne Ladegerät-Bedingung, falls nicht schon ein Lauf aktiv ist. */
+    suspend fun startCompressNow() {
+        compressionSettings.setPaused(false)
+        if (runner.isCompressing()) return
+        val request = OneTimeWorkRequestBuilder<JobWorker>()
+            .setInputData(androidx.work.workDataOf(JobWorker.KEY_COMPRESS to true))
+            .setExpedited(androidx.work.OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(WORK_NAME_COMPRESS, ExistingWorkPolicy.REPLACE, request)
     }
 
     /** Pausiert oder setzt die Komprimierung fort. Ein laufender Job wird beendet, wenn er fertig ist. */
@@ -191,6 +206,7 @@ class JobScheduler @Inject constructor(
         }
         jobDao.deleteFinishedBefore(System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000)
         if (runner.hasWork()) trigger()
+        if (runner.hasCompressWork()) triggerCompress()
         // Verpasste Backups (Karte war nicht da, App war zu) werden spätestens hier nachgeholt.
         enqueueBackupIfDue()
     }

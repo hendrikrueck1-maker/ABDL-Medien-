@@ -113,7 +113,8 @@ class CompressionJobExecutor @Inject constructor(
         workDir.mkdirs()
         if (workDir.usableSpace < estimate * 12 / 10) return JobOutcome.Failed("Zu wenig freier Speicher im Gerät")
         source.volumeUuid?.let { File("/storage/$it") }?.takeIf { it.exists() }?.let {
-            if (it.usableSpace < estimate * 11 / 10) return JobOutcome.Failed("Zu wenig Platz auf der Speicherkarte")
+            // usableSpace = 0 heißt oft nur "nicht lesbar": dann nicht abbrechen, das Kopieren meldet echten Platzmangel.
+            if (it.usableSpace in 1 until estimate * 11 / 10) return JobOutcome.Failed("Zu wenig Platz auf der Speicherkarte")
         }
 
         val parentRel = media.relativePath.substringBeforeLast('/', "")
@@ -139,11 +140,25 @@ class CompressionJobExecutor @Inject constructor(
             // gibt es einen zweiten Versuch mit niedrigerer Rate, bevor das Video als nicht komprimierbar gilt.
             var attemptTarget = target
             var failure: VerifyFailure? = null
-            for (attempt in 0..1) {
+            var mime = androidx.media3.common.MimeTypes.VIDEO_H265
+            var attempt = 0
+            while (attempt <= 1) {
                 ctx.report(if (attempt == 0) "Komprimiere" else "Komprimiere (zweiter Versuch)", 0f, force = true)
-                engine.encode(srcUri, local, attemptTarget.toInt()) { fraction ->
-                    ctx.checkpoint()
-                    ctx.report(if (attempt == 0) "Komprimiere" else "Komprimiere (zweiter Versuch)", fraction * ENCODE_SHARE)
+                try {
+                    engine.encode(srcUri, local, attemptTarget.toInt(), videoMime = mime) { fraction ->
+                        ctx.checkpoint()
+                        ctx.report(if (attempt == 0) "Komprimiere" else "Komprimiere (zweiter Versuch)", fraction * ENCODE_SHARE)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // H.265-Encoder fehlt oder bricht ab: einmal mit H.264 versuchen.
+                    if (mime != androidx.media3.common.MimeTypes.VIDEO_H264) {
+                        errorLogger.logNow(ErrorType.COMPRESSION, "H.265 fehlgeschlagen, versuche H.264: ${describeFailure(e)}")
+                        mime = androidx.media3.common.MimeTypes.VIDEO_H264
+                        continue
+                    }
+                    throw e
                 }
 
                 ctx.report("Prüfe Ergebnis", ENCODE_SHARE, force = true)
@@ -153,6 +168,7 @@ class CompressionJobExecutor @Inject constructor(
                 val lower = attemptTarget * RETRY_FACTOR_PERCENT / 100
                 if (failure == VerifyFailure.NOT_SMALLER && attempt == 0 && lower >= CompressionPolicy.MIN_TARGET_BPS) {
                     attemptTarget = lower
+                    attempt++
                     continue
                 }
                 break

@@ -428,6 +428,13 @@ interface JobDao {
     )
     suspend fun nextQueued(allowCompress: Boolean): JobEntity?
 
+    /** Nächster Job ohne Komprimierung (eigene Spur, damit lange Bild-Jobs die Komprimierung nie blockieren). */
+    @Query("SELECT * FROM job WHERE status = 'QUEUED' AND type != 'COMPRESS' ORDER BY priority DESC, createdAt ASC LIMIT 1")
+    suspend fun nextGeneral(): JobEntity?
+
+    @Query("SELECT * FROM job WHERE status = 'QUEUED' AND type = 'COMPRESS' ORDER BY priority DESC, createdAt ASC LIMIT 1")
+    suspend fun nextCompress(): JobEntity?
+
     @Query("SELECT * FROM job WHERE type = 'COMPRESS' AND status IN ('QUEUED', 'RUNNING') ORDER BY priority DESC, createdAt ASC")
     fun observeCompressQueue(): Flow<List<JobEntity>>
 

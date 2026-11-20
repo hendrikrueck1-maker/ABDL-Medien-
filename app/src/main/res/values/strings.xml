@@ -142,6 +142,10 @@
     <string name="compress_queued">Komprimierung eingereiht. Den Fortschritt siehst du in der Benachrichtigung und unter „Speicher“.</string>
     <string name="compress_exists">Für dieses Video läuft oder wartet schon eine Komprimierung.</string>
     <string name="compress_card_title">Komprimierung</string>
+    <string name="compress_start_now">Jetzt starten</string>
+    <string name="compress_why_paused">Die Warteschlange ist pausiert.</string>
+    <string name="compress_why_charging">Wartet auf das Ladegerät. „Jetzt starten“ ignoriert das.</string>
+    <string name="compress_why_starting">Startet gleich. Falls nichts passiert, „Jetzt starten“ drücken.</string>
     <string name="compress_waiting">Wartet</string>
     <string name="compress_last_job">Zuletzt: %1$s</string>
     <string name="compress_grace">Aufbewahrte Originale: %1$d (%2$s belegt)</string>

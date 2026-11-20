@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
@@ -102,6 +103,21 @@ fun CompressionCard(viewModel: CompressionViewModel = hiltViewModel()) {
                         }
                         TextButton(onClick = { viewModel.cancel(item.jobUuid) }) { Text(stringResource(R.string.diag_cancel)) }
                     }
+                }
+                val nothingRunning = queue.none { it.running }
+                if (nothingRunning) {
+                    Text(
+                        stringResource(
+                            when {
+                                paused -> R.string.compress_why_paused
+                                onlyCharging -> R.string.compress_why_charging
+                                else -> R.string.compress_why_starting
+                            },
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = onColor,
+                    )
+                    Button(onClick = viewModel::startNow) { Text(stringResource(R.string.compress_start_now)) }
                 }
                 OutlinedButton(onClick = { viewModel.setPaused(!paused) }) {
                     Text(stringResource(if (paused) R.string.compress_resume else R.string.compress_pause))

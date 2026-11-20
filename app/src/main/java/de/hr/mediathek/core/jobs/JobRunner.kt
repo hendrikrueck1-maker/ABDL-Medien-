@@ -43,19 +43,36 @@ class JobRunner @Inject constructor(
     private val errorLogger: ErrorLogger,
 ) {
     private val runLock = Mutex()
+    private val compressLock = Mutex()
     @Volatile private var cancelRequestedFor: String? = null
 
-    suspend fun hasWork(): Boolean = jobDao.nextQueued(compressionSettings.mayRunNow()) != null
+    suspend fun hasWork(): Boolean = jobDao.nextGeneral() != null
+
+    suspend fun hasCompressWork(): Boolean = jobDao.nextCompress() != null
+
+    /** Läuft gerade ein Komprimierungslauf in diesem Prozess? */
+    fun isCompressing(): Boolean = compressLock.isLocked
 
     /** Bittet den laufenden Job mit dieser UUID, an der nächsten Stelle abzubrechen. */
     fun requestCancel(jobUuid: String) {
         cancelRequestedFor = jobUuid
     }
 
+    /** Allgemeine Spur: alles außer Komprimierung. */
     suspend fun runAll(onProgress: (text: String, progress: Float?) -> Unit) {
         runLock.withLock {
             while (true) {
-                val job = jobDao.nextQueued(compressionSettings.mayRunNow()) ?: break
+                val job = jobDao.nextGeneral() ?: break
+                runOne(job, onProgress)
+            }
+        }
+    }
+
+    /** Komprimierungs-Spur: eigene Sperre, läuft unabhängig von Einlesen, Vorschaubildern und Hashes. */
+    suspend fun runCompress(onProgress: (text: String, progress: Float?) -> Unit) {
+        compressLock.withLock {
+            while (compressionSettings.mayRunNow()) {
+                val job = jobDao.nextCompress() ?: break
                 runOne(job, onProgress)
             }
         }
@@ -91,7 +108,8 @@ class JobRunner @Inject constructor(
             // Das System hat den Worker gestoppt: Job bleibt eingereiht und wird später fortgesetzt.
             withContext(NonCancellable) { jobDao.setStatus(job.uuid, JobStatus.QUEUED, null) }
             throw e
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Auch Fehler wie OutOfMemoryError: der Job darf nie auf RUNNING hängen bleiben.
             errorLogger.logNow(errorTypeFor(job.type), "Job ${job.type} fehlgeschlagen: $e")
             JobOutcome.Failed(e.message ?: e.toString())
         }

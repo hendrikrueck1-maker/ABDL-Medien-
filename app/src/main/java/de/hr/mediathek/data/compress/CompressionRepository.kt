@@ -117,7 +117,7 @@ class CompressionRepository @Inject constructor(
             clearTest()
             testFile.parentFile?.mkdirs()
             try {
-                engine.encode(docUri, testFile, target.toInt(), start, length, onProgress)
+                engine.encode(docUri, testFile, target.toInt(), start, length, onProgress = onProgress)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

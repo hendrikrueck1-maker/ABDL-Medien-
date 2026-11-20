@@ -68,7 +68,7 @@ class CompressionViewModel @Inject constructor(
     val paused: StateFlow<Boolean> = settings.observePaused()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val onlyCharging: StateFlow<Boolean> = settings.observeOnlyCharging()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val keepOriginals: StateFlow<Boolean> = settings.observeKeepOriginals()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
@@ -92,6 +92,10 @@ class CompressionViewModel @Inject constructor(
 
     fun setPaused(value: Boolean) {
         viewModelScope.launch { scheduler.setCompressPaused(value) }
+    }
+
+    fun startNow() {
+        viewModelScope.launch { scheduler.startCompressNow() }
     }
 
     fun setOnlyCharging(value: Boolean) {
