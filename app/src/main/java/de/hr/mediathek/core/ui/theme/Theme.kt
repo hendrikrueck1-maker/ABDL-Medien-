@@ -6,11 +6,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.material3.Typography
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 
@@ -55,18 +51,18 @@ private val DarkColors = darkColorScheme(
     onTertiary = Color(0xFF0B3A27),
     tertiaryContainer = Color(0xFF217553),
     onTertiaryContainer = Color(0xFFCFF3E0),
-    background = Color(0xFF1E1A24),
-    onBackground = Color(0xFFEDE3EC),
-    surface = Color(0xFF1E1A24),
-    onSurface = Color(0xFFEDE3EC),
-    surfaceVariant = Color(0xFF3D3446),
-    onSurfaceVariant = Color(0xFFD0C2CE),
-    surfaceContainerLowest = Color(0xFF181420),
-    surfaceContainerLow = Color(0xFF252030),
-    surfaceContainer = Color(0xFF2B2536),
-    surfaceContainerHigh = Color(0xFF352E41),
-    surfaceContainerHighest = Color(0xFF40384D),
-    outline = Color(0xFF9A8C9A),
+    background = Color(0xFF152122),
+    onBackground = Color(0xFFE9F5F3),
+    surface = Color(0xFF152122),
+    onSurface = Color(0xFFE9F5F3),
+    surfaceVariant = Color(0xFF2A3B3C),
+    onSurfaceVariant = Color(0xFFBFD6D4),
+    surfaceContainerLowest = Color(0xFF0F1A1B),
+    surfaceContainerLow = Color(0xFF1C2A2B),
+    surfaceContainer = Color(0xFF223234),
+    surfaceContainerHigh = Color(0xFF2B3D3F),
+    surfaceContainerHighest = Color(0xFF344749),
+    outline = Color(0xFF8FA9AB),
 )
 
 private val PlayfulShapes = Shapes(
@@ -95,22 +91,8 @@ fun MediathekTheme(
     val scheme = if (darkTheme) DarkColors else LightColors
     MaterialTheme(
         colorScheme = scheme,
-        typography = haloTypography(scheme.surface),
         shapes = PlayfulShapes,
         content = content,
     )
 }
 
-/** Jede Schrift bekommt einen weichen Heiligenschein in der Flächenfarbe: bleibt auch auf unruhigem Bild lesbar. */
-private fun haloTypography(halo: Color): Typography {
-    val shadow = Shadow(color = halo.copy(alpha = 0.9f), offset = Offset.Zero, blurRadius = 8f)
-    fun TextStyle.h() = copy(shadow = shadow)
-    val t = Typography()
-    return t.copy(
-        displayLarge = t.displayLarge.h(), displayMedium = t.displayMedium.h(), displaySmall = t.displaySmall.h(),
-        headlineLarge = t.headlineLarge.h(), headlineMedium = t.headlineMedium.h(), headlineSmall = t.headlineSmall.h(),
-        titleLarge = t.titleLarge.h(), titleMedium = t.titleMedium.h(), titleSmall = t.titleSmall.h(),
-        bodyLarge = t.bodyLarge.h(), bodyMedium = t.bodyMedium.h(), bodySmall = t.bodySmall.h(),
-        labelLarge = t.labelLarge.h(), labelMedium = t.labelMedium.h(), labelSmall = t.labelSmall.h(),
-    )
-}

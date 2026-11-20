@@ -101,16 +101,20 @@ fun AppBackground(content: @Composable () -> Unit) {
     val level by viewModel.level.collectAsStateWithLifecycle()
     val auto by viewModel.auto.collectAsStateWithLifecycle()
     val stats by viewModel.stats.collectAsStateWithLifecycle()
-    val dark = isSystemInDarkTheme()
-    val cfg = remember(level, auto, stats, dark) { Readability.compute(level, auto, stats, dark) }
+    val systemDark = isSystemInDarkTheme()
+    val dark = if (auto) Readability.useDark(stats, systemDark) else systemDark
+    val cfg = remember(level, auto, stats) { Readability.compute(level, auto, stats) }
+    val busy = if (auto) ((stats?.contrast ?: 0f) / 0.30f).coerceIn(0f, 1f) else 0f
+    de.hr.mediathek.core.ui.theme.MediathekTheme(darkTheme = dark) {
     CompositionLocalProvider(LocalReadability provides cfg) {
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         image?.let {
-            Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(6.dp))
+            Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur((6f + 12f * busy).dp))
             Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = cfg.veilAlpha)))
         }
         content()
     }
+}
 }
 }
 

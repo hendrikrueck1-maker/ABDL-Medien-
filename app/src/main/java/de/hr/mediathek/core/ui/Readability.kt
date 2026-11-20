@@ -23,19 +23,23 @@ val LocalReadability = compositionLocalOf { ReadabilityConfig(0.80f, 0.45f, 0.25
 object Readability {
     const val DEFAULT_LEVEL = 0.5f
 
+    /** Dunkles Bild bekommt das dunkle Design (helle Schrift), helles Bild das helle Design (dunkle Schrift). */
+    fun useDark(stats: ImageStats?, systemDark: Boolean): Boolean = if (stats == null) systemDark else stats.luminance < 0.5f
+
     /**
-     * Berechnet die Deckkraft aus dem Regler (level 0..1) und, wenn auto, aus dem Bild:
-     * helle Bilder im hellen Design und dunkle im dunklen Design sowie unruhige Bilder bekommen mehr Schutz.
+     * Berechnet die Deckkraft aus dem Regler (level 0..1) und, wenn auto, aus dem Bild.
+     * Weil das Design zur Bildhelligkeit passt, brauchen nur Bilder mit mittlerer Helligkeit
+     * (Schrift hat dort wenig Abstand) und unruhige Bilder zusätzlichen Schutz.
      */
-    fun compute(level: Float, auto: Boolean, stats: ImageStats?, dark: Boolean): ReadabilityConfig {
+    fun compute(level: Float, auto: Boolean, stats: ImageStats?): ReadabilityConfig {
         val l = level.coerceIn(0f, 1f)
         var card = 0.55f + 0.40f * l
         var panel = 0.20f + 0.50f * l
         var veil = 0.08f + 0.35f * l
         if (auto && stats != null) {
             val busy = (stats.contrast / 0.30f).coerceIn(0f, 1f)
-            val risk = (if (dark) stats.luminance else 1f - stats.luminance).coerceIn(0f, 1f)
-            val boost = 0.15f * busy + 0.25f * risk
+            val mid = (1f - kotlin.math.abs(stats.luminance - 0.5f) * 2f).coerceIn(0f, 1f)
+            val boost = 0.15f * busy + 0.20f * mid
             panel += boost
             veil += boost * 0.8f
             card += boost * 0.4f

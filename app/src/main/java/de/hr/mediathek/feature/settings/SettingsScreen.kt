@@ -228,7 +228,7 @@ private fun ReadabilityCard(vm: ReadabilityViewModel = hiltViewModel()) {
             Slider(value = level, onValueChange = vm::setLevel, valueRange = 0f..1f)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Switch(checked = auto, onCheckedChange = vm::setAuto)
-                Text("Automatisch je nach Bild (helle oder unruhige Bilder bekommen mehr Schutz)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                Text("Automatisch je nach Bild (dunkles Bild: helle Schrift auf dunklem Glas, helles Bild: dunkle Schrift)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             }
         }
     }
