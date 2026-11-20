@@ -7,7 +7,19 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.semantics.Role
+import de.hr.mediathek.core.ui.theme.LocalAppColors
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Row
@@ -97,8 +109,8 @@ private fun isFullScreenRoute(route: String?): Boolean =
     route != null && (route.startsWith("player/") || route.startsWith("image/{") || route.startsWith("slideshow"))
 
 /**
- * Sehr durchsichtiger Milchglas-Schleier (das Hintergrundbild bleibt gut sichtbar) hinter jedem normalen Bildschirm: Schrift liegt nie direkt auf dem Hintergrundbild
- * und bleibt lesbar. Darauf steigen zarte Seifenblasen auf. Vollbild-Seiten (Player, Bilder) bleiben unverändert;
+ * Deckende Fläche hinter jedem normalen Bildschirm, mit Rand, damit das Hintergrundbild an den Seiten sichtbar bleibt.
+ * Schrift liegt nie direkt auf dem Bild. Vollbild-Seiten (Player, Bilder) bleiben unverändert;
  * der Inhalt behält dabei seinen Platz im Baum, damit beim Wechsel nichts neu aufgebaut wird.
  */
 @Composable
@@ -108,12 +120,11 @@ private fun ScreenPanel(fullScreen: Boolean, modifier: Modifier = Modifier, cont
     } else {
         Modifier
             .fillMaxSize()
-            .padding(horizontal = 6.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(28.dp))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = LocalReadability.current.panelAlpha))
+            .padding(horizontal = 12.dp, vertical = 12.dp)
+            .clip(RoundedCornerShape(32.dp))
+            .background(LocalAppColors.current.bar)
     }
     Box(modifier.then(panel)) {
-        if (!fullScreen) FloatingBubbles()
         content()
     }
 }
@@ -323,41 +334,97 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
     }
 }
 
+/** Modulfarbe je Bereich (aktiver Eintrag in der Navigation). */
+@Composable
+private fun Destination.moduleColor(): Color {
+    val c = LocalAppColors.current
+    return when (this) {
+        Destination.Images -> c.hellblau
+        Destination.Videos -> c.mint
+        Destination.Products -> c.gold
+        Destination.Tracker -> c.lavendel
+        else -> c.rosa
+    }
+}
+
+/** Ein Eintrag der Navigation: Icon (bei aktiv auf Pille in Modulfarbe) und Beschriftung. */
+@Composable
+private fun NavItem(destination: Destination, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val c = LocalAppColors.current
+    val color = destination.moduleColor()
+    val label = stringResource(destination.label)
+    Column(
+        modifier
+            .clip(RoundedCornerShape(24.dp))
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+            .defaultMinSize(minWidth = 64.dp, minHeight = 56.dp)
+            .padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            Modifier.size(width = 56.dp, height = 32.dp).clip(CircleShape).background(if (selected) color else Color.Transparent),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(destination.icon, contentDescription = null, tint = if (selected) c.onAccent else c.onCardVariant)
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (selected) color else c.onCardVariant,
+            maxLines = 1,
+        )
+    }
+}
+
+/** Handy: schwebende Leiste als Pille mit 4 Einträgen. */
 @Composable
 private fun AppBottomBar(navController: NavHostController) {
     val currentRoute = navController.currentRoute()
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = (LocalReadability.current.cardAlpha + 0.1f).coerceAtMost(0.97f))) {
+    val c = LocalAppColors.current
+    Row(
+        Modifier
+            .navigationBarsPadding()
+            .padding(12.dp)
+            .fillMaxWidth()
+            .height(70.dp)
+            .clip(RoundedCornerShape(35.dp))
+            .background(c.bar),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Destination.entries.filter { it.inCompactBar }.forEach { destination ->
-            NavigationBarItem(
-                selected = currentRoute == destination.route,
-                onClick = { navController.navigateTopLevel(destination) },
-                icon = { Icon(destination.icon, contentDescription = null) },
-                label = { Text(stringResource(destination.label)) },
-            )
+            NavItem(destination, currentRoute == destination.route, { navController.navigateTopLevel(destination) })
         }
     }
 }
 
+/** Tablet: schwebende Rail links mit allen Bereichen, Einstellungen unten. */
 @Composable
 private fun AppNavigationRail(navController: NavHostController) {
     val currentRoute = navController.currentRoute()
-    // Feste Breite: die Trennlinien füllen sonst die ganze Zeile und der Inhalt daneben hat keinen Platz mehr.
-    NavigationRail(modifier = Modifier.width(80.dp), containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = (LocalReadability.current.cardAlpha + 0.1f).coerceAtMost(0.97f))) {
-        Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-            var previousGroup = Destination.entries.first().group
-            Destination.entries.forEach { destination ->
-                if (destination.group != previousGroup) {
-                    HorizontalDivider(Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-                    previousGroup = destination.group
-                }
-                NavigationRailItem(
-                    selected = currentRoute == destination.route,
-                    onClick = { navController.navigateTopLevel(destination) },
-                    icon = { Icon(destination.icon, contentDescription = null) },
-                    label = { Text(stringResource(destination.label)) },
-                )
+    val c = LocalAppColors.current
+    Column(
+        Modifier
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(start = 16.dp, top = 12.dp, bottom = 12.dp)
+            .width(104.dp)
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(32.dp))
+            .background(c.bar)
+            .padding(vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Column(
+            Modifier.weight(1f).verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Destination.entries.filter { it != Destination.Settings }.forEach { destination ->
+                NavItem(destination, currentRoute == destination.route, { navController.navigateTopLevel(destination) })
             }
         }
+        NavItem(Destination.Settings, currentRoute == Destination.Settings.route, { navController.navigateTopLevel(Destination.Settings) })
     }
 }
 

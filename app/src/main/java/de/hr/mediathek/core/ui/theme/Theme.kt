@@ -1,75 +1,77 @@
 package de.hr.mediathek.core.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.sp
+import de.hr.mediathek.R
 
-// Pastell-Palette: Mint, Rosé, Hellblau/Türkis (Flieder und Pfirsich als Zusatz für Kacheln).
-private val LightColors = lightColorScheme(
-    primary = Color(0xFFEC6FA3),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFFFC9DE),
-    onPrimaryContainer = Color(0xFF5A1F38),
-    secondary = Color(0xFF1FB5C9),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFBDEFF5),
-    onSecondaryContainer = Color(0xFF0C4650),
-    tertiary = Color(0xFF3DC9A0),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFBFF3E0),
-    onTertiaryContainer = Color(0xFF0F4630),
-    background = Color(0xFFF4FDFB),
-    onBackground = Color(0xFF2F3A3C),
-    surface = Color(0xFFF4FDFB),
-    onSurface = Color(0xFF2F3A3C),
-    surfaceVariant = Color(0xFFE6F4F2),
-    onSurfaceVariant = Color(0xFF4F6165),
-    surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF0FBF9),
-    surfaceContainer = Color(0xFFE8F8F6),
-    surfaceContainerHigh = Color(0xFFDFF4F2),
-    surfaceContainerHighest = Color(0xFFD6F0EE),
-    outline = Color(0xFF8FB0B3),
+private val NightScheme = AppColors().let { c ->
+    darkColorScheme(
+        primary = c.rosa, onPrimary = c.onAccent,
+        primaryContainer = Color(0xFF3B2142), onPrimaryContainer = Color(0xFFFFC4DE),
+        secondary = c.hellblau, onSecondary = c.onAccent,
+        secondaryContainer = Color(0xFF15343F), onSecondaryContainer = Color(0xFFC2E9FF),
+        tertiary = c.mint, onTertiary = c.onAccent,
+        tertiaryContainer = Color(0xFF163A30), onTertiaryContainer = Color(0xFFBDF5DF),
+        error = c.warnung, onError = c.onAccent,
+        errorContainer = Color(0xFF4A2030), onErrorContainer = Color(0xFFFFD6D6),
+        background = c.bar, onBackground = c.onCard,
+        surface = c.card, onSurface = c.onCard,
+        surfaceVariant = c.cardInset, onSurfaceVariant = c.onCardVariant,
+        surfaceTint = c.rosa,
+        inverseSurface = c.onCard, inverseOnSurface = c.onAccent, inversePrimary = c.rosa,
+        surfaceContainerLowest = c.bgFullscreen, surfaceContainerLow = c.bar, surfaceContainer = c.card,
+        surfaceContainerHigh = c.bar, surfaceContainerHighest = c.cardInset,
+        outline = Color(0xFF9A90BE), outlineVariant = c.cardInset,
+        scrim = Color(0xFF000000),
+    )
+}
+
+private val Quicksand = FontFamily(
+    Font(R.font.quicksand, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
+)
+private val Nunito = FontFamily(
+    Font(R.font.nunito, FontWeight.SemiBold, variationSettings = FontVariation.Settings(FontVariation.weight(600))),
+    Font(R.font.nunito, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
+    Font(R.font.nunito, FontWeight.ExtraBold, variationSettings = FontVariation.Settings(FontVariation.weight(800))),
 )
 
-private val DarkColors = darkColorScheme(
-    primary = Color(0xFFFF8FBE),
-    onPrimary = Color(0xFF4A1830),
-    primaryContainer = Color(0xFF99306A),
-    onPrimaryContainer = Color(0xFFFFD6E4),
-    secondary = Color(0xFF7DBBFF),
-    onSecondary = Color(0xFF0E3150),
-    secondaryContainer = Color(0xFF2B63A0),
-    onSecondaryContainer = Color(0xFFD3EAFF),
-    tertiary = Color(0xFF6FE0B0),
-    onTertiary = Color(0xFF0B3A27),
-    tertiaryContainer = Color(0xFF217553),
-    onTertiaryContainer = Color(0xFFCFF3E0),
-    background = Color(0xFF152122),
-    onBackground = Color(0xFFE9F5F3),
-    surface = Color(0xFF152122),
-    onSurface = Color(0xFFE9F5F3),
-    surfaceVariant = Color(0xFF2A3B3C),
-    onSurfaceVariant = Color(0xFFBFD6D4),
-    surfaceContainerLowest = Color(0xFF0F1A1B),
-    surfaceContainerLow = Color(0xFF1C2A2B),
-    surfaceContainer = Color(0xFF223234),
-    surfaceContainerHigh = Color(0xFF2B3D3F),
-    surfaceContainerHighest = Color(0xFF344749),
-    outline = Color(0xFF8FA9AB),
+/** Literata für lange Texte im Leser (Gewicht 400). */
+val LiterataFamily = FontFamily(
+    Font(R.font.literata, FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400))),
+)
+
+private fun heading(size: Int, line: Int) =
+    TextStyle(fontFamily = Quicksand, fontWeight = FontWeight.Bold, fontSize = size.sp, lineHeight = line.sp)
+
+private fun body(size: Int, line: Int, weight: FontWeight = FontWeight.SemiBold) =
+    TextStyle(fontFamily = Nunito, fontWeight = weight, fontSize = size.sp, lineHeight = line.sp)
+
+private val AppTypography = Typography(
+    displayLarge = heading(48, 56), displayMedium = heading(40, 48), displaySmall = heading(34, 42),
+    headlineLarge = heading(32, 40), headlineMedium = heading(28, 36), headlineSmall = heading(24, 32),
+    titleLarge = heading(22, 28), titleMedium = heading(18, 24), titleSmall = body(16, 22, FontWeight.ExtraBold),
+    bodyLarge = body(16, 24), bodyMedium = body(15, 22), bodySmall = body(13, 18),
+    labelLarge = body(15, 20, FontWeight.ExtraBold), labelMedium = body(13, 18, FontWeight.Bold), labelSmall = body(12, 16, FontWeight.Bold),
 )
 
 private val PlayfulShapes = Shapes(
     small = RoundedCornerShape(20.dp),
     medium = RoundedCornerShape(28.dp),
-    large = RoundedCornerShape(36.dp),
-    extraLarge = RoundedCornerShape(44.dp),
+    large = RoundedCornerShape(30.dp),
+    extraLarge = RoundedCornerShape(32.dp),
 )
 
 /** Zusatzfarben für die Kacheln der Bereiche (Flieder und Pfirsich neben Rosé, Blau, Mint). */
@@ -82,17 +84,10 @@ object TilePalette {
     val peachDark = TileColors(Color(0xFF6B4A33), Color(0xFFFFE3CF))
 }
 
-/** Farbschema folgt dem System (hell/dunkel), immer mit der Pastell-Palette. */
+/** Immer „Nacht-Pastell“: ein festes dunkles Design, unabhängig von der Systemeinstellung. */
 @Composable
-fun MediathekTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    content: @Composable () -> Unit,
-) {
-    val scheme = if (darkTheme) DarkColors else LightColors
-    MaterialTheme(
-        colorScheme = scheme,
-        shapes = PlayfulShapes,
-        content = content,
-    )
+fun MediathekTheme(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalAppColors provides AppColors()) {
+        MaterialTheme(colorScheme = NightScheme, typography = AppTypography, shapes = PlayfulShapes, content = content)
+    }
 }
-

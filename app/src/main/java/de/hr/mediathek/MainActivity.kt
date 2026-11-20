@@ -3,6 +3,7 @@ package de.hr.mediathek
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import android.view.WindowManager
 import androidx.lifecycle.lifecycleScope
@@ -19,7 +20,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
         lifecycleScope.launch {
             settingDao.observe("privacy_secure_screen").collect { value ->
                 if (value == "1") window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)

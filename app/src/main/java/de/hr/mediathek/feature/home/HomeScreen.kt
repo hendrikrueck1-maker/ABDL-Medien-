@@ -3,7 +3,6 @@ package de.hr.mediathek.feature.home
 import de.hr.mediathek.core.ui.bounceClick
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,7 +47,7 @@ private val moduleTiles = listOf(
 
 @Composable
 private fun tileColors(destination: Destination): TileColors {
-    val dark = isSystemInDarkTheme()
+    val dark = true
     val scheme = MaterialTheme.colorScheme
     return when (destination) {
         Destination.Stories -> TileColors(scheme.primaryContainer, scheme.onPrimaryContainer)

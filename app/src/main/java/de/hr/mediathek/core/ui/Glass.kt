@@ -1,7 +1,6 @@
 package de.hr.mediathek.core.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,43 +10,36 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 
 /**
- * Glasoptik: farbig getönte, durchsichtige Milchglas-Fläche mit hellem Rand, der oben links glänzt.
- * Sie liegt hinter Schrift, damit sie auf dem Hintergrundbild gut lesbar bleibt.
+ * Deckende Fläche in der Farbe [tint] mit abgerundeten Ecken (früher Milchglas). Der Name bleibt, damit alle
+ * bestehenden Bildschirme sofort die neue, immer lesbare Optik bekommen.
  */
-fun Modifier.glass(tint: Color, shape: Shape = RoundedCornerShape(24.dp)): Modifier = composed {
-    val a = LocalReadability.current.cardAlpha
-    this
-        .clip(shape)
-        .background(Brush.verticalGradient(listOf(tint.copy(alpha = (a + 0.08f).coerceAtMost(1f)), tint.copy(alpha = (a - 0.08f).coerceAtLeast(0f)))), shape)
-        .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = 0.75f), Color.White.copy(alpha = 0.12f))), shape)
-}
+fun Modifier.glass(tint: Color, shape: Shape = RoundedCornerShape(28.dp)): Modifier =
+    this.clip(shape).background(tint.copy(alpha = 1f), shape)
 
-/** Kartenfarben im selben Stil, damit Karten auf dem Hintergrundbild lesbar sind. */
+/** Kartenfarben: deckend, damit Karten auf jedem Hintergrundbild lesbar sind. */
 @Composable
-fun glassCardColors(tint: Color): CardColors = CardDefaults.cardColors(containerColor = tint.copy(alpha = (LocalReadability.current.cardAlpha - 0.10f).coerceAtLeast(0f)))
+fun glassCardColors(tint: Color): CardColors = CardDefaults.cardColors(containerColor = tint.copy(alpha = 1f))
 
-/** Überschrift als farbiges Glas-Etikett. */
+/** Überschrift als Pille auf deckender Fläche. */
 @Composable
 fun GlassTitle(
     text: String,
     modifier: Modifier = Modifier,
-    tint: Color = MaterialTheme.colorScheme.primaryContainer,
-    onTint: Color = MaterialTheme.colorScheme.onPrimaryContainer,
+    tint: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    onTint: Color = MaterialTheme.colorScheme.onSurface,
     style: TextStyle = MaterialTheme.typography.titleMedium,
 ) {
     Text(
         text = text,
         style = style,
         color = onTint,
-        modifier = modifier.glass(tint, CircleShape).padding(horizontal = 18.dp, vertical = 8.dp),
+        modifier = modifier.glass(tint, CircleShape).padding(horizontal = 20.dp, vertical = 10.dp),
     )
 }

@@ -53,9 +53,6 @@ fun SettingsScreen(onOpenRoute: (String) -> Unit, viewModel: UpdateViewModel = h
             modifier = Modifier.align(Alignment.Start),
         )
 
-        GroupTitle("Aussehen")
-        ReadabilityCard()
-
         GroupTitle(stringResource(R.string.settings_group_media))
         SettingsRow(R.string.settings_row_sources, R.string.settings_row_sources_hint, GlassTint.BLUE) {
             onOpenRoute(AppRoutes.storage(StorageSection.SOURCES))
@@ -213,23 +210,5 @@ private fun SettingsRow(@StringRes title: Int, @StringRes hint: Int?, tint: Glas
             }
         }
         Text("›", style = MaterialTheme.typography.titleLarge, color = onContainer)
-    }
-}
-
-/** Regler für die Lesbarkeit der Schrift über dem Hintergrundbild. */
-@Composable
-private fun ReadabilityCard(vm: ReadabilityViewModel = hiltViewModel()) {
-    val level by vm.level.collectAsStateWithLifecycle()
-    val auto by vm.auto.collectAsStateWithLifecycle()
-    Card(colors = glassCardColors(MaterialTheme.colorScheme.surfaceContainer), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Lesbarkeit der Schrift", style = MaterialTheme.typography.titleMedium)
-            Text("Links: Hintergrundbild deutlich sichtbar. Rechts: Flächen hinter der Schrift fester.", style = MaterialTheme.typography.bodySmall)
-            Slider(value = level, onValueChange = vm::setLevel, valueRange = 0f..1f)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Switch(checked = auto, onCheckedChange = vm::setAuto)
-                Text("Automatisch je nach Bild (dunkles Bild: helle Schrift auf dunklem Glas, helles Bild: dunkle Schrift)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            }
-        }
     }
 }
