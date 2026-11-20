@@ -1,6 +1,13 @@
 package de.hr.mediathek.core.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -50,9 +57,13 @@ fun AccentButton(
     enabled: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.94f else 1f, spring(dampingRatio = 0.45f, stiffness = 500f), label = "accent-bounce")
     Button(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = 52.dp),
+        interactionSource = source,
+        modifier = modifier.defaultMinSize(minHeight = 52.dp).graphicsLayer { scaleX = scale; scaleY = scale },
         enabled = enabled,
         shape = CircleShape,
         colors = ButtonDefaults.buttonColors(containerColor = color, contentColor = LocalAppColors.current.onAccent),
@@ -69,9 +80,13 @@ fun OutlineAccentButton(
     enabled: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.94f else 1f, spring(dampingRatio = 0.45f, stiffness = 500f), label = "outline-bounce")
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.defaultMinSize(minHeight = 52.dp),
+        interactionSource = source,
+        modifier = modifier.defaultMinSize(minHeight = 52.dp).graphicsLayer { scaleX = scale; scaleY = scale },
         enabled = enabled,
         shape = CircleShape,
         border = BorderStroke(2.dp, color),

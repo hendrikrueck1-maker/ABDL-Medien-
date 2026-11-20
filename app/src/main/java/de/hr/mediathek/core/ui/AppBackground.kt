@@ -103,13 +103,14 @@ class AppBackgroundViewModel @Inject constructor(
  * sondern immer auf deckenden Flächen (Karten, Leisten). Ohne Bild bleibt eine dunkle Fläche.
  */
 @Composable
-fun AppBackground(content: @Composable () -> Unit) {
+fun AppBackground(hearts: Boolean = false, content: @Composable () -> Unit) {
     val viewModel: AppBackgroundViewModel = hiltViewModel()
     val image by viewModel.image.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize().background(LocalAppColors.current.bgFullscreen)) {
         image?.let {
             Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
+        FloatingHearts(hearts)
         content()
     }
 }

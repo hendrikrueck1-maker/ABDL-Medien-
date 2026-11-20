@@ -86,7 +86,7 @@ fun AppRoot() {
     val route = navController.currentRoute().orEmpty()
     val fullScreenRoute = isFullScreenRoute(route)
 
-    AppBackground {
+    AppBackground(hearts = showsHearts(route)) {
     if (isWide) {
         Row(Modifier.fillMaxSize()) {
             if (!fullScreenRoute) AppNavigationRail(navController)
@@ -104,6 +104,10 @@ fun AppRoot() {
     }
     }
 }
+
+/** Schwebende Herzen nur auf Übersicht und in den Listen, nie im Vollbild, Leser oder Editor. */
+private fun showsHearts(route: String): Boolean =
+    route in setOf(Destination.Home.route, Destination.Videos.route, Destination.Images.route, Destination.Stories.route, Destination.Products.route)
 
 private fun isFullScreenRoute(route: String?): Boolean =
     route != null && (route.startsWith("player/") || route.startsWith("image/{") || route.startsWith("slideshow") || route.startsWith("story/{"))
