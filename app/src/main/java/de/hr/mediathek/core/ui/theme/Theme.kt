@@ -10,32 +10,32 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 
-// Pastell-Palette: Rosé, Hellblau, Mint, Flieder, Pfirsich.
+// Pastell-Palette: Mint, Rosé, Hellblau/Türkis (Flieder und Pfirsich als Zusatz für Kacheln).
 private val LightColors = lightColorScheme(
-    primary = Color(0xFFE8458B),
+    primary = Color(0xFFEC6FA3),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFFFBCD9),
+    primaryContainer = Color(0xFFFFC9DE),
     onPrimaryContainer = Color(0xFF5A1F38),
-    secondary = Color(0xFF3D8BFD),
+    secondary = Color(0xFF1FB5C9),
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFB8DAFF),
-    onSecondaryContainer = Color(0xFF123B5E),
-    tertiary = Color(0xFF22B77F),
+    secondaryContainer = Color(0xFFBDEFF5),
+    onSecondaryContainer = Color(0xFF0C4650),
+    tertiary = Color(0xFF3DC9A0),
     onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFB0F0D2),
+    tertiaryContainer = Color(0xFFBFF3E0),
     onTertiaryContainer = Color(0xFF0F4630),
-    background = Color(0xFFFFF7FA),
-    onBackground = Color(0xFF3A2E34),
-    surface = Color(0xFFFFF7FA),
-    onSurface = Color(0xFF3A2E34),
-    surfaceVariant = Color(0xFFF7E6EE),
-    onSurfaceVariant = Color(0xFF6B5560),
+    background = Color(0xFFF4FDFB),
+    onBackground = Color(0xFF2F3A3C),
+    surface = Color(0xFFF4FDFB),
+    onSurface = Color(0xFF2F3A3C),
+    surfaceVariant = Color(0xFFE6F4F2),
+    onSurfaceVariant = Color(0xFF4F6165),
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFFFF0F5),
-    surfaceContainer = Color(0xFFFFE9F1),
-    surfaceContainerHigh = Color(0xFFFFE2ED),
-    surfaceContainerHighest = Color(0xFFFFDBE9),
-    outline = Color(0xFFB59AA6),
+    surfaceContainerLow = Color(0xFFF0FBF9),
+    surfaceContainer = Color(0xFFE8F8F6),
+    surfaceContainerHigh = Color(0xFFDFF4F2),
+    surfaceContainerHighest = Color(0xFFD6F0EE),
+    outline = Color(0xFF8FB0B3),
 )
 
 private val DarkColors = darkColorScheme(
@@ -66,10 +66,10 @@ private val DarkColors = darkColorScheme(
 )
 
 private val PlayfulShapes = Shapes(
-    small = RoundedCornerShape(16.dp),
-    medium = RoundedCornerShape(24.dp),
-    large = RoundedCornerShape(32.dp),
-    extraLarge = RoundedCornerShape(36.dp),
+    small = RoundedCornerShape(20.dp),
+    medium = RoundedCornerShape(28.dp),
+    large = RoundedCornerShape(36.dp),
+    extraLarge = RoundedCornerShape(44.dp),
 )
 
 /** Zusatzfarben für die Kacheln der Bereiche (Flieder und Pfirsich neben Rosé, Blau, Mint). */

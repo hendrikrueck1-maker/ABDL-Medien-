@@ -61,8 +61,8 @@ fun AppBackground(content: @Composable () -> Unit) {
     val image by viewModel.image.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         image?.let {
-            Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(14.dp))
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = 0.84f)))
+            Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().blur(6.dp))
+            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = 0.10f)))
         }
         content()
     }

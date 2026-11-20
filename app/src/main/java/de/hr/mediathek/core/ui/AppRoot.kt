@@ -97,7 +97,7 @@ private fun isFullScreenRoute(route: String?): Boolean =
     route != null && (route.startsWith("player/") || route.startsWith("image/{") || route.startsWith("slideshow"))
 
 /**
- * Heller, fast deckender Untergrund hinter jedem normalen Bildschirm: Schrift liegt nie direkt auf dem Hintergrundbild
+ * Sehr durchsichtiger Milchglas-Schleier (das Hintergrundbild bleibt gut sichtbar) hinter jedem normalen Bildschirm: Schrift liegt nie direkt auf dem Hintergrundbild
  * und bleibt lesbar. Darauf steigen zarte Seifenblasen auf. Vollbild-Seiten (Player, Bilder) bleiben unverändert;
  * der Inhalt behält dabei seinen Platz im Baum, damit beim Wechsel nichts neu aufgebaut wird.
  */
@@ -110,7 +110,7 @@ private fun ScreenPanel(fullScreen: Boolean, modifier: Modifier = Modifier, cont
             .fillMaxSize()
             .padding(horizontal = 6.dp, vertical = 4.dp)
             .clip(RoundedCornerShape(28.dp))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.90f))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.26f))
     }
     Box(modifier.then(panel)) {
         if (!fullScreen) FloatingBubbles()
@@ -303,7 +303,7 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
 @Composable
 private fun AppBottomBar(navController: NavHostController) {
     val currentRoute = navController.currentRoute()
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f)) {
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f)) {
         Destination.entries.filter { it.inCompactBar }.forEach { destination ->
             NavigationBarItem(
                 selected = currentRoute == destination.route,
@@ -319,7 +319,7 @@ private fun AppBottomBar(navController: NavHostController) {
 private fun AppNavigationRail(navController: NavHostController) {
     val currentRoute = navController.currentRoute()
     // Feste Breite: die Trennlinien füllen sonst die ganze Zeile und der Inhalt daneben hat keinen Platz mehr.
-    NavigationRail(modifier = Modifier.width(80.dp), containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f)) {
+    NavigationRail(modifier = Modifier.width(80.dp), containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f)) {
         Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             var previousGroup = Destination.entries.first().group
             Destination.entries.forEach { destination ->

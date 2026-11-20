@@ -19,18 +19,18 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 
 /**
- * Glasoptik: farbig getönte, fast deckende Fläche mit hellem Rand, der oben links glänzt.
+ * Glasoptik: farbig getönte, durchsichtige Milchglas-Fläche mit hellem Rand, der oben links glänzt.
  * Sie liegt hinter Schrift, damit sie auf dem Hintergrundbild gut lesbar bleibt.
  */
 fun Modifier.glass(tint: Color, shape: Shape = RoundedCornerShape(24.dp)): Modifier =
     this
         .clip(shape)
-        .background(Brush.verticalGradient(listOf(tint.copy(alpha = 0.92f), tint.copy(alpha = 0.78f))), shape)
+        .background(Brush.verticalGradient(listOf(tint.copy(alpha = 0.66f), tint.copy(alpha = 0.50f))), shape)
         .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = 0.75f), Color.White.copy(alpha = 0.12f))), shape)
 
 /** Kartenfarben im selben Stil, damit Karten auf dem Hintergrundbild lesbar sind. */
 @Composable
-fun glassCardColors(tint: Color): CardColors = CardDefaults.cardColors(containerColor = tint.copy(alpha = 0.88f))
+fun glassCardColors(tint: Color): CardColors = CardDefaults.cardColors(containerColor = tint.copy(alpha = 0.58f))
 
 /** Überschrift als farbiges Glas-Etikett. */
 @Composable

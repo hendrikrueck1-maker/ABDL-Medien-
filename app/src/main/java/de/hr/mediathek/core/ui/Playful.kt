@@ -1,5 +1,6 @@
 package de.hr.mediathek.core.ui
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -18,7 +19,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,7 +67,7 @@ fun Modifier.bounceClick(
         )
 }
 
-/** Lässt das Symbol aufploppen, sobald [active] wahr wird (Favorit, Tropfen, Sterne). */
+/** Lässt das Symbol aufploppen und ein paar Herzchen und Sterne aufsteigen, sobald [active] wahr wird. */
 @Composable
 fun PopBox(active: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val scale by animateFloatAsState(
@@ -69,14 +75,49 @@ fun PopBox(active: Boolean, modifier: Modifier = Modifier, content: @Composable 
         animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessMedium),
         label = "pop",
     )
+    val burst = remember { Animatable(1f) }
+    var first by remember { mutableStateOf(true) }
+    LaunchedEffect(active) {
+        if (first) {
+            first = false
+            return@LaunchedEffect
+        }
+        if (active) {
+            burst.snapTo(0f)
+            burst.animateTo(1f, tween(durationMillis = 900, easing = LinearEasing))
+        }
+    }
     Box(
         modifier.graphicsLayer {
             scaleX = scale
             scaleY = scale
         },
         contentAlignment = Alignment.Center,
-    ) { content() }
+    ) {
+        content()
+        if (burst.value < 1f) {
+            SPARKLES.forEach { (symbol, dx, dy) ->
+                Text(
+                    symbol,
+                    fontSize = 12.sp,
+                    modifier = Modifier.graphicsLayer {
+                        translationX = dx * burst.value * density
+                        translationY = dy * burst.value * density
+                        alpha = 1f - burst.value
+                    },
+                )
+            }
+        }
+    }
 }
+
+private val SPARKLES = listOf(
+    Triple("\u2665", -18f, -46f),
+    Triple("\u2726", 16f, -52f),
+    Triple("\u2665", 0f, -64f),
+    Triple("\u2726", -26f, -30f),
+    Triple("\u2665", 24f, -34f),
+)
 
 private class Bubble(val x: Float, val radiusDp: Float, val speed: Int, val phase: Float)
 
@@ -103,7 +144,7 @@ fun FloatingBubbles(modifier: Modifier = Modifier) {
         label = "bubbleTime",
     )
     val scheme = MaterialTheme.colorScheme
-    val colors = listOf(scheme.primary, scheme.secondary, scheme.tertiary).map { it.copy(alpha = 0.16f) }
+    val colors = listOf(scheme.primary, scheme.secondary, scheme.tertiary).map { it.copy(alpha = 0.12f) }
     Canvas(modifier.fillMaxSize()) {
         BUBBLES.forEachIndexed { i, b ->
             val progress = (t * b.speed + b.phase) % 1f
