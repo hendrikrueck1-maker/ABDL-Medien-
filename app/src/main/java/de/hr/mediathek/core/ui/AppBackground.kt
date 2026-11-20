@@ -110,6 +110,8 @@ fun AppBackground(hearts: Boolean = false, content: @Composable () -> Unit) {
         image?.let {
             Image(it.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
+        // Das Bild immer leicht milchig (nur zur Optik; Texte stehen ohnehin auf deckenden Karten).
+        if (image != null) Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.16f)))
         FloatingHearts(hearts)
         content()
     }

@@ -109,20 +109,11 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(if (wide) 20.dp else 12.dp),
     ) {
         HeaderCard(date, wide, onNewBackground = background::reload)
-        if (wide) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                Column(Modifier.weight(1.25f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    CurrentCard(tiles.filter { it.favorite }.take(3), todayCount, tracker, wide = true, onMore = { onOpen(Destination.Tracker) })
-                    SuggestionsCard(suggestions, viewModel, wide = true, onOpenVideo)
-                }
-                AreasGrid(Modifier.weight(1f), onOpen, wide = true)
-            }
-            RecentCard(recent, onOpenVideo)
-        } else {
-            CurrentCard(tiles.filter { it.favorite }.take(3), todayCount, tracker, wide = false, onMore = { onOpen(Destination.Tracker) })
-            SuggestionsCard(suggestions, viewModel, wide = false, onOpenVideo)
-            AreasGrid(Modifier.fillMaxWidth(), onOpen, wide = false)
-        }
+        // Reihenfolge wie vorher: erst die Bereiche, dann Aktuell, Vorschläge (alle sichtbar, ohne seitliches Scrollen), Zuletzt.
+        AreasGrid(Modifier.fillMaxWidth(), onOpen, wide = wide)
+        CurrentCard(tiles.filter { it.favorite }.take(3), todayCount, tracker, wide = wide, onMore = { onOpen(Destination.Tracker) })
+        SuggestionsCard(suggestions, viewModel, wide = wide, onOpenVideo)
+        RecentCard(recent, onOpenVideo)
         Text(
             stringResource(R.string.version_label, BuildConfig.VERSION_NAME),
             style = MaterialTheme.typography.labelSmall,
@@ -203,11 +194,11 @@ private fun SuggestionsCard(
     val c = LocalAppColors.current
     AppCard(Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.home_suggestions), style = MaterialTheme.typography.titleLarge, color = c.onCard)
-        Row(
-            Modifier.horizontalScroll(rememberScrollState()).padding(top = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            for (s in suggestions) {
+        val cols = if (wide) 4 else 2
+        Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+          suggestions.chunked(cols).forEach { rowItems ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            for (s in rowItems) {
                 val video = s.item
                 val bitmap = rememberThumbBitmap(viewModel.thumbnailOf(video.uuid))
                 val (label, color) = when (s.kind) {
@@ -215,7 +206,7 @@ private fun SuggestionsCard(
                     SuggestionKind.RARE -> stringResource(R.string.suggest_rare) to c.hellblau
                     SuggestionKind.NEVER -> stringResource(R.string.suggest_never) to c.mint
                 }
-                Column(Modifier.width(if (wide) 170.dp else 150.dp).bounceClick { onOpenVideo(video.uuid) }, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.weight(1f).bounceClick { onOpenVideo(video.uuid) }, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Box(
                         Modifier.fillMaxWidth().aspectRatio(16f / 9f)
                             .clip(RoundedCornerShape(16.dp)).background(c.cardInset)
@@ -229,6 +220,9 @@ private fun SuggestionsCard(
                     Text(video.displayName, style = MaterialTheme.typography.bodySmall, color = c.onCard, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
+            repeat(cols - rowItems.size) { androidx.compose.foundation.layout.Spacer(Modifier.weight(1f)) }
+            }
+          }
         }
     }
 }
@@ -237,7 +231,7 @@ private fun SuggestionsCard(
 private fun AreasGrid(modifier: Modifier, onOpen: (Destination) -> Unit, wide: Boolean) {
     val c = LocalAppColors.current
     Column(modifier, verticalArrangement = Arrangement.spacedBy(if (wide) 20.dp else 12.dp)) {
-        areaTiles.chunked(2).forEach { row ->
+        areaTiles.chunked(if (wide) 4 else 2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (wide) 20.dp else 12.dp)) {
                 row.forEach { d ->
                     val color = c.colorOf(d)

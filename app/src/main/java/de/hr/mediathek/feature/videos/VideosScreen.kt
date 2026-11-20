@@ -414,18 +414,6 @@ fun VideosScreen(
 
         val tiles = viewSettings.layout == CardLayout.TILES
         Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-            if (wide) {
-                FolderTreeCard(
-                    path = path,
-                    folders = if (foldersOn) folders else emptyList(),
-                    categories = categories.map { FilterLabel(it.uuid, it.name) },
-                    activeCategory = filter.categoryUuid,
-                    onGoTo = viewModel.browser::goTo,
-                    onEnter = viewModel.browser::enter,
-                    onCategory = { id -> viewModel.update { it.copy(categoryUuid = if (it.categoryUuid == id) null else id) } },
-                    modifier = Modifier.width(280.dp).fillMaxHeight(),
-                )
-            }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -435,14 +423,10 @@ fun VideosScreen(
                     PillChip(stringResource(R.string.video_chip_all), filter.format == null && !filter.favoriteOnly && !filter.peeOnly) {
                         viewModel.update { it.copy(format = null, favoriteOnly = false, peeOnly = false) }
                     }
-                    PillChip("MP4", filter.format == "mp4") { viewModel.update { it.copy(format = if (it.format == "mp4") null else "mp4") } }
-                    PillChip("MKV", filter.format == "mkv") { viewModel.update { it.copy(format = if (it.format == "mkv") null else "mkv") } }
                     PillChip(stringResource(R.string.video_chip_favorites), filter.favoriteOnly) { viewModel.update { it.copy(favoriteOnly = !it.favoriteOnly) } }
                     PillChip(stringResource(R.string.video_chip_pee), filter.peeOnly) { viewModel.update { it.copy(peeOnly = !it.peeOnly) } }
-                    if (!wide) {
-                        val cat = categories.firstOrNull { it.uuid == filter.categoryUuid }
-                        PillChip(cat?.name ?: stringResource(R.string.video_chip_category), cat != null) { showFilter = true }
-                    }
+                    val cat = categories.firstOrNull { it.uuid == filter.categoryUuid }
+                    PillChip(cat?.name ?: stringResource(R.string.video_chip_category), cat != null) { showFilter = true }
                     OutlineAccentButton(onClick = { showViewSettings = true }, color = c.mint, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.view_button)) }
                     val activeCount = activeFilterCount(filter)
                     if (activeCount > 0) {
@@ -451,8 +435,8 @@ fun VideosScreen(
                         OutlineAccentButton(onClick = { showFilter = true }, color = c.mint, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.filter_button)) }
                     }
                 }
-                if (foldersOn && path.isNotEmpty() && !wide) {
-                    PathBar(path = path, onGoTo = viewModel.browser::goTo)
+                if (foldersOn && path.isNotEmpty()) {
+                    PathBar(path = path, onGoTo = viewModel.browser::goTo, modifier = Modifier.clip(CircleShape).background(c.bar).padding(horizontal = 8.dp))
                 }
                 if (items.itemCount == 0 && folders.isEmpty()) {
                     AppCard(Modifier.fillMaxWidth()) {

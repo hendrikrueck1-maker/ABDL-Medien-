@@ -91,7 +91,7 @@ fun AppRoot() {
         Row(Modifier.fillMaxSize()) {
             if (!fullScreenRoute) AppNavigationRail(navController)
             Scaffold(Modifier.weight(1f), containerColor = Color.Transparent) { padding ->
-                ScreenPanel(fullScreenRoute, Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
+                ScreenPanel(fullScreenRoute, route in CARD_ROUTES, Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
             }
         }
     } else {
@@ -99,13 +99,16 @@ fun AppRoot() {
             containerColor = Color.Transparent,
             bottomBar = { if (!fullScreenRoute) AppBottomBar(navController) },
         ) { padding ->
-            ScreenPanel(fullScreenRoute, Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
+            ScreenPanel(fullScreenRoute, route in CARD_ROUTES, Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
         }
     }
     }
 }
 
 /** Schwebende Herzen nur auf Übersicht und in den Listen, nie im Vollbild, Leser oder Editor. */
+/** Bildschirme, die nur aus deckenden Karten bestehen: dort bleibt das große Fenster durchsichtig (Hintergrundbild sichtbar). */
+private val CARD_ROUTES = setOf(Destination.Home.route, Destination.Videos.route, Destination.Tracker.route)
+
 private fun showsHearts(route: String): Boolean =
     route in setOf(Destination.Home.route, Destination.Videos.route, Destination.Images.route, Destination.Stories.route, Destination.Products.route)
 
@@ -118,8 +121,8 @@ private fun isFullScreenRoute(route: String?): Boolean =
  * der Inhalt behält dabei seinen Platz im Baum, damit beim Wechsel nichts neu aufgebaut wird.
  */
 @Composable
-private fun ScreenPanel(fullScreen: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    val panel = if (fullScreen) {
+private fun ScreenPanel(fullScreen: Boolean, transparent: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val panel = if (fullScreen || transparent) {
         Modifier.fillMaxSize()
     } else {
         Modifier
