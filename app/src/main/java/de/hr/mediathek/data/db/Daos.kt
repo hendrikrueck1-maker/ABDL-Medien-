@@ -733,3 +733,102 @@ interface CompressionDao {
     )
     suspend fun originalFor(mediaUuid: String): CompressionRecordEntity?
 }
+
+/** Listenzeile einer Geschichte: nie mit Text, damit große Texte die Liste nicht bremsen. */
+data class StoryRow(
+    val uuid: String,
+    val title: String,
+    val category: StoryCategory,
+    val rating: Int,
+    val favorite: Boolean,
+    val continueFlag: Boolean,
+    val sourceText: String?,
+    val createdAt: Long,
+    val updatedAt: Long,
+    val deletedAt: Long?,
+)
+
+@Dao
+interface StoryDao {
+    @Query(
+        "SELECT uuid, title, category, rating, favorite, continueFlag, sourceText, createdAt, updatedAt, deletedAt " +
+            "FROM story WHERE deletedAt IS NULL",
+    )
+    fun observeActive(): Flow<List<StoryRow>>
+
+    @Query(
+        "SELECT uuid, title, category, rating, favorite, continueFlag, sourceText, createdAt, updatedAt, deletedAt " +
+            "FROM story WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC",
+    )
+    fun observeDeleted(): Flow<List<StoryRow>>
+
+    @Query("SELECT * FROM story WHERE uuid = :uuid")
+    suspend fun get(uuid: String): StoryEntity?
+
+    @Query("SELECT * FROM story WHERE uuid = :uuid")
+    fun observe(uuid: String): Flow<StoryEntity?>
+
+    @Query("SELECT uuid FROM story WHERE deletedAt IS NULL AND textHash = :hash LIMIT 1")
+    suspend fun uuidByHash(hash: String): String?
+
+    @Query("SELECT title FROM story WHERE deletedAt IS NULL AND textHash = :hash LIMIT 1")
+    suspend fun titleByHash(hash: String): String?
+
+    @Insert
+    suspend fun insert(story: StoryEntity): Long
+
+    @Update
+    suspend fun update(story: StoryEntity)
+
+    @Query("SELECT text FROM story_text WHERE storyUuid = :uuid")
+    suspend fun getText(uuid: String): String?
+
+    @Upsert
+    suspend fun upsertText(text: StoryTextEntity)
+
+    @Query("UPDATE story SET readingParagraph = :paragraph, readingOffset = :offset WHERE uuid = :uuid")
+    suspend fun setReading(uuid: String, paragraph: Int, offset: Int)
+
+    @Query("UPDATE story SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun softDelete(uuid: String, now: Long)
+
+    @Query("UPDATE story SET deletedAt = NULL, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun restore(uuid: String, now: Long)
+
+    @Query("SELECT uuid FROM story WHERE deletedAt IS NOT NULL AND deletedAt < :before")
+    suspend fun expiredUuids(before: Long): List<String>
+
+    @Query("DELETE FROM story WHERE uuid = :uuid")
+    suspend fun deleteStory(uuid: String)
+
+    @Query("DELETE FROM story_text WHERE storyUuid = :uuid")
+    suspend fun deleteText(uuid: String)
+
+    @Query("DELETE FROM story_draft_version WHERE storyUuid = :uuid")
+    suspend fun deleteDrafts(uuid: String)
+
+    @Transaction
+    suspend fun purge(uuid: String) {
+        deleteText(uuid)
+        deleteDrafts(uuid)
+        deleteStory(uuid)
+    }
+
+    @Insert
+    suspend fun insertDraft(draft: StoryDraftVersionEntity)
+
+    @Query("SELECT * FROM story_draft_version WHERE storyUuid = :uuid ORDER BY savedAt DESC")
+    suspend fun drafts(uuid: String): List<StoryDraftVersionEntity>
+
+    @Query("SELECT savedAt FROM story_draft_version WHERE storyUuid = :uuid ORDER BY savedAt DESC LIMIT 1")
+    suspend fun lastDraftAt(uuid: String): Long?
+
+    @Query(
+        "DELETE FROM story_draft_version WHERE storyUuid = :uuid AND id NOT IN " +
+            "(SELECT id FROM story_draft_version WHERE storyUuid = :uuid ORDER BY savedAt DESC LIMIT :keep)",
+    )
+    suspend fun pruneDrafts(uuid: String, keep: Int)
+
+    @Query("SELECT COUNT(*) FROM story WHERE deletedAt IS NULL")
+    fun observeCount(): Flow<Int>
+}

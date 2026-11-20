@@ -41,5 +41,6 @@ object DatabaseModule {
     @Provides fun provideTagDao(db: MediathekDatabase): de.hr.mediathek.data.db.TagDao = db.tagDao()
     @Provides fun providePlaylistDao(db: MediathekDatabase): de.hr.mediathek.data.db.PlaylistDao = db.playlistDao()
     @Provides fun provideCompressionDao(db: MediathekDatabase): de.hr.mediathek.data.db.CompressionDao = db.compressionDao()
+    @Provides fun provideStoryDao(db: MediathekDatabase): de.hr.mediathek.data.db.StoryDao = db.storyDao()
     @Provides fun provideThumbnailDao(db: MediathekDatabase): ThumbnailDao = db.thumbnailDao()
 }

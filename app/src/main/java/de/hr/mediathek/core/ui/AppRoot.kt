@@ -137,6 +137,25 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
                 onOpen = { navController.navigate("image/$it") },
             )
         }
+        composable(Destination.Stories.route) {
+            de.hr.mediathek.feature.stories.StoriesScreen(
+                onOpen = { navController.navigate("story/$it") },
+                onEdit = { navController.navigate("story-edit/$it") },
+                onImport = { navController.navigate("story-import") },
+            )
+        }
+        composable("story-import") {
+            de.hr.mediathek.feature.stories.StoryImportScreen(onBack = { navController.popBackStack() })
+        }
+        composable("story/{uuid}", arguments = listOf(navArgument("uuid") { type = NavType.StringType })) {
+            de.hr.mediathek.feature.stories.StoryReaderScreen(
+                onBack = { navController.popBackStack() },
+                onEdit = { navController.navigate("story-edit/$it") },
+            )
+        }
+        composable("story-edit/{uuid}", arguments = listOf(navArgument("uuid") { type = NavType.StringType })) {
+            de.hr.mediathek.feature.stories.StoryEditorScreen(onBack = { navController.popBackStack() })
+        }
         composable("trash") { TrashScreen(onBack = { navController.popBackStack() }) }
         composable("duplicates") { DuplicatesScreen(onBack = { navController.popBackStack() }) }
         composable(
@@ -162,7 +181,7 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
         Destination.entries
             .filter {
                 it != Destination.Home && it != Destination.Settings && it != Destination.Videos &&
-                    it != Destination.Images
+                    it != Destination.Images && it != Destination.Stories
             }
             .forEach { destination ->
                 composable(destination.route) {
