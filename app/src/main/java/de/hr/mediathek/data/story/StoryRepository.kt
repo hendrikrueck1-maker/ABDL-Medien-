@@ -41,7 +41,7 @@ class StoryRepository @Inject constructor(private val dao: StoryDao) {
             sourceUrl = sourceUrl?.ifBlank { null },
             textHash = if (text.isBlank()) null else TextCleaner.hash(text),
         )
-        dao.insert(story)
+        dao.insert(story.copy(wordCount = text.trim().split(Regex("\\s+")).count { it.isNotEmpty() }))
         dao.upsertText(StoryTextEntity(story.uuid, text))
         return story.uuid
     }
@@ -64,12 +64,25 @@ class StoryRepository @Inject constructor(private val dao: StoryDao) {
             }
         }
         dao.upsertText(StoryTextEntity(uuid, text))
-        dao.get(uuid)?.let { dao.update(it.copy(textHash = TextCleaner.hash(text), updatedAt = now, userUpdatedAt = now)) }
+        dao.get(uuid)?.let { dao.update(it.copy(textHash = TextCleaner.hash(text), wordCount = text.trim().split(Regex("\\s+")).count { w -> w.isNotEmpty() }, updatedAt = now, userUpdatedAt = now)) }
     }
 
     suspend fun drafts(uuid: String): List<StoryDraftVersionEntity> = dao.drafts(uuid)
 
-    suspend fun saveReading(uuid: String, paragraph: Int, offset: Int) = dao.setReading(uuid, paragraph, offset)
+    /** Merkt die Leseposition und den Fortschritt; nur wirklich gelesen (nicht bloß geöffnet) zählt als "zuletzt gelesen". */
+    suspend fun saveReading(uuid: String, paragraph: Int, offset: Int, paragraphCount: Int) {
+        val progress = if (paragraphCount <= 1) 0f else (paragraph.toFloat() / (paragraphCount - 1)).coerceIn(0f, 1f)
+        if (paragraph == 0 && offset == 0) {
+            dao.setReading(uuid, 0, 0)
+            return
+        }
+        dao.setReadingFull(uuid, paragraph, offset, progress, nowMillis())
+    }
+
+    fun observeSeriesRows() = dao.observeSeriesRows()
+    fun observeFolders() = dao.observeFolders()
+    fun observeFolderItems() = dao.observeFolderItems()
+    suspend fun backfillWordCounts() = dao.backfillWordCounts()
 
     suspend fun delete(uuid: String) = dao.softDelete(uuid, nowMillis())
     suspend fun restore(uuid: String) = dao.restore(uuid, nowMillis())

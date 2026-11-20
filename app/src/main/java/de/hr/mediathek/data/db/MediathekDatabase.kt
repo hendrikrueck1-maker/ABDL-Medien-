@@ -16,6 +16,9 @@ import androidx.room.RoomDatabase
         StoryEntity::class,
         StoryTextEntity::class,
         StoryDraftVersionEntity::class,
+        StoryFolderEntity::class,
+        StoryFolderItemEntity::class,
+        StoryBookmarkEntity::class,
         PlaylistEntity::class,
         PlaylistItemEntity::class,
         BrandEntity::class,
@@ -55,7 +58,7 @@ abstract class MediathekDatabase : RoomDatabase() {
     abstract fun statsDao(): StatsDao
 
     companion object {
-        const val VERSION = 7
+        const val VERSION = 8
         const val NAME = "mediathek.db"
     }
 }

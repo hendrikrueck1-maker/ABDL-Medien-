@@ -769,6 +769,24 @@ data class StoryRow(
     val createdAt: Long,
     val updatedAt: Long,
     val deletedAt: Long?,
+    val seriesUuid: String?,
+    val seriesOrder: Int?,
+    val author: String?,
+    val lastReadAt: Long?,
+    val readProgress: Float,
+    val wordCount: Int,
+)
+
+data class SeriesRow(val uuid: String, val name: String)
+
+/** Minimale Angaben für Duplikat- und Serienerkennung. */
+data class StoryBrief(
+    val uuid: String,
+    val title: String,
+    val author: String?,
+    val seriesUuid: String?,
+    val createdAt: Long,
+    val textHash: String?,
 )
 
 data class SeriesPart(val uuid: String, val title: String, val seriesOrder: Int?)
@@ -776,13 +794,13 @@ data class SeriesPart(val uuid: String, val title: String, val seriesOrder: Int?
 @Dao
 interface StoryDao {
     @Query(
-        "SELECT uuid, title, category, rating, favorite, continueFlag, sourceText, createdAt, updatedAt, deletedAt " +
+        "SELECT uuid, title, category, rating, favorite, continueFlag, sourceText, createdAt, updatedAt, deletedAt, seriesUuid, seriesOrder, author, lastReadAt, readProgress, wordCount " +
             "FROM story WHERE deletedAt IS NULL",
     )
     fun observeActive(): Flow<List<StoryRow>>
 
     @Query(
-        "SELECT uuid, title, category, rating, favorite, continueFlag, sourceText, createdAt, updatedAt, deletedAt " +
+        "SELECT uuid, title, category, rating, favorite, continueFlag, sourceText, createdAt, updatedAt, deletedAt, seriesUuid, seriesOrder, author, lastReadAt, readProgress, wordCount " +
             "FROM story WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC",
     )
     fun observeDeleted(): Flow<List<StoryRow>>
@@ -802,6 +820,78 @@ interface StoryDao {
 
     @Query("SELECT * FROM story WHERE uuid = :uuid")
     suspend fun get(uuid: String): StoryEntity?
+
+    @Query("SELECT uuid, name FROM series WHERE deletedAt IS NULL")
+    fun observeSeriesRows(): Flow<List<SeriesRow>>
+
+    @Query("SELECT uuid, title, author, seriesUuid, createdAt, textHash FROM story WHERE deletedAt IS NULL")
+    suspend fun briefs(): List<StoryBrief>
+
+    @Query("SELECT * FROM series WHERE uuid = :uuid")
+    suspend fun seriesByUuid(uuid: String): SeriesEntity?
+
+    @Query("UPDATE story SET seriesUuid = :seriesUuid, seriesOrder = :order, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun setSeries(uuid: String, seriesUuid: String?, order: Int?, now: Long)
+
+    @Query(
+        "UPDATE story SET rating = :rating, favorite = :favorite, continueFlag = :continueFlag, " +
+            "updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid",
+    )
+    suspend fun setFlags(uuid: String, rating: Int, favorite: Boolean, continueFlag: Boolean, now: Long)
+
+    /** Wortzahl nachrechnen, wo sie noch fehlt (z. B. nach einem Import). */
+    @Query(
+        "UPDATE story SET wordCount = COALESCE((SELECT LENGTH(TRIM(text)) - LENGTH(REPLACE(TRIM(text), ' ', '')) + 1 " +
+            "FROM story_text WHERE storyUuid = story.uuid AND LENGTH(TRIM(text)) > 0), 0) WHERE wordCount = 0",
+    )
+    suspend fun backfillWordCounts()
+
+    @Query("UPDATE story SET readingParagraph = :paragraph, readingOffset = :offset, readProgress = :progress, lastReadAt = :now WHERE uuid = :uuid")
+    suspend fun setReadingFull(uuid: String, paragraph: Int, offset: Int, progress: Float, now: Long)
+
+    // --- Ordner ---
+    @Query("SELECT * FROM story_folder WHERE deletedAt IS NULL ORDER BY name COLLATE NOCASE")
+    fun observeFolders(): Flow<List<StoryFolderEntity>>
+
+    @Query("SELECT * FROM story_folder_item WHERE deletedAt IS NULL")
+    fun observeFolderItems(): Flow<List<StoryFolderItemEntity>>
+
+    @Insert
+    suspend fun insertFolder(folder: StoryFolderEntity): Long
+
+    @Query("UPDATE story_folder SET name = :name, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun renameFolder(uuid: String, name: String, now: Long)
+
+    @Query("UPDATE story_folder SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun softDeleteFolder(uuid: String, now: Long)
+
+    @Query("UPDATE story_folder SET parentUuid = :parent, updatedAt = :now, userUpdatedAt = :now WHERE parentUuid = :old AND deletedAt IS NULL")
+    suspend fun reparentChildren(old: String, parent: String?, now: Long)
+
+    @Query("UPDATE story_folder_item SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE folderUuid = :folderUuid AND deletedAt IS NULL")
+    suspend fun softDeleteItemsOfFolder(folderUuid: String, now: Long)
+
+    @Query("SELECT * FROM story_folder_item WHERE folderUuid = :folderUuid AND storyUuid = :storyUuid LIMIT 1")
+    suspend fun findFolderItem(folderUuid: String, storyUuid: String): StoryFolderItemEntity?
+
+    @Insert
+    suspend fun insertFolderItem(item: StoryFolderItemEntity): Long
+
+    @Query("UPDATE story_folder_item SET deletedAt = :deletedAt, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun setFolderItemDeleted(uuid: String, deletedAt: Long?, now: Long)
+
+    @Query("UPDATE story_folder_item SET storyUuid = :to, updatedAt = :now, userUpdatedAt = :now WHERE storyUuid = :from AND deletedAt IS NULL")
+    suspend fun moveFolderItems(from: String, to: String, now: Long)
+
+    // --- Lesezeichen ---
+    @Query("SELECT * FROM story_bookmark WHERE storyUuid = :storyUuid AND deletedAt IS NULL ORDER BY paragraph")
+    fun observeBookmarks(storyUuid: String): Flow<List<StoryBookmarkEntity>>
+
+    @Insert
+    suspend fun insertBookmark(bookmark: StoryBookmarkEntity): Long
+
+    @Query("UPDATE story_bookmark SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun deleteBookmark(uuid: String, now: Long)
 
     @Query("SELECT * FROM story WHERE uuid = :uuid")
     fun observe(uuid: String): Flow<StoryEntity?>

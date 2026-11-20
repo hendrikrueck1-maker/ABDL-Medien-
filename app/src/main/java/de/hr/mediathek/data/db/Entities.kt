@@ -211,6 +211,52 @@ data class StoryEntity(
     val publishedAt: Long? = null,
     /** SHA-256 über den normalisierten Text, nur für den Import (Duplikaterkennung). */
     val importHash: String? = null,
+    /** Zuletzt gelesen (null = nie geöffnet und gescrollt). */
+    val lastReadAt: Long? = null,
+    /** Lesefortschritt 0..1; ab etwa 0,97 gilt die Geschichte als gelesen. */
+    val readProgress: Float = 0f,
+    /** Wörter im Text (0 = noch nicht berechnet). */
+    val wordCount: Int = 0,
+)
+
+/** Eigener Ordner (Sammlung) für Geschichten; Ordner können verschachtelt sein. */
+@Entity(tableName = "story_folder", indices = [Index("uuid", unique = true), Index("parentUuid")])
+data class StoryFolderEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val uuid: String = newUuid(),
+    val name: String,
+    val parentUuid: String? = null,
+    val createdAt: Long = nowMillis(),
+    val updatedAt: Long = createdAt,
+    val userUpdatedAt: Long = createdAt,
+    val deletedAt: Long? = null,
+)
+
+/** Zuordnung Geschichte <-> Ordner (eine Geschichte kann in mehreren Ordnern liegen). */
+@Entity(tableName = "story_folder_item", indices = [Index("uuid", unique = true), Index("folderUuid"), Index("storyUuid")])
+data class StoryFolderItemEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val uuid: String = newUuid(),
+    val folderUuid: String,
+    val storyUuid: String,
+    val createdAt: Long = nowMillis(),
+    val updatedAt: Long = createdAt,
+    val userUpdatedAt: Long = createdAt,
+    val deletedAt: Long? = null,
+)
+
+/** Lesezeichen an einem Absatz einer Geschichte. */
+@Entity(tableName = "story_bookmark", indices = [Index("uuid", unique = true), Index("storyUuid")])
+data class StoryBookmarkEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val uuid: String = newUuid(),
+    val storyUuid: String,
+    val paragraph: Int,
+    val label: String = "",
+    val createdAt: Long = nowMillis(),
+    val updatedAt: Long = createdAt,
+    val userUpdatedAt: Long = createdAt,
+    val deletedAt: Long? = null,
 )
 
 /** Eigene Tabelle, damit die Liste nie den Text lädt (CursorWindow-Limit). */

@@ -98,7 +98,7 @@ class StoryReaderViewModel @Inject constructor(
     }
 
     fun saveProgress(paragraph: Int, offset: Int) {
-        viewModelScope.launch { repository.saveReading(uuid, paragraph, offset) }
+        viewModelScope.launch { repository.saveReading(uuid, paragraph, offset, _state.value.paragraphs.size) }
     }
 
     fun setRating(rating: Int) = edit { it.copy(rating = if (it.rating == rating) 0 else rating) }

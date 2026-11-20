@@ -199,7 +199,22 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
                 onOpen = { navController.navigate("story/$it") },
                 onEdit = { navController.navigate("story-edit/$it") },
                 onImport = { navController.navigate("story-import") },
+                onDuplicates = { navController.navigate("story-duplicates") },
+                onSeriesSuggest = { navController.navigate("story-series-suggest") },
+                onTools = { navController.navigate("story-tools") },
             )
+        }
+        composable("story-duplicates") {
+            de.hr.mediathek.feature.stories.DuplicatesScreen(
+                onBack = { navController.popBackStack() },
+                onOpen = { navController.navigate("story/$it") },
+            )
+        }
+        composable("story-tools") {
+            de.hr.mediathek.feature.stories.StoryToolsScreen(onBack = { navController.popBackStack() })
+        }
+        composable("story-series-suggest") {
+            de.hr.mediathek.feature.stories.SeriesSuggestScreen(onBack = { navController.popBackStack() })
         }
         composable("story-import") {
             de.hr.mediathek.feature.stories.StoryImportScreen(
