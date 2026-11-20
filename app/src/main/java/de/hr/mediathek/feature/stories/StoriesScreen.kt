@@ -70,6 +70,8 @@ fun StoriesScreen(
     val listState = rememberLazyListState()
     var menu by remember { mutableStateOf(false) }
     var gotoPage by remember { mutableStateOf(false) }
+    var showView by remember { mutableStateOf(false) }
+    var showFilter by remember { mutableStateOf(false) }
     var firstShown by remember { mutableStateOf(false) }
     var pickFor by remember { mutableStateOf<List<String>?>(null) }
     var newFolder by remember { mutableStateOf<String?>(null) } // Name im Eingabedialog
@@ -123,14 +125,11 @@ fun StoriesScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (v in StoryView.entries) {
-                        FilterChip(selected = filter.view == v, onClick = { viewModel.update { it.copy(view = v) } }, label = { Text(v.label) })
-                    }
-                }
+                val activeFilters = listOf(filter.favoritesOnly, filter.continueOnly, filter.readState != ReadState.ALL).count { it }
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     FilterChip(selected = filter.category == null, onClick = { viewModel.update { it.copy(category = null) } }, label = { Text("Alle") })
                     for (c in StoryCategory.entries) {
@@ -140,23 +139,9 @@ fun StoriesScreen(
                             label = { Text(categoryLabel(c)) },
                         )
                     }
-                    FilterChip(selected = filter.favoritesOnly, onClick = { viewModel.update { it.copy(favoritesOnly = !it.favoritesOnly) } }, label = { Text("♥ Favoriten") })
-                    FilterChip(selected = filter.continueOnly, onClick = { viewModel.update { it.copy(continueOnly = !it.continueOnly) } }, label = { Text("✏ Weiterschreiben") })
-                }
-                Row(
-                    Modifier.horizontalScroll(rememberScrollState()).padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    for (r in ReadState.entries.drop(1)) {
-                        FilterChip(
-                            selected = filter.readState == r,
-                            onClick = { viewModel.update { f -> f.copy(readState = if (f.readState == r) ReadState.ALL else r) } },
-                            label = { Text(r.label) },
-                        )
-                    }
-                    for (s in StorySort.entries) {
-                        FilterChip(selected = filter.sort == s, onClick = { viewModel.update { f -> f.copy(sort = s) } }, label = { Text("↕ ${s.label}") })
-                    }
+                    OutlinedButton(onClick = { showView = true }) { Text("Ansicht: ${filter.view.label}") }
+                    if (activeFilters > 0) Button(onClick = { showFilter = true }) { Text("Filter ($activeFilters)") }
+                    else OutlinedButton(onClick = { showFilter = true }) { Text("Filter") }
                 }
                 if (filter.view == StoryView.FOLDERS) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -254,6 +239,8 @@ fun StoriesScreen(
             onDismiss = { pickFor = null },
         )
     }
+    if (showView) StoryViewDialog(filter, onDismiss = { showView = false }) { f -> viewModel.update { f } }
+    if (showFilter) StoryFilterDialog(filter, onDismiss = { showFilter = false }) { f -> viewModel.update { f } }
     newFolder?.let { name ->
         NameDialog("Neuer Ordner", name, onDismiss = { newFolder = null }) { viewModel.createFolder(it, filter.folder?.takeIf { f -> f != NO_FOLDER }); newFolder = null }
     }
@@ -476,5 +463,57 @@ private fun NameDialog(title: String, initial: String, onDismiss: () -> Unit, on
         text = { OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, modifier = Modifier.fillMaxWidth()) },
         confirmButton = { TextButton(onClick = { if (name.isNotBlank()) onOk(name) }, enabled = name.isNotBlank()) { Text("OK") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } },
+    )
+}
+
+
+/** Ansicht: Darstellung (Liste, Baum, Ordner) und Sortierung. */
+@Composable
+private fun StoryViewDialog(filter: StoryFilter, onDismiss: () -> Unit, onChange: (StoryFilter) -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Fertig") } },
+        title = { Text("Ansicht") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Darstellung", style = MaterialTheme.typography.labelLarge)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (v in StoryView.entries) FilterChip(selected = filter.view == v, onClick = { onChange(filter.copy(view = v)) }, label = { Text(v.label) })
+                }
+                Text("Sortierung", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (o in StorySort.entries) FilterChip(selected = filter.sort == o, onClick = { onChange(filter.copy(sort = o)) }, label = { Text(o.label) })
+                }
+            }
+        },
+    )
+}
+
+/** Filter: Favoriten, Weiterschreiben, Lesestand; "Zurücksetzen" löscht alle drei. */
+@Composable
+private fun StoryFilterDialog(filter: StoryFilter, onDismiss: () -> Unit, onChange: (StoryFilter) -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Fertig") } },
+        dismissButton = {
+            TextButton(onClick = { onChange(filter.copy(favoritesOnly = false, continueOnly = false, readState = ReadState.ALL)) }) { Text("Zurücksetzen") }
+        },
+        title = { Text("Filter") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = filter.favoritesOnly, onClick = { onChange(filter.copy(favoritesOnly = !filter.favoritesOnly)) }, label = { Text("♥ Favoriten") })
+                    FilterChip(selected = filter.continueOnly, onClick = { onChange(filter.copy(continueOnly = !filter.continueOnly)) }, label = { Text("✏ Weiterschreiben") })
+                }
+                Text("Lesestand", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (r in ReadState.entries) {
+                        FilterChip(selected = filter.readState == r, onClick = { onChange(filter.copy(readState = r)) }, label = { Text(r.label) })
+                    }
+                }
+            }
+        },
     )
 }

@@ -57,6 +57,7 @@ import de.hr.mediathek.data.db.MediaFileEntity
 import de.hr.mediathek.data.suggest.Suggestion
 import de.hr.mediathek.data.suggest.SuggestionKind
 import de.hr.mediathek.feature.library.rememberThumbBitmap
+import de.hr.mediathek.data.db.RecentStory
 import de.hr.mediathek.feature.tracker.Tile
 import de.hr.mediathek.feature.tracker.TrackerViewModel
 import de.hr.mediathek.feature.tracker.UndoBar
@@ -87,6 +88,7 @@ private fun descOf(d: Destination): Int = when (d) {
 fun HomeScreen(
     onOpen: (Destination) -> Unit,
     onOpenVideo: (String) -> Unit = {},
+    onOpenStory: (String) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     tracker: TrackerViewModel = hiltViewModel(),
 ) {
@@ -109,11 +111,11 @@ fun HomeScreen(
         verticalArrangement = Arrangement.spacedBy(if (wide) 20.dp else 12.dp),
     ) {
         HeaderCard(date, wide, onNewBackground = background::reload)
-        // Reihenfolge: Bereiche, Vorschläge (fünf nebeneinander), Aktuell (alle sichtbar, ohne seitliches Scrollen), Zuletzt.
+        // Reihenfolge: Bereiche, Vorschläge (fünf nebeneinander), Zuletzt geöffnet (nur Geschichten), Aktuell.
         AreasGrid(Modifier.fillMaxWidth(), onOpen, wide = wide)
         SuggestionsCard(suggestions, viewModel, wide = wide, onOpenVideo)
+        RecentCard(recent, onOpenStory)
         CurrentCard(tiles.filter { it.favorite }.take(3), todayCount, tracker, wide = wide, onMore = { onOpen(Destination.Tracker) })
-        RecentCard(recent, onOpenVideo)
         Text(
             stringResource(R.string.version_label, BuildConfig.VERSION_NAME),
             style = MaterialTheme.typography.labelSmall,
@@ -254,7 +256,7 @@ private fun AreasGrid(modifier: Modifier, onOpen: (Destination) -> Unit, wide: B
 }
 
 @Composable
-private fun RecentCard(recent: List<MediaFileEntity>, onOpenVideo: (String) -> Unit) {
+private fun RecentCard(recent: List<RecentStory>, onOpenStory: (String) -> Unit) {
     if (recent.isEmpty()) return
     val c = LocalAppColors.current
     AppCard(Modifier.fillMaxWidth(), padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp, vertical = 14.dp)) {
@@ -263,9 +265,9 @@ private fun RecentCard(recent: List<MediaFileEntity>, onOpenVideo: (String) -> U
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for (v in recent) {
                     Box(
-                        Modifier.clip(CircleShape).background(c.bar).bounceClick { onOpenVideo(v.uuid) }
+                        Modifier.clip(CircleShape).background(c.bar).bounceClick { onOpenStory(v.uuid) }
                             .padding(horizontal = 16.dp, vertical = 10.dp),
-                    ) { Text(v.displayName, style = MaterialTheme.typography.labelMedium, color = c.onCard, maxLines = 1) }
+                    ) { Text(v.title, style = MaterialTheme.typography.labelMedium, color = c.onCard, maxLines = 1) }
                 }
             }
         }

@@ -806,6 +806,9 @@ data class StoryBrief(
 
 data class SeriesPart(val uuid: String, val title: String, val seriesOrder: Int?)
 
+/** Zuletzt gelesene Geschichte für die Übersicht. */
+data class RecentStory(val uuid: String, val title: String)
+
 @Dao
 interface StoryDao {
     @Query(
@@ -866,6 +869,9 @@ interface StoryDao {
             "FROM story_text WHERE storyUuid = story.uuid AND LENGTH(TRIM(text)) > 0), 0) WHERE wordCount = 0",
     )
     suspend fun backfillWordCounts()
+
+    @Query("SELECT uuid, title FROM story WHERE deletedAt IS NULL AND lastReadAt IS NOT NULL ORDER BY lastReadAt DESC LIMIT :limit")
+    suspend fun recentStories(limit: Int): List<RecentStory>
 
     @Query("UPDATE story SET readingParagraph = :paragraph, readingOffset = :offset, readProgress = :progress, lastReadAt = :now WHERE uuid = :uuid")
     suspend fun setReadingFull(uuid: String, paragraph: Int, offset: Int, progress: Float, now: Long)

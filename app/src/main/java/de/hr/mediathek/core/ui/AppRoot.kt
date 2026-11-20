@@ -91,7 +91,7 @@ fun AppRoot() {
         Row(Modifier.fillMaxSize()) {
             if (!fullScreenRoute) AppNavigationRail(navController)
             Scaffold(Modifier.weight(1f), containerColor = Color.Transparent) { padding ->
-                ScreenPanel(fullScreenRoute, route in CARD_ROUTES, Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
+                ScreenPanel(fullScreenRoute, route in CARD_ROUTES, isStoryRoute(route), Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
             }
         }
     } else {
@@ -99,7 +99,7 @@ fun AppRoot() {
             containerColor = Color.Transparent,
             bottomBar = { if (!fullScreenRoute) AppBottomBar(navController) },
         ) { padding ->
-            ScreenPanel(fullScreenRoute, route in CARD_ROUTES, Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
+            ScreenPanel(fullScreenRoute, route in CARD_ROUTES, isStoryRoute(route), Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
         }
     }
     }
@@ -120,8 +120,22 @@ private fun isFullScreenRoute(route: String?): Boolean =
  * Schrift liegt nie direkt auf dem Bild. Vollbild-Seiten (Player, Bilder) bleiben unverändert;
  * der Inhalt behält dabei seinen Platz im Baum, damit beim Wechsel nichts neu aufgebaut wird.
  */
+private fun isStoryRoute(route: String): Boolean = route.startsWith("stories") || route.startsWith("story")
+
 @Composable
-private fun ScreenPanel(fullScreen: Boolean, transparent: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+private fun ScreenPanel(fullScreen: Boolean, transparent: Boolean, stories: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    // Geschichten-Teile: dunkle Flächen nur zu 20 % durchsichtig (Alpha 0,8) statt 60 %.
+    val base = LocalAppColors.current
+    val colors = if (stories) base.copy(
+        bar = base.bar.copy(alpha = 0.8f), card = base.card.copy(alpha = 0.8f), cardInset = base.cardInset.copy(alpha = 0.8f),
+    ) else base
+    androidx.compose.runtime.CompositionLocalProvider(LocalAppColors provides colors) {
+        ScreenPanelBody(fullScreen, transparent, modifier, content)
+    }
+}
+
+@Composable
+private fun ScreenPanelBody(fullScreen: Boolean, transparent: Boolean, modifier: Modifier, content: @Composable () -> Unit) {
     val panel = if (fullScreen || transparent) {
         Modifier.fillMaxSize()
     } else {
@@ -161,6 +175,7 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
             HomeScreen(
                 onOpen = { navController.navigateTopLevel(it) },
                 onOpenVideo = { navController.navigate("player/$it") },
+                onOpenStory = { navController.navigate("story/$it") },
             )
         }
         composable(Destination.Settings.route) {

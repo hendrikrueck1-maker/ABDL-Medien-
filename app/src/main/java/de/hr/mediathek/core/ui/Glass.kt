@@ -25,7 +25,8 @@ fun Modifier.glass(tint: Color, shape: Shape = RoundedCornerShape(28.dp)): Modif
 
 /** Kartenfarben: deckend, damit Karten auf jedem Hintergrundbild lesbar sind. */
 @Composable
-fun glassCardColors(tint: Color): CardColors = CardDefaults.cardColors(containerColor = tint.copy(alpha = 0.4f))
+fun glassCardColors(tint: Color): CardColors =
+    CardDefaults.cardColors(containerColor = tint.copy(alpha = de.hr.mediathek.core.ui.theme.LocalAppColors.current.card.alpha))
 
 /** Überschrift als Pille auf deckender Fläche. */
 @Composable
