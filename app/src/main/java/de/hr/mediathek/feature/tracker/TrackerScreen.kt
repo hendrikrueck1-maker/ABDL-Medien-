@@ -164,8 +164,6 @@ private fun PeriodSwitch(period: StatPeriod, onPeriod: (StatPeriod) -> Unit) {
     }
 }
 
-private fun Modifier.selectableGroup(): Modifier = this.semantics { }
-
 @Composable
 fun TrackerScreen(
     onOpenProduct: (String) -> Unit,
