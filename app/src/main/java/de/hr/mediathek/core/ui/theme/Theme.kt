@@ -8,6 +8,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -39,9 +40,11 @@ private val NightScheme = AppColors().let { c ->
     )
 }
 
+@OptIn(ExperimentalTextApi::class)
 private val Quicksand = FontFamily(
     Font(R.font.quicksand, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
 )
+@OptIn(ExperimentalTextApi::class)
 private val Nunito = FontFamily(
     Font(R.font.nunito, FontWeight.SemiBold, variationSettings = FontVariation.Settings(FontVariation.weight(600))),
     Font(R.font.nunito, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(700))),
@@ -49,6 +52,7 @@ private val Nunito = FontFamily(
 )
 
 /** Literata für lange Texte im Leser (Gewicht 400). */
+@OptIn(ExperimentalTextApi::class)
 val LiterataFamily = FontFamily(
     Font(R.font.literata, FontWeight.Normal, variationSettings = FontVariation.Settings(FontVariation.weight(400))),
 )
