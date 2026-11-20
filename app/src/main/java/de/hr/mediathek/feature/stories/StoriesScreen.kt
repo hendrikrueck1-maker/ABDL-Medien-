@@ -29,6 +29,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import de.hr.mediathek.core.ui.readable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -381,7 +382,7 @@ internal fun formatWords(n: Int): String = if (n >= 1000) "${n / 1000} Tsd. Wör
 @Composable
 private fun LetterBar(letterPages: Map<Char, Int>, onPage: (Int) -> Unit, modifier: Modifier) {
     Column(
-        modifier.fillMaxHeight().padding(top = 80.dp, bottom = 110.dp),
+        modifier.fillMaxHeight().padding(top = 80.dp, bottom = 110.dp).readable(),
         verticalArrangement = Arrangement.SpaceEvenly,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -401,7 +402,7 @@ private fun LetterBar(letterPages: Map<Char, Int>, onPage: (Int) -> Unit, modifi
 /** Seitenleiste unten: erste, zurück, "Seite x von y" (antippen zum Springen), weiter, letzte. */
 @Composable
 private fun PageBar(page: Int, pageCount: Int, total: Int, onPage: (Int) -> Unit, onGoto: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp).readable(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
         TextButton(onClick = { onPage(0) }, enabled = page > 0) { Text("⏮") }
         TextButton(onClick = { onPage(page - 1) }, enabled = page > 0) { Text("◀") }
         Text(

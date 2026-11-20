@@ -110,7 +110,7 @@ private fun ScreenPanel(fullScreen: Boolean, modifier: Modifier = Modifier, cont
             .fillMaxSize()
             .padding(horizontal = 6.dp, vertical = 4.dp)
             .clip(RoundedCornerShape(28.dp))
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.26f))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = LocalReadability.current.panelAlpha))
     }
     Box(modifier.then(panel)) {
         if (!fullScreen) FloatingBubbles()
@@ -326,7 +326,7 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
 @Composable
 private fun AppBottomBar(navController: NavHostController) {
     val currentRoute = navController.currentRoute()
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f)) {
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = (LocalReadability.current.cardAlpha + 0.1f).coerceAtMost(0.97f))) {
         Destination.entries.filter { it.inCompactBar }.forEach { destination ->
             NavigationBarItem(
                 selected = currentRoute == destination.route,
@@ -342,7 +342,7 @@ private fun AppBottomBar(navController: NavHostController) {
 private fun AppNavigationRail(navController: NavHostController) {
     val currentRoute = navController.currentRoute()
     // Feste Breite: die Trennlinien füllen sonst die ganze Zeile und der Inhalt daneben hat keinen Platz mehr.
-    NavigationRail(modifier = Modifier.width(80.dp), containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f)) {
+    NavigationRail(modifier = Modifier.width(80.dp), containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = (LocalReadability.current.cardAlpha + 0.1f).coerceAtMost(0.97f))) {
         Column(Modifier.verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             var previousGroup = Destination.entries.first().group
             Destination.entries.forEach { destination ->

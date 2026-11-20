@@ -18,6 +18,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,6 +52,9 @@ fun SettingsScreen(onOpenRoute: (String) -> Unit, viewModel: UpdateViewModel = h
             style = MaterialTheme.typography.headlineMedium,
             modifier = Modifier.align(Alignment.Start),
         )
+
+        GroupTitle("Aussehen")
+        ReadabilityCard()
 
         GroupTitle(stringResource(R.string.settings_group_media))
         SettingsRow(R.string.settings_row_sources, R.string.settings_row_sources_hint, GlassTint.BLUE) {
@@ -208,5 +213,23 @@ private fun SettingsRow(@StringRes title: Int, @StringRes hint: Int?, tint: Glas
             }
         }
         Text("›", style = MaterialTheme.typography.titleLarge, color = onContainer)
+    }
+}
+
+/** Regler für die Lesbarkeit der Schrift über dem Hintergrundbild. */
+@Composable
+private fun ReadabilityCard(vm: ReadabilityViewModel = hiltViewModel()) {
+    val level by vm.level.collectAsStateWithLifecycle()
+    val auto by vm.auto.collectAsStateWithLifecycle()
+    Card(colors = glassCardColors(MaterialTheme.colorScheme.surfaceContainer), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Lesbarkeit der Schrift", style = MaterialTheme.typography.titleMedium)
+            Text("Links: Hintergrundbild deutlich sichtbar. Rechts: Flächen hinter der Schrift fester.", style = MaterialTheme.typography.bodySmall)
+            Slider(value = level, onValueChange = vm::setLevel, valueRange = 0f..1f)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Switch(checked = auto, onCheckedChange = vm::setAuto)
+                Text("Automatisch je nach Bild (helle oder unruhige Bilder bekommen mehr Schutz)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            }
+        }
     }
 }
