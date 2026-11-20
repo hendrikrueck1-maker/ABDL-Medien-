@@ -53,6 +53,10 @@ fun StorageScreen(onBack: () -> Unit, section: String = StorageSection.SOURCES, 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val backup by viewModel.backup.collectAsStateWithLifecycle()
     val restore by viewModel.restore.collectAsStateWithLifecycle()
+    val mirror by viewModel.mirror.collectAsStateWithLifecycle()
+    val mirrorPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) viewModel.setMirror(uri)
+    }
     var rebindTarget by remember { mutableStateOf<String?>(null) }
     var removeTarget by remember { mutableStateOf<SourceItem?>(null) }
     var confirmRestore by remember { mutableStateOf<de.hr.mediathek.data.backup.BackupFileInfo?>(null) }
@@ -227,6 +231,14 @@ fun StorageScreen(onBack: () -> Unit, section: String = StorageSection.SOURCES, 
             onExport = { exportPicker.launch("mediathek-backup.zip") },
             onImport = { importPicker.launch(arrayOf("application/zip", "application/octet-stream")) },
             onDismissMessage = viewModel::dismissRestoreMessage,
+        )
+
+        if (section == StorageSection.BACKUP) MirrorCard(
+            mirror = mirror,
+            lastBackupAt = backup.lastSuccessAt,
+            onPick = { mirrorPicker.launch(null) },
+            onCopy = viewModel::mirrorNow,
+            onRemove = viewModel::removeMirror,
         )
 
         if (section == StorageSection.COMPRESSION) CompressionCard()
@@ -499,6 +511,69 @@ private fun BackupCard(
                     OutlinedButton(onClick = { onPick(file) }, enabled = !restore.busy, modifier = Modifier.fillMaxWidth()) {
                         Text("$date · ${(file.size / 1024).coerceAtLeast(1)} KB")
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MirrorCard(
+    mirror: MirrorUiState,
+    lastBackupAt: Long?,
+    onPick: () -> Unit,
+    onCopy: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val onColor = MaterialTheme.colorScheme.onTertiaryContainer
+    val now = System.currentTimeMillis()
+    fun ago(t: Long?): String {
+        if (t == null) return stringResource(R.string.mirror_never)
+        val d = ((now - t) / 86_400_000L).toInt()
+        return if (d == 0) stringResource(R.string.mirror_today) else stringResource(R.string.mirror_days_ago, d)
+    }
+    val job = mirror.job
+    val running = job != null && (job.status == JobStatus.QUEUED || job.status == JobStatus.RUNNING)
+    val stale = mirror.configured &&
+        (mirror.lastSuccessAt == null || now - mirror.lastSuccessAt > de.hr.mediathek.data.backup.MirrorService.STALE_DAYS * 86_400_000L)
+    val offer = mirror.configured && mirror.reachable == true && !running &&
+        (mirror.lastSuccessAt == null || (lastBackupAt != null && lastBackupAt > mirror.lastSuccessAt))
+    Card(
+        colors = de.hr.mediathek.core.ui.glassCardColors(MaterialTheme.colorScheme.tertiaryContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.mirror_title), style = MaterialTheme.typography.titleMedium, color = onColor)
+            // Sicherheits-Übersicht
+            Text(stringResource(R.string.mirror_dash_main, ago(lastBackupAt)), color = onColor)
+            Text(stringResource(R.string.mirror_dash_mirror, ago(mirror.lastSuccessAt)), color = onColor)
+            if (lastBackupAt == null || now - lastBackupAt > 3 * 86_400_000L) {
+                Text(stringResource(R.string.backup_old_warning), color = MaterialTheme.colorScheme.error)
+            }
+            if (!mirror.configured) {
+                Text(stringResource(R.string.mirror_hint), style = MaterialTheme.typography.bodySmall, color = onColor)
+                Button(onClick = onPick) { Text(stringResource(R.string.mirror_choose)) }
+            } else {
+                Text(
+                    stringResource(R.string.mirror_card, mirror.label ?: "-") + " · " +
+                        stringResource(if (mirror.reachable == true) R.string.mirror_connected else R.string.mirror_not_connected),
+                    color = onColor,
+                )
+                if (stale) Text(stringResource(R.string.mirror_stale_warning), color = MaterialTheme.colorScheme.error)
+                if (offer) Text(stringResource(R.string.mirror_offer), color = onColor)
+                if (job != null && job.status == JobStatus.RUNNING) {
+                    Text(job.phase ?: "", style = MaterialTheme.typography.bodySmall, color = onColor)
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
+                } else if (job != null && job.status == JobStatus.FAILED) {
+                    Text(stringResource(R.string.backup_failed, job.lastError ?: "-"), color = MaterialTheme.colorScheme.error)
+                } else if (job != null && job.status == JobStatus.COMPLETED) {
+                    Text(job.phase ?: "", style = MaterialTheme.typography.bodySmall, color = onColor)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = onCopy, enabled = mirror.reachable == true && !running) {
+                        Text(stringResource(R.string.mirror_copy_now))
+                    }
+                    OutlinedButton(onClick = onRemove) { Text(stringResource(R.string.mirror_remove)) }
                 }
             }
         }

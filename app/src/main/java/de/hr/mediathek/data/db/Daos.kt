@@ -13,11 +13,17 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SourceDao {
-    @Query("SELECT * FROM source WHERE deletedAt IS NULL ORDER BY createdAt")
+    @Query("SELECT * FROM source WHERE deletedAt IS NULL AND role = 'MEDIA' ORDER BY createdAt")
     fun observeAll(): Flow<List<SourceEntity>>
 
-    @Query("SELECT * FROM source WHERE deletedAt IS NULL ORDER BY createdAt")
+    @Query("SELECT * FROM source WHERE deletedAt IS NULL AND role = 'MEDIA' ORDER BY createdAt")
     suspend fun getAll(): List<SourceEntity>
+
+    @Query("SELECT * FROM source WHERE deletedAt IS NULL AND role = 'BACKUP' ORDER BY createdAt DESC LIMIT 1")
+    fun observeMirror(): Flow<SourceEntity?>
+
+    @Query("SELECT * FROM source WHERE deletedAt IS NULL AND role = 'BACKUP' ORDER BY createdAt DESC LIMIT 1")
+    suspend fun getMirror(): SourceEntity?
 
     @Query("SELECT * FROM source WHERE deletedAt IS NULL AND treeUri = :treeUri LIMIT 1")
     suspend fun findByTreeUri(treeUri: String): SourceEntity?

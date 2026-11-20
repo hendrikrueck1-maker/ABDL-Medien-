@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -63,6 +64,14 @@ data class RestoreUiState(
     val message: RestoreMessage? = null,
 )
 
+data class MirrorUiState(
+    val configured: Boolean = false,
+    val label: String? = null,
+    val reachable: Boolean? = null,
+    val lastSuccessAt: Long? = null,
+    val job: JobEntity? = null,
+)
+
 data class ThumbUiState(
     val count: Int = 0,
     val bytes: Long = 0,
@@ -83,6 +92,7 @@ class StorageViewModel @Inject constructor(
     private val thumbCache: ThumbnailCache,
     private val backupStore: BackupStore,
     private val backupService: BackupService,
+    private val mirrorService: de.hr.mediathek.data.backup.MirrorService,
 ) : ViewModel() {
 
     private val reachability = MutableStateFlow<Map<String, Boolean>>(emptyMap())
@@ -121,6 +131,24 @@ class StorageViewModel @Inject constructor(
 
     val backup: StateFlow<BackupStatus> = backupStore.observeStatus()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BackupStatus(null, null, null))
+
+    private val mirrorReachable = MutableStateFlow<Boolean?>(null)
+
+    val mirror: StateFlow<MirrorUiState> = combine(mirrorService.observeStatus(), mirrorReachable) { st, reach ->
+        MirrorUiState(st.source != null, st.source?.label, reach, st.lastSuccessAt, st.job)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MirrorUiState())
+
+    fun setMirror(uri: Uri) {
+        viewModelScope.launch { mirrorService.setMirror(uri); refreshStatus() }
+    }
+
+    fun removeMirror() {
+        viewModelScope.launch { mirrorService.removeMirror(); mirrorReachable.value = null }
+    }
+
+    fun mirrorNow() {
+        viewModelScope.launch { scheduler.enqueueMirrorCopy() }
+    }
 
     private val _restore = MutableStateFlow(RestoreUiState())
     val restore: StateFlow<RestoreUiState> = _restore
@@ -208,6 +236,7 @@ class StorageViewModel @Inject constructor(
                 if (ok) repository.markMounted(source)
             }
             reachability.update { result }
+            mirrorService.observeStatus().first().source?.let { mirrorReachable.value = mirrorService.isReachable(it) }
         }
     }
 

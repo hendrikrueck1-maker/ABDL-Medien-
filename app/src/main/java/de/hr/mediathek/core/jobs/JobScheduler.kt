@@ -51,6 +51,14 @@ class JobScheduler @Inject constructor(
         enqueueBackup()
     }
 
+    /** Sicherung und Produktfotos auf die Spiegelkarte kopieren. */
+    suspend fun enqueueMirrorCopy(): Boolean {
+        if (jobDao.findActive(JobType.MIRROR_COPY, "%") != null) return false
+        jobDao.insert(JobEntity(type = JobType.MIRROR_COPY, priority = JobPriority.MEDIUM))
+        trigger()
+        return true
+    }
+
     /** Vorschaubilder nachziehen (läuft sonst automatisch nach jedem Scan). */
     suspend fun enqueueThumbnails(): Boolean {
         if (jobDao.findActive(JobType.THUMBNAILS, "%") != null) return false
