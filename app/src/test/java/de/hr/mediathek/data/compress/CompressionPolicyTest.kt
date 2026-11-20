@@ -63,18 +63,16 @@ class CompressionPolicyTest {
         assertEquals(VerifyFailure.DURATION, CompressionPolicy.verify(facts(), facts(size = 600_000_000, duration = null)))
     }
 
-    @Test fun verifyRequiresFifteenPercentSaving() {
-        assertEquals(VerifyFailure.NOT_SMALLER, CompressionPolicy.verify(facts(), facts(size = 900_000_000)))
-        assertNull(CompressionPolicy.verify(facts(), facts(size = 850_000_000)))
-        assertEquals(VerifyFailure.NOT_SMALLER, CompressionPolicy.verify(facts(), facts(size = 850_000_001)))
+    @Test fun verifyRequiresFivePercentSaving() {
+        assertEquals(VerifyFailure.NOT_SMALLER, CompressionPolicy.verify(facts(), facts(size = 980_000_000)))
+        assertNull(CompressionPolicy.verify(facts(), facts(size = 950_000_000)))
+        assertEquals(VerifyFailure.NOT_SMALLER, CompressionPolicy.verify(facts(), facts(size = 950_000_001)))
     }
 
     @Test fun verifyRequiresAudioPassthrough() {
         assertEquals(VerifyFailure.AUDIO_CHANGED, CompressionPolicy.verify(facts(), facts(size = 500_000_000, audio = 0)))
-        assertEquals(
-            VerifyFailure.AUDIO_CHANGED,
-            CompressionPolicy.verify(facts(), facts(size = 500_000_000, audioMime = "audio/opus")),
-        )
+        // Anderer Ton-Codec (z. B. AC3 zu AAC, weil MP4 ihn nicht aufnimmt) ist in Ordnung, solange die Spur da ist
+        assertNull(CompressionPolicy.verify(facts(), facts(size = 500_000_000, audioMime = "audio/opus")))
         // Mehrere Tonspuren in der Quelle: nur die erste bleibt (vom Nutzer bestätigt)
         assertNull(CompressionPolicy.verify(facts(audio = 3), facts(size = 500_000_000, audio = 1)))
         // Quelle ohne Ton

@@ -4,7 +4,9 @@ import android.content.Context
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Effects
 import androidx.media3.common.MimeTypes
+import androidx.media3.effect.Presentation
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.DefaultEncoderFactory
@@ -44,6 +46,8 @@ class CompressionEngine @Inject constructor(
         clipStartMs: Long = 0,
         clipLengthMs: Long = 0,
         videoMime: String = MimeTypes.VIDEO_H265,
+        maxHeight: Int = 0,
+        allowFallback: Boolean = false,
         onProgress: suspend (Float) -> Unit,
     ) {
         output.parentFile?.mkdirs()
@@ -52,7 +56,7 @@ class CompressionEngine @Inject constructor(
             val done = CompletableDeferred<Unit>()
             val encoderFactory = DefaultEncoderFactory.Builder(context)
                 .setRequestedVideoEncoderSettings(VideoEncoderSettings.Builder().setBitrate(videoBitrate).build())
-                .setEnableFallback(false)
+                .setEnableFallback(allowFallback)
                 .build()
             val transformer = Transformer.Builder(context)
                 .setVideoMimeType(videoMime)
@@ -77,7 +81,12 @@ class CompressionEngine @Inject constructor(
                     )
                 }
             }.build()
-            transformer.start(EditedMediaItem.Builder(item).build(), output.absolutePath)
+            val edited = EditedMediaItem.Builder(item).apply {
+                if (maxHeight > 0) {
+                    setEffects(Effects(emptyList(), listOf(Presentation.createForHeight(maxHeight))))
+                }
+            }.build()
+            transformer.start(edited, output.absolutePath)
             val poller = launch {
                 val holder = ProgressHolder()
                 var lastValue = -1

@@ -47,7 +47,20 @@ class CompressionJobExecutor @Inject constructor(
     private val errorLogger: ErrorLogger,
 ) {
     private val resolver get() = context.contentResolver
-    private val workDir get() = File(context.filesDir, "compress")
+    /**
+     * Arbeitsordner mit genug Platz: zuerst der Gerätespeicher, sonst der App-Ordner auf der SD-Karte
+     * (getExternalFilesDirs braucht keine Freigabe). So lassen sich auch sehr große Videos komprimieren.
+     */
+    private fun pickWorkDir(needed: Long): File? {
+        val candidates = buildList {
+            add(File(context.filesDir, "compress"))
+            context.getExternalFilesDirs(null).filterNotNull().forEach { add(File(it, "compress")) }
+        }
+        return candidates.firstOrNull {
+            it.mkdirs()
+            it.exists() && it.usableSpace >= needed
+        }
+    }
 
     suspend fun execute(job: JobEntity, ctx: JobContext): JobOutcome = withContext(Dispatchers.IO) {
         val params = CompressionParams.parse(job.paramsJson)
@@ -110,8 +123,9 @@ class CompressionJobExecutor @Inject constructor(
         val target = CompressionPolicy.targetVideoBitrate(videoBps, p.level)
         val estimate = CompressionPolicy.estimatedSize(target, duration)
 
-        workDir.mkdirs()
-        if (workDir.usableSpace < estimate * 12 / 10) return JobOutcome.Failed("Zu wenig freier Speicher im Gerät")
+        // Die erste Stufe braucht ungefähr die geschätzte Größe; Reserve für Hardware-Encoder, die die Rate überschreiten.
+        val workBase = pickWorkDir(estimate * 15 / 10)
+            ?: return JobOutcome.Failed("Zu wenig freier Speicher (Gerät und Speicherkarte) für die Zwischendatei")
         source.volumeUuid?.let { File("/storage/$it") }?.takeIf { it.exists() }?.let {
             // usableSpace = 0 heißt oft nur "nicht lesbar": dann nicht abbrechen, das Kopieren meldet echten Platzmangel.
             if (it.usableSpace in 1 until estimate * 11 / 10) return JobOutcome.Failed("Zu wenig Platz auf der Speicherkarte")
@@ -125,7 +139,7 @@ class CompressionJobExecutor @Inject constructor(
             return JobOutcome.Failed("Im Ordner gibt es schon eine Datei mit dem Zielnamen")
         }
 
-        val local = File(workDir, "${job.uuid}.mp4")
+        val local = File(workBase, "${job.uuid}.mp4")
         var record = CompressionRecordEntity(
             jobUuid = job.uuid, mediaUuid = media.uuid, phase = CompressionPhase.ENCODING,
             sourceUuid = media.sourceUuid, relativePath = media.relativePath, origName = media.displayName,
@@ -136,52 +150,72 @@ class CompressionJobExecutor @Inject constructor(
         record = record.copy(id = dao.insert(record))
 
         try {
-            // Hardware-Encoder überschreiten die Zielrate manchmal deutlich. Wird das Ergebnis nicht klein genug,
-            // gibt es einen zweiten Versuch mit niedrigerer Rate, bevor das Video als nicht komprimierbar gilt.
-            var attemptTarget = target
-            var failure: VerifyFailure? = null
-            var mime = androidx.media3.common.MimeTypes.VIDEO_H265
-            var attempt = 0
-            while (attempt <= 1) {
-                ctx.report(if (attempt == 0) "Komprimiere" else "Komprimiere (zweiter Versuch)", 0f, force = true)
+            // Stufenleiter: jede Stufe wird nur versucht, wenn die vorige scheitert (Encoder-Fehler, Ergebnis nicht klein genug,
+            // Dauer/Ton/Dekodierung auffällig). Hardware-Encoder überschreiten die Zielrate oft deutlich.
+            val h265 = androidx.media3.common.MimeTypes.VIDEO_H265
+            val h264 = androidx.media3.common.MimeTypes.VIDEO_H264
+            val ladder = listOf(
+                Step(h265, target, 0, false),
+                Step(h265, (target * 0.65).toLong(), 0, false),
+                Step(h264, (target * 0.80).toLong(), 0, false),
+                Step(h265, (target * 0.45).toLong(), 720, true),
+                Step(h264, (target * 0.55).toLong(), 720, true),
+            )
+            var failure: VerifyFailure? = VerifyFailure.NOT_SMALLER
+            var lastError: Throwable? = null
+            var lastNote = ""
+            var done = false
+            for ((index, step) in ladder.withIndex()) {
+                val bps = step.bps.coerceAtLeast(CompressionPolicy.MIN_TARGET_BPS)
+                // Gleiche Rate wie die vorige Stufe wäre sinnlos.
+                if (index > 0 && step.mime == ladder[index - 1].mime && step.height == ladder[index - 1].height && bps >= ladder[index - 1].bps) continue
+                val label = if (index == 0) "Komprimiere" else "Komprimiere (Versuch ${index + 1})"
+                ctx.report(label, 0f, force = true)
                 try {
-                    engine.encode(srcUri, local, attemptTarget.toInt(), videoMime = mime) { fraction ->
+                    engine.encode(srcUri, local, bps.toInt(), videoMime = step.mime, maxHeight = step.height, allowFallback = step.fallback) { fraction ->
                         ctx.checkpoint()
-                        ctx.report(if (attempt == 0) "Komprimiere" else "Komprimiere (zweiter Versuch)", fraction * ENCODE_SHARE)
+                        ctx.report(label, fraction * ENCODE_SHARE)
                     }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    // H.265-Encoder fehlt oder bricht ab: einmal mit H.264 versuchen.
-                    if (mime != androidx.media3.common.MimeTypes.VIDEO_H264) {
-                        errorLogger.logNow(ErrorType.COMPRESSION, "H.265 fehlgeschlagen, versuche H.264: ${describeFailure(e)}")
-                        mime = androidx.media3.common.MimeTypes.VIDEO_H264
-                        continue
-                    }
-                    throw e
+                    lastError = e
+                    lastNote = "Stufe ${index + 1} (${step.mime}, ${bps / 1000} kbit/s${if (step.height > 0) ", ${step.height}p" else ""}): ${describeFailure(e)}"
+                    errorLogger.logNow(ErrorType.COMPRESSION, "Kodierung fehlgeschlagen: $lastNote")
+                    runCatching { local.delete() }
+                    continue
                 }
 
                 ctx.report("Prüfe Ergebnis", ENCODE_SHARE, force = true)
                 val outFacts = probe.probe(Uri.fromFile(local), local.length())
-                if (outFacts == null) return rejected(job, record, "UNREADABLE", "Ergebnis nicht lesbar")
-                failure = CompressionPolicy.verify(facts, outFacts)
-                val lower = attemptTarget * RETRY_FACTOR_PERCENT / 100
-                if (failure == VerifyFailure.NOT_SMALLER && attempt == 0 && lower >= CompressionPolicy.MIN_TARGET_BPS) {
-                    attemptTarget = lower
-                    attempt++
+                if (outFacts == null) {
+                    failure = VerifyFailure.NO_VIDEO
+                    lastNote = "Stufe ${index + 1}: Ergebnis nicht lesbar"
                     continue
                 }
+                failure = CompressionPolicy.verify(facts, outFacts)
+                if (failure != null) {
+                    lastNote = "Stufe ${index + 1}: ${describe(failure)} (${local.length() / 1_000_000} MB von ${media.size / 1_000_000} MB)"
+                    errorLogger.logNow(ErrorType.COMPRESSION, "Ergebnis abgelehnt: $lastNote")
+                    continue
+                }
+                val decodedOk = decoder.decodesCompletely(local, duration) { f ->
+                    ctx.checkpoint()
+                    ctx.report("Dekodiertest", ENCODE_SHARE + f * DECODE_SHARE)
+                }
+                if (!decodedOk) {
+                    failure = VerifyFailure.DECODE
+                    lastNote = "Stufe ${index + 1}: Dekodiertest fehlgeschlagen"
+                    errorLogger.logNow(ErrorType.COMPRESSION, "Ergebnis abgelehnt: $lastNote")
+                    continue
+                }
+                done = true
+                failure = null
                 break
             }
-            failure?.let {
-                return rejected(job, record, "VERIFY_$it", "Ergebnis abgelehnt (${describe(it)}), Original unverändert")
-            }
-            val decodedOk = decoder.decodesCompletely(local, duration) { f ->
-                ctx.checkpoint()
-                ctx.report("Dekodiertest", ENCODE_SHARE + f * DECODE_SHARE)
-            }
-            if (!decodedOk) {
-                return rejected(job, record, "VERIFY_${VerifyFailure.DECODE}", "Dekodiertest fehlgeschlagen, Original unverändert")
+            if (!done) {
+                val why = lastError?.let { "Kodierung nicht möglich" } ?: failure?.let { describe(it) } ?: "unbekannt"
+                return rejected(job, record, "VERIFY_${failure ?: "ENCODE"}", "Alle Stufen fehlgeschlagen ($why) – $lastNote. Original unverändert")
             }
 
             ctx.report("Kopiere auf Speicherkarte", ENCODE_SHARE + DECODE_SHARE, force = true)
@@ -379,10 +413,11 @@ class CompressionJobExecutor @Inject constructor(
         )
     }
 
+    private data class Step(val mime: String, val bps: Long, val height: Int, val fallback: Boolean)
+
     companion object {
         const val ALT_DIR = "_alt"
         private const val COPY_BUFFER = 1 shl 20
-        private const val RETRY_FACTOR_PERCENT = 65L
         private const val ENCODE_SHARE = 0.80f
         private const val DECODE_SHARE = 0.10f
         private const val COPY_SHARE = 0.10f

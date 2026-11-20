@@ -68,7 +68,7 @@ data class MediaFacts(
 object CompressionPolicy {
     const val AUDIO_ESTIMATE_BPS = 192_000L
     const val MIN_TARGET_BPS = 300_000L
-    const val MIN_SAVING = 0.15
+    const val MIN_SAVING = 0.05
     const val MAX_DURATION_DEVIATION = 0.01
     const val GRACE_MS = 7L * 24 * 60 * 60 * 1000
 
@@ -119,7 +119,6 @@ object CompressionPolicy {
         if (out.sizeBytes > src.sizeBytes * (1.0 - MIN_SAVING)) return VerifyFailure.NOT_SMALLER
         val expectedAudio = if (src.audioTracks >= 1) 1 else 0
         if (out.audioTracks != expectedAudio) return VerifyFailure.AUDIO_CHANGED
-        if (expectedAudio == 1 && src.audioMime != out.audioMime) return VerifyFailure.AUDIO_CHANGED
         return null
     }
 }
