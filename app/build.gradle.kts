@@ -116,6 +116,8 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
+    // Audit: echte FTS4-Engine fuer den Such-Fuzz-Test (nur Testcode, Branch audit/tests)
+    testImplementation("org.xerial:sqlite-jdbc:3.46.1.3")
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
