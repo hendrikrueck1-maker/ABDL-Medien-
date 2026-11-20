@@ -46,6 +46,17 @@
     <string name="mark_fav">Fav</string>
     <string name="mark_pee">Pee</string>
     <string name="mark_delete">Löschen</string>
+    <string name="mark_fav_long">Favorit</string>
+    <string name="player_mark_delete">Zum Löschen markieren</string>
+    <string name="player_marked_delete">Zum Löschen markiert</string>
+    <string name="player_lock_rotation">Drehung sperren</string>
+    <string name="player_unlock_rotation">Drehung freigeben</string>
+    <string name="player_categories">Kategorie zuordnen</string>
+    <string name="player_back_10">10 Sekunden zurück</string>
+    <string name="player_forward_10">10 Sekunden vor</string>
+    <string name="player_play">Abspielen</string>
+    <string name="player_pause">Pause</string>
+    <string name="player_speed">Geschwindigkeit ändern</string>
     <string name="home_title">Übersicht</string>
     <string name="home_new_background">Neues Hintergrundbild</string>
     <string name="home_new_background_short">Hintergrundbild wechseln</string>

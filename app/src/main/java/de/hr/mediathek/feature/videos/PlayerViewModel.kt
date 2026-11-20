@@ -15,7 +15,9 @@ import de.hr.mediathek.data.db.SourceDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -50,6 +52,7 @@ class PlayerViewModel @Inject constructor(
     private val playback: PlaybackContext,
     private val compressionDao: de.hr.mediathek.data.db.CompressionDao,
     private val compression: de.hr.mediathek.data.compress.CompressionRepository,
+    private val categories: de.hr.mediathek.data.category.CategoryRepository,
 ) : ViewModel() {
 
     private val uuid: String = checkNotNull(savedStateHandle["uuid"])
@@ -146,6 +149,32 @@ class PlayerViewModel @Inject constructor(
     }
 
     val hasContext: Boolean get() = playback.filter != null
+
+    val categoryList: StateFlow<List<de.hr.mediathek.data.db.CategoryEntity>> = categories.observeVideoCategories()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _usedCategories = MutableStateFlow<Set<String>>(emptySet())
+    val usedCategories: StateFlow<Set<String>> = _usedCategories
+
+    fun loadUsedCategories() {
+        viewModelScope.launch { _usedCategories.value = categories.usedBy(listOf(uuid)) }
+    }
+
+    fun assignCategory(categoryUuid: String) {
+        viewModelScope.launch { categories.assign(listOf(uuid), categoryUuid); loadUsedCategories() }
+    }
+
+    fun unassignCategory(categoryUuid: String) {
+        viewModelScope.launch { categories.unassign(listOf(uuid), categoryUuid); loadUsedCategories() }
+    }
+
+    fun createCategory(name: String) {
+        viewModelScope.launch { categories.create(name) }
+    }
+
+    fun deleteCategory(categoryUuid: String) {
+        viewModelScope.launch { categories.delete(categoryUuid); loadUsedCategories() }
+    }
 
     fun setRating(rating: Int) {
         val current = _state.value as? PlayerState.Ready ?: return

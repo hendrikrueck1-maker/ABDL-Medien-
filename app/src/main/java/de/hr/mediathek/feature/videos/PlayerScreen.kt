@@ -67,6 +67,35 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import de.hr.mediathek.R
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.ScreenLockRotation
+import androidx.compose.material.icons.filled.ScreenRotation
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
+import de.hr.mediathek.core.ui.theme.LocalAppColors
 import kotlinx.coroutines.delay
 
 private val SPEEDS = listOf(1f, 1.25f, 1.5f, 2f, 0.5f, 0.75f)
@@ -224,7 +253,56 @@ private fun ReadyPlayer(
         )
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    val c = LocalAppColors.current
+    val a11y = remember {
+        (context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as android.view.accessibility.AccessibilityManager).isTouchExplorationEnabled
+    }
+    var position by remember { mutableLongStateOf(0L) }
+    var duration by remember { mutableLongStateOf(0L) }
+    var playing by remember { mutableStateOf(true) }
+    var touch by remember { mutableIntStateOf(0) }
+    var seeking by remember { mutableStateOf(false) }
+    var rotationLocked by remember { mutableStateOf(false) }
+    var showCategories by remember { mutableStateOf(false) }
+    val categories by viewModel.categoryList.collectAsStateWithLifecycle()
+    val usedCategories by viewModel.usedCategories.collectAsStateWithLifecycle()
+    val poke = { touch++ }
+
+    LaunchedEffect(player) {
+        while (true) {
+            position = player.currentPosition
+            duration = player.duration.coerceAtLeast(0L)
+            playing = player.isPlaying
+            delay(300)
+        }
+    }
+    // Overlays blenden nach 3 s ohne Berührung aus; mit TalkBack bleiben sie stehen.
+    LaunchedEffect(touch, controlsVisible, seeking, error) {
+        if (controlsVisible && !a11y && !seeking && error == null && !showCategories) {
+            delay(3_000)
+            controlsVisible = false
+        }
+    }
+    DisposableEffect(rotationLocked) {
+        val activity = generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }.filterIsInstance<android.app.Activity>().firstOrNull()
+        activity?.requestedOrientation = if (rotationLocked) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LOCKED else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        onDispose { activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    }
+
+    if (showCategories) {
+        CategoryDialog(
+            title = stringResource(R.string.video_category_action),
+            categories = categories.map { LabelItem(it.uuid, it.name) },
+            used = usedCategories,
+            onAssign = viewModel::assignCategory,
+            onUnassign = viewModel::unassignCategory,
+            onCreate = viewModel::createCategory,
+            onDelete = viewModel::deleteCategory,
+            onDismiss = { showCategories = false; poke() },
+        )
+    }
+
+    Box(Modifier.fillMaxSize().background(c.bgFullscreen)) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
@@ -233,115 +311,180 @@ private fun ReadyPlayer(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT,
                     )
                     this.player = player
-                    useController = true
+                    useController = false
                     keepScreenOn = true
-                    // Die Knopfleiste oben blendet gemeinsam mit der Zeitleiste ein und aus.
-                    setControllerVisibilityListener(
-                        PlayerView.ControllerVisibilityListener { visibility -> controlsVisible = visibility == View.VISIBLE },
-                    )
+                    setOnClickListener { controlsVisible = !controlsVisible; touch++ }
                 }
             },
             update = { it.player = player },
             onRelease = { it.player = null },
         )
-        if (state.isOriginal) {
-            Text(
-                stringResource(R.string.player_original_badge),
-                color = Color.White,
-                style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)
-                    .background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 8.dp, vertical = 2.dp),
-            )
-        }
         error?.let {
             Text(
                 it,
-                color = Color.White,
-                modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                color = c.onCard,
+                modifier = Modifier.align(Alignment.Center).padding(24.dp).background(c.bar, RoundedCornerShape(24.dp)).padding(20.dp),
                 style = MaterialTheme.typography.bodyLarge,
             )
         }
         AnimatedVisibility(
             visible = controlsVisible || error != null,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter),
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(200)),
+            modifier = Modifier.fillMaxSize(),
         ) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.65f))
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                TextButton(onClick = onBack) { Text(stringResource(R.string.diag_back), color = Color.White) }
-                OutlinedButton(onClick = {
-                    speedIndex = (speedIndex + 1) % SPEEDS.size
-                    player.setPlaybackSpeed(SPEEDS[speedIndex])
-                }) { Text("${SPEEDS[speedIndex]}x", color = Color.White) }
-                if (viewModel.hasContext) {
-                    OutlinedButton(onClick = { viewModel.next(onNext) }) { Text(stringResource(R.string.player_next), color = Color.White) }
+            Box(Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp)) {
+                // Oben links: zurück und Titel.
+                Row(
+                    Modifier.align(Alignment.TopStart).fillMaxWidth(0.45f).clip(RoundedCornerShape(32.dp)).background(c.bar).padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Box(
+                        Modifier.size(52.dp).clip(CircleShape).border(2.dp, c.mint, CircleShape).clickable(onClickLabel = stringResource(R.string.diag_back), onClick = onBack),
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.diag_back), tint = c.mint) }
+                    Column(Modifier.weight(1f)) {
+                        Text(state.media.displayName, style = MaterialTheme.typography.titleSmall, color = c.onCard, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(playerInfo(state), style = MaterialTheme.typography.bodySmall, color = c.onCardVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
-                if (state.hasOriginal || state.isOriginal) {
-                    OutlinedButton(onClick = { showOriginal = true }) { Text(stringResource(R.string.player_original_button), color = Color.White) }
+                // Oben rechts: Sterne, Favorit, Pee.
+                Row(
+                    Modifier.align(Alignment.TopEnd).clip(RoundedCornerShape(32.dp)).background(c.bar).padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Row(Modifier.selectableGroup()) {
+                        (1..5).forEach { star ->
+                            Box(
+                                Modifier.size(44.dp).selectable(selected = star == state.rating, role = Role.RadioButton, onClick = { viewModel.setRating(star); poke() }),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(Icons.Filled.Star, stringResource(R.string.video_rate, star), tint = if (star <= state.rating) c.gold else c.muted)
+                            }
+                        }
+                    }
+                    MarkToggle(stringResource(R.string.mark_fav_long), Icons.Filled.Favorite, state.favorite, c.rosa) { viewModel.toggleFavorite(); poke() }
+                    MarkToggle(stringResource(R.string.mark_pee), Icons.Filled.WaterDrop, state.markedPee, c.hellblau) { viewModel.toggleMarkedPee(); poke() }
+                }
+                // Unten: Zeitleiste und Bedienung.
+                Column(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(RoundedCornerShape(32.dp)).background(c.bar).padding(horizontal = 18.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(formatPlayerTime(position), style = MaterialTheme.typography.labelMedium, color = c.onCardVariant)
+                        Slider(
+                            value = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f,
+                            onValueChange = { seeking = true; position = (it * duration).toLong() },
+                            onValueChangeFinished = { player.seekTo(position); seeking = false; poke() },
+                            colors = SliderDefaults.colors(thumbColor = c.onCard, activeTrackColor = c.mint, inactiveTrackColor = c.cardInset),
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(formatPlayerTime(duration), style = MaterialTheme.typography.labelMedium, color = c.onCardVariant)
+                    }
+                    Row(
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        RoundTool(Icons.Filled.Replay10, stringResource(R.string.player_back_10)) { player.seekTo((player.currentPosition - 10_000).coerceAtLeast(0)); poke() }
+                        Box(
+                            Modifier.size(width = 72.dp, height = 56.dp).clip(CircleShape).background(c.mint)
+                                .clickable(onClickLabel = stringResource(if (playing) R.string.player_pause else R.string.player_play)) {
+                                    if (player.isPlaying) player.pause() else player.play()
+                                    poke()
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                stringResource(if (playing) R.string.player_pause else R.string.player_play),
+                                tint = c.onAccent, modifier = Modifier.size(32.dp),
+                            )
+                        }
+                        RoundTool(Icons.Filled.Forward10, stringResource(R.string.player_forward_10)) { player.seekTo(player.currentPosition + 10_000); poke() }
+                        if (viewModel.hasContext) RoundTool(Icons.Filled.SkipNext, stringResource(R.string.player_next)) { viewModel.next(onNext) }
+                        Box(
+                            Modifier.height(48.dp).clip(CircleShape).background(c.card)
+                                .clickable(onClickLabel = stringResource(R.string.player_speed)) {
+                                    speedIndex = (speedIndex + 1) % SPEEDS.size
+                                    player.setPlaybackSpeed(SPEEDS[speedIndex]); poke()
+                                }.padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.Center,
+                        ) { Text("${SPEEDS[speedIndex]}×", style = MaterialTheme.typography.labelLarge, color = c.onCard) }
+                        Spacer(Modifier.width(24.dp))
+                        // Abgesetzt: zum Löschen markieren (nur Umriss und Wort, nie gefüllt).
+                        Row(
+                            Modifier.height(48.dp).clip(CircleShape).border(2.dp, c.warnung, CircleShape)
+                                .toggleable(value = state.markedDelete, role = Role.Switch, onValueChange = { viewModel.toggleMarkedDelete(); poke() })
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Icon(Icons.Filled.Delete, null, tint = c.warnung, modifier = Modifier.size(20.dp))
+                            Text(
+                                stringResource(if (state.markedDelete) R.string.player_marked_delete else R.string.player_mark_delete),
+                                style = MaterialTheme.typography.labelLarge, color = c.warnung, maxLines = 1,
+                            )
+                        }
+                        RoundTool(Icons.AutoMirrored.Filled.Label, stringResource(R.string.player_categories)) {
+                            viewModel.loadUsedCategories(); showCategories = true
+                        }
+                        RoundTool(
+                            if (rotationLocked) Icons.Filled.ScreenLockRotation else Icons.Filled.ScreenRotation,
+                            stringResource(if (rotationLocked) R.string.player_unlock_rotation else R.string.player_lock_rotation),
+                        ) { rotationLocked = !rotationLocked; poke() }
+                        if (state.hasOriginal || state.isOriginal) {
+                            RoundTool(Icons.Filled.History, stringResource(R.string.player_original_button)) { showOriginal = true }
+                        }
+                    }
                 }
             }
-        }
-        // Markierungen hochkant am linken Rand: Favorit, Tropfen, zum Löschen, darunter die fünf Sterne.
-        AnimatedVisibility(
-            visible = controlsVisible || error != null,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.CenterStart),
-        ) {
-            MarkRail(state, viewModel)
         }
     }
 }
 
+private fun playerInfo(state: PlayerState.Ready): String {
+    val m = state.media
+    val folder = m.relativePath.substringBeforeLast('/', "").substringAfterLast('/')
+    val format = m.displayName.substringAfterLast('.', "").uppercase().takeIf { it.isNotEmpty() && it.length <= 5 }
+    val res = m.height?.takeIf { it > 0 }?.let { "${it}p" }
+    return listOfNotNull(folder.takeIf { it.isNotEmpty() }, format, res, if (state.isOriginal) "Original" else null).joinToString(" · ")
+}
+
+private fun formatPlayerTime(ms: Long): String {
+    val total = ms / 1000
+    val h = total / 3600
+    val m = (total % 3600) / 60
+    val s = total % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
+}
+
+/** Runder Werkzeug-Knopf (48 dp) auf `card`. */
 @Composable
-private fun MarkRail(state: PlayerState.Ready, viewModel: PlayerViewModel) {
-    Column(
-        Modifier
-            .padding(start = 8.dp)
-            .background(Color.Black.copy(alpha = 0.62f), RoundedCornerShape(28.dp))
-            .verticalScroll(rememberScrollState())
-            .padding(vertical = 6.dp, horizontal = 2.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(0.dp),
+private fun RoundTool(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    val c = LocalAppColors.current
+    Box(
+        Modifier.size(48.dp).clip(CircleShape).background(c.card).clickable(onClickLabel = label, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, label, tint = c.onCard) }
+}
+
+/** Schalter als Pille mit Form, Farbe und Wort: aktiv gefüllt, inaktiv nur Umriss. */
+@Composable
+private fun MarkToggle(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, active: Boolean, color: Color, onToggle: () -> Unit) {
+    val c = LocalAppColors.current
+    Row(
+        Modifier.height(44.dp).clip(CircleShape)
+            .then(if (active) Modifier.background(color) else Modifier.border(2.dp, color, CircleShape))
+            .toggleable(value = active, role = Role.Switch, onValueChange = { onToggle() })
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        IconButton(onClick = viewModel::toggleFavorite, modifier = Modifier.size(48.dp)) {
-            PopBox(active = state.favorite) {
-                Icon(
-                    Icons.Filled.Favorite,
-                    contentDescription = stringResource(R.string.video_favorite),
-                    tint = if (state.favorite) Color(0xFFFF6FA8) else Color(0xFF9E9E9E),
-                )
-            }
-        }
-        IconButton(onClick = viewModel::toggleMarkedPee, modifier = Modifier.size(48.dp)) {
-            PopBox(active = state.markedPee) {
-                Text("💧", fontSize = 22.sp, modifier = Modifier.alpha(if (state.markedPee) 1f else 0.35f))
-            }
-        }
-        IconButton(onClick = viewModel::toggleMarkedDelete, modifier = Modifier.size(48.dp)) {
-            PopBox(active = state.markedDelete) {
-                Text("🗑", fontSize = 22.sp, modifier = Modifier.alpha(if (state.markedDelete) 1f else 0.35f))
-            }
-        }
-        HorizontalDivider(Modifier.padding(horizontal = 10.dp, vertical = 4.dp).width(28.dp), color = Color.White.copy(alpha = 0.3f))
-        (1..5).forEach { star ->
-            IconButton(onClick = { viewModel.setRating(star) }, modifier = Modifier.size(44.dp)) {
-                PopBox(active = star <= state.rating) {
-                    Icon(
-                        Icons.Filled.Star,
-                        contentDescription = stringResource(R.string.video_rate, star),
-                        tint = if (star <= state.rating) Color(0xFFFFC107) else Color(0xFF9E9E9E),
-                    )
-                }
-            }
-        }
+        Icon(icon, null, tint = if (active) c.onAccent else color, modifier = Modifier.size(18.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge, color = if (active) c.onAccent else color, maxLines = 1)
     }
 }
