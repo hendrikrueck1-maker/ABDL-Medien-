@@ -305,6 +305,17 @@ interface MediaFileDao {
     @Query("SELECT uuid FROM media_file WHERE type = 'IMAGE' AND status = 'ONLINE' AND deletedAt IS NULL ORDER BY RANDOM() LIMIT 1")
     suspend fun randomImageUuid(): String?
 
+    /** Alle erreichbaren Bilder für die Bilder neben dem Text im Geschichten-Leser, nach Pfad sortiert. */
+    @Query("SELECT uuid FROM media_file WHERE type = 'IMAGE' AND status = 'ONLINE' AND deletedAt IS NULL ORDER BY relativePath COLLATE NOCASE")
+    suspend fun onlineImageUuids(): List<String>
+
+    /** Wie [onlineImageUuids], aber nur aus einem obersten Ordner. */
+    @Query(
+        "SELECT uuid FROM media_file WHERE type = 'IMAGE' AND status = 'ONLINE' AND deletedAt IS NULL " +
+            "AND substr(relativePath, 1, length(:folder) + 1) = :folder || '/' ORDER BY relativePath COLLATE NOCASE",
+    )
+    suspend fun onlineImageUuidsIn(folder: String): List<String>
+
     @Query(
         "UPDATE media_file SET resumePositionMs = :position, seenState = :seen, updatedAt = :now, userUpdatedAt = :now " +
             "WHERE uuid = :uuid",

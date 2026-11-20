@@ -106,7 +106,7 @@ fun AppRoot() {
 }
 
 private fun isFullScreenRoute(route: String?): Boolean =
-    route != null && (route.startsWith("player/") || route.startsWith("image/{") || route.startsWith("slideshow"))
+    route != null && (route.startsWith("player/") || route.startsWith("image/{") || route.startsWith("slideshow") || route.startsWith("story/{"))
 
 /**
  * Deckende Fläche hinter jedem normalen Bildschirm, mit Rand, damit das Hintergrundbild an den Seiten sichtbar bleibt.
@@ -248,6 +248,7 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
                 onBack = { navController.popBackStack() },
                 onEdit = { navController.navigate("story-edit/$it") },
                 onEditSeries = { navController.navigate("series-edit/$it") },
+                onOpenImage = { navController.navigate("image/$it") },
                 onOpenStory = { id ->
                     navController.navigate("story/$id") { popUpTo("story/{uuid}") { inclusive = true } }
                 },
