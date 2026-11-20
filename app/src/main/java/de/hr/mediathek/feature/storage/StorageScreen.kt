@@ -526,11 +526,15 @@ private fun MirrorCard(
     onRemove: () -> Unit,
 ) {
     val onColor = MaterialTheme.colorScheme.onTertiaryContainer
+    val context = androidx.compose.ui.platform.LocalContext.current
     val now = System.currentTimeMillis()
+    val never = stringResource(R.string.mirror_never)
+    val today = stringResource(R.string.mirror_today)
+    val daysAgo = { d: Int -> context.getString(R.string.mirror_days_ago, d) }
     fun ago(t: Long?): String {
-        if (t == null) return stringResource(R.string.mirror_never)
+        if (t == null) return never
         val d = ((now - t) / 86_400_000L).toInt()
-        return if (d == 0) stringResource(R.string.mirror_today) else stringResource(R.string.mirror_days_ago, d)
+        return if (d == 0) today else daysAgo(d)
     }
     val job = mirror.job
     val running = job != null && (job.status == JobStatus.QUEUED || job.status == JobStatus.RUNNING)
