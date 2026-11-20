@@ -38,6 +38,7 @@ class MarkdownImportViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sources: StoryImportSources,
     private val store: RoomImportStore,
+    private val scheduler: de.hr.mediathek.core.jobs.JobScheduler,
 ) : ViewModel() {
     private val _state = MutableStateFlow(MdImportUi())
     val state: StateFlow<MdImportUi> = _state
@@ -69,8 +70,10 @@ class MarkdownImportViewModel @Inject constructor(
                     StoryImporter(store).run(source) { p -> _state.update { it.copy(progress = p) } }
                 }
                 _state.value = MdImportUi(MdPhase.DONE, label, report = report)
+                runCatching { scheduler.enqueueBackupAfterChange() }
             } catch (e: StoryImporter.CancelledWithReport) {
                 _state.value = MdImportUi(MdPhase.DONE, label, report = e.report, message = "Abgebrochen. Bereits gespeicherte Geschichten bleiben erhalten.")
+                runCatching { scheduler.enqueueBackupAfterChange() }
             } catch (e: CancellationException) {
                 _state.value = MdImportUi(message = "Import abgebrochen.")
                 throw e

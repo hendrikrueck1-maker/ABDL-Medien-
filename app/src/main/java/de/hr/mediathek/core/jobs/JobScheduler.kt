@@ -35,6 +35,12 @@ class JobScheduler @Inject constructor(
         return true
     }
 
+    /** Sichert nach größeren Änderungen (z. B. Geschichten-Import) sofort, sofern ein Arbeitsordner gewählt ist. */
+    suspend fun enqueueBackupAfterChange() {
+        if (storage.getWorkFolderUri() == null) return
+        enqueueBackup()
+    }
+
     /** Backup jetzt einreihen (Nutzeraktion). */
     suspend fun enqueueBackup(): Boolean {
         if (jobDao.findActive(JobType.BACKUP, "%") != null) return false
