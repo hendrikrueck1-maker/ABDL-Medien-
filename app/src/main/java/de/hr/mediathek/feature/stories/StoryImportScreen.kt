@@ -35,7 +35,7 @@ import de.hr.mediathek.data.story.StoryFileKind
 import de.hr.mediathek.data.story.TextEncoding
 
 @Composable
-fun StoryImportScreen(onBack: () -> Unit, onMarkdown: () -> Unit, onWeb: () -> Unit, viewModel: StoryImportViewModel = hiltViewModel()) {
+fun StoryImportScreen(onBack: () -> Unit, onMarkdown: () -> Unit, onWeb: () -> Unit, onLinks: () -> Unit, viewModel: StoryImportViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) viewModel.loadFiles(uris)
@@ -50,6 +50,7 @@ fun StoryImportScreen(onBack: () -> Unit, onMarkdown: () -> Unit, onWeb: () -> U
             Text("Geschichten importieren", style = MaterialTheme.typography.titleLarge)
         }
         Button(onClick = onWeb, modifier = Modifier.fillMaxWidth()) { Text("Von Webseite oder Forum holen (Link)") }
+        OutlinedButton(onClick = onLinks, modifier = Modifier.fillMaxWidth()) { Text("Viele Links auf einmal (Link-Liste)") }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = {
                 filePicker.launch(

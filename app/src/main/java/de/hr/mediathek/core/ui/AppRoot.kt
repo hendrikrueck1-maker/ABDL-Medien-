@@ -277,7 +277,11 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
                 onBack = { navController.popBackStack() },
                 onMarkdown = { navController.navigate("story-import-md") },
                 onWeb = { navController.navigate("story-import-web") },
+                onLinks = { navController.navigate("story-import-links") },
             )
+        }
+        composable("story-import-links") {
+            de.hr.mediathek.feature.stories.LinkListScreen(onBack = { navController.popBackStack() })
         }
         composable(
             "story-import-web?url={url}",
