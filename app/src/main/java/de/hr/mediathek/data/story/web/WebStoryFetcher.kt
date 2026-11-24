@@ -53,6 +53,37 @@ class WebStoryFetcher @Inject constructor(
         }
     }
 
+    /**
+     * Sammelt die Themen-Links eines Forum-Bereichs über alle Seiten. Beginnt immer bei Seite 1.
+     * [onProgress] bekommt (gelesene Seiten, gefundene Links).
+     */
+    suspend fun collectThreadLinks(rawUrl: String, onProgress: (Int, Int) -> Unit = { _, _ -> }): List<String> = withContext(Dispatchers.IO) {
+        var next: String? = ListingParser.firstPageUrl(normalize(rawUrl))
+        val found = LinkedHashMap<String, String>()
+        val seen = HashSet<String>()
+        var pages = 0
+        var loginNeeded = false
+        while (next != null && pages < MAX_LISTING_PAGES && seen.add(next)) {
+            coroutineContext.ensureActive()
+            val doc = download(next)
+            val listing = ListingParser.parse(doc, pages + 1)
+            if (listing.links.isEmpty() && PageParser.parse(doc).loginRequired) loginNeeded = true
+            pages++
+            for (l in listing.links) found.putIfAbsent(ThreadBuilder.threadKey(l), l)
+            onProgress(pages, found.size)
+            next = listing.nextUrl
+            if (next != null) delay(PAGE_DELAY_MS)
+        }
+        if (found.isEmpty()) {
+            throw WebFetchException(
+                if (loginNeeded) "Die Seite verlangt eine Anmeldung. Bitte zuerst unter „Von Webseite holen“ anmelden."
+                else "Auf der Seite wurden keine Themen-Links erkannt. Ist es die Übersichtsseite eines Forum-Bereichs?",
+                loginNeeded = loginNeeded,
+            )
+        }
+        found.values.toList()
+    }
+
     private fun userAgent(): String =
         runCatching { android.webkit.WebSettings.getDefaultUserAgent(context) }.getOrDefault(USER_AGENT)
 
@@ -122,6 +153,7 @@ class WebStoryFetcher @Inject constructor(
 
     private companion object {
         const val MAX_PAGES = 60
+        const val MAX_LISTING_PAGES = 400
         const val PAGE_DELAY_MS = 700L
         const val MAX_BYTES = 8 * 1024 * 1024
         const val USER_AGENT =
