@@ -102,7 +102,7 @@ fun AppRoot() {
         Row(Modifier.fillMaxSize()) {
             if (!fullScreenRoute) AppNavigationRail(navController)
             Scaffold(Modifier.weight(1f), containerColor = Color.Transparent) { padding ->
-                ScreenPanel(fullScreenRoute, route in CARD_ROUTES, isStoryRoute(route), Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
+                ScreenPanel(fullScreenRoute, route in CARD_ROUTES, storyAlpha(route), Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
             }
         }
     } else {
@@ -110,7 +110,7 @@ fun AppRoot() {
             containerColor = Color.Transparent,
             bottomBar = { if (!fullScreenRoute) AppBottomBar(navController) },
         ) { padding ->
-            ScreenPanel(fullScreenRoute, route in CARD_ROUTES, isStoryRoute(route), Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
+            ScreenPanel(fullScreenRoute, route in CARD_ROUTES, storyAlpha(route), Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
         }
     }
     }
@@ -131,14 +131,19 @@ private fun isFullScreenRoute(route: String?): Boolean =
  * Schrift liegt nie direkt auf dem Bild. Vollbild-Seiten (Player, Bilder) bleiben unverändert;
  * der Inhalt behält dabei seinen Platz im Baum, damit beim Wechsel nichts neu aufgebaut wird.
  */
-private fun isStoryRoute(route: String): Boolean = route.startsWith("stories") || route.startsWith("story")
+/** Geschichten-Übersicht: deckend (1,0); übrige Geschichten-Teile 0,8; sonst null. */
+private fun storyAlpha(route: String): Float? = when {
+    route == Destination.Stories.route -> 1f
+    route.startsWith("stories") || route.startsWith("story") -> 0.8f
+    else -> null
+}
 
 @Composable
-private fun ScreenPanel(fullScreen: Boolean, transparent: Boolean, stories: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+private fun ScreenPanel(fullScreen: Boolean, transparent: Boolean, storyAlpha: Float?, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     // Geschichten-Teile: dunkle Flächen nur zu 20 % durchsichtig (Alpha 0,8) statt 60 %.
     val base = LocalAppColors.current
-    val colors = if (stories) base.copy(
-        bar = base.bar.copy(alpha = 0.8f), card = base.card.copy(alpha = 0.8f), cardInset = base.cardInset.copy(alpha = 0.8f),
+    val colors = if (storyAlpha != null) base.copy(
+        bar = base.bar.copy(alpha = storyAlpha ?: 1f), card = base.card.copy(alpha = storyAlpha ?: 1f), cardInset = base.cardInset.copy(alpha = storyAlpha ?: 1f),
     ) else base
     androidx.compose.runtime.CompositionLocalProvider(LocalAppColors provides colors) {
         ScreenPanelBody(fullScreen, transparent, modifier, content)
