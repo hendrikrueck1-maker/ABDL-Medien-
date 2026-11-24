@@ -13,10 +13,16 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import de.hr.mediathek.core.ui.theme.MediathekTheme
 import de.hr.mediathek.core.ui.AppRoot
+import de.hr.mediathek.core.ui.ShareInbox
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject lateinit var settingDao: SettingDao
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        ShareInbox.accept(intent)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,6 +36,7 @@ class MainActivity : ComponentActivity() {
                 else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
             }
         }
+        if (savedInstanceState == null) ShareInbox.accept(intent)
         setContent {
             MediathekTheme {
                 AppRoot()

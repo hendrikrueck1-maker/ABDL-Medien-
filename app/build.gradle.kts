@@ -108,6 +108,7 @@ dependencies {
     implementation(libs.androidx.room.paging)
     implementation(libs.pdfbox.android)
     implementation(libs.snakeyaml.engine)
+    implementation(libs.jsoup)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

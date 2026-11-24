@@ -22,6 +22,8 @@ data class EditorState(
     val text: String = "",
     val source: String = "",
     val url: String = "",
+    /** Original-Datum der Geschichte als Text ("TT.MM.JJJJ HH:MM"); leer = unbekannt. */
+    val published: String = "",
     val category: StoryCategory = StoryCategory.MIXED,
     val saved: Boolean = true,
     val drafts: List<StoryDraftVersionEntity>? = null,
@@ -50,6 +52,7 @@ class StoryEditorViewModel @Inject constructor(
             _state.value = EditorState(
                 loaded = true, title = story?.title ?: "", text = text, source = story?.sourceText ?: "",
                 url = story?.sourceUrl ?: "", category = story?.category ?: StoryCategory.MIXED,
+                published = de.hr.mediathek.data.story.web.WebDates.format(story?.publishedAt),
             )
         }
     }
@@ -70,6 +73,9 @@ class StoryEditorViewModel @Inject constructor(
             story.copy(
                 title = s.title.ifBlank { "Ohne Titel" }, sourceText = s.source.ifBlank { null },
                 sourceUrl = s.url.ifBlank { null }, category = s.category,
+                // Ungültige Eingabe lässt das bisherige Datum stehen; leer löscht es.
+                publishedAt = if (s.published.isBlank()) null
+                else de.hr.mediathek.data.story.web.WebDates.parseInput(s.published)?.millis ?: story.publishedAt,
             ),
         )
         repository.saveText(uuid, s.text)

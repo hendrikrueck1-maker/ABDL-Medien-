@@ -1,0 +1,183 @@
+package de.hr.mediathek.feature.stories
+
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import de.hr.mediathek.data.db.StoryCategory
+import de.hr.mediathek.data.story.mdimport.ImportItem as ImportEntry
+import de.hr.mediathek.data.story.mdimport.ImportReport
+import de.hr.mediathek.data.story.mdimport.ImportSource
+import de.hr.mediathek.data.story.mdimport.ParseResult
+import de.hr.mediathek.data.story.mdimport.ParsedStory
+import de.hr.mediathek.data.story.mdimport.RoomImportStore
+import de.hr.mediathek.data.story.mdimport.SeriesRef
+import de.hr.mediathek.data.story.mdimport.StoryHash
+import de.hr.mediathek.data.story.mdimport.StoryImporter
+import de.hr.mediathek.data.story.web.ThreadBuilder
+import de.hr.mediathek.data.story.web.WebDates
+import de.hr.mediathek.data.story.web.WebFetchException
+import de.hr.mediathek.data.story.web.WebPart
+import de.hr.mediathek.data.story.web.WebStoryFetcher
+import de.hr.mediathek.data.story.web.WebThread
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import javax.inject.Inject
+
+enum class WebPhase { IDLE, LOADING, PREVIEW, SAVING, DONE }
+
+/** Ein Kapitel in der Vorschau mit den Werten, die der Nutzer noch ändern kann. */
+data class WebPartUi(
+    val part: WebPart,
+    val selected: Boolean,
+    /** Datum als Text ("TT.MM.JJJJ" oder "TT.MM.JJJJ HH:MM"); leer = kein Datum. */
+    val dateText: String,
+)
+
+data class WebImportUi(
+    val url: String = "",
+    val phase: WebPhase = WebPhase.IDLE,
+    val pagesRead: Int = 0,
+    val error: String? = null,
+    val thread: WebThread? = null,
+    val title: String = "",
+    val category: StoryCategory = StoryCategory.MIXED,
+    val parts: List<WebPartUi> = emptyList(),
+    val report: ImportReport? = null,
+)
+
+@HiltViewModel
+class WebImportViewModel @Inject constructor(
+    savedState: SavedStateHandle,
+    private val fetcher: WebStoryFetcher,
+    private val store: RoomImportStore,
+    private val scheduler: de.hr.mediathek.core.jobs.JobScheduler,
+) : ViewModel() {
+    private val _state = MutableStateFlow(WebImportUi(url = savedState.get<String>("url").orEmpty()))
+    val state: StateFlow<WebImportUi> = _state
+    private var job: Job? = null
+
+    init {
+        // Link aus der Teilen-Funktion: gleich laden.
+        if (_state.value.url.isNotBlank()) load()
+    }
+
+    fun setUrl(value: String) = _state.update { it.copy(url = value, error = null) }
+    fun setTitle(value: String) = _state.update { it.copy(title = value) }
+    fun setCategory(c: StoryCategory) = _state.update { it.copy(category = c) }
+
+    fun setSelected(id: String, value: Boolean) = updatePart(id) { it.copy(selected = value) }
+    fun setDateText(id: String, value: String) = updatePart(id) { it.copy(dateText = value) }
+
+    fun selectAll(value: Boolean) = _state.update { s -> s.copy(parts = s.parts.map { it.copy(selected = value) }) }
+
+    private fun updatePart(id: String, change: (WebPartUi) -> WebPartUi) =
+        _state.update { s -> s.copy(parts = s.parts.map { if (it.part.id == id) change(it) else it }) }
+
+    fun load() {
+        if (job?.isActive == true) return
+        val url = _state.value.url.trim()
+        if (url.isEmpty()) {
+            _state.update { it.copy(error = "Bitte einen Link eingeben.") }
+            return
+        }
+        job = viewModelScope.launch {
+            _state.update { it.copy(phase = WebPhase.LOADING, pagesRead = 0, error = null, thread = null, parts = emptyList(), report = null) }
+            try {
+                val thread = fetcher.load(url) { n -> _state.update { it.copy(pagesRead = n) } }
+                _state.update {
+                    it.copy(
+                        phase = WebPhase.PREVIEW,
+                        thread = thread,
+                        title = thread.title,
+                        parts = thread.parts.map { p -> WebPartUi(p, p.selected, WebDates.format(p.dateMillis)) },
+                    )
+                }
+            } catch (e: CancellationException) {
+                _state.update { it.copy(phase = WebPhase.IDLE) }
+                throw e
+            } catch (e: WebFetchException) {
+                _state.update { it.copy(phase = WebPhase.IDLE, error = e.message) }
+            } catch (e: Exception) {
+                _state.update { it.copy(phase = WebPhase.IDLE, error = "Das hat nicht geklappt: ${e.message ?: e.javaClass.simpleName}") }
+            }
+        }
+    }
+
+    fun cancel() {
+        job?.cancel()
+    }
+
+    /** Speichert die gewählten Kapitel über den normalen Import (Duplikate werden erkannt, Serien angelegt). */
+    fun save() {
+        val s = _state.value
+        val thread = s.thread ?: return
+        val chosen = s.parts.filter { it.selected && it.part.text.isNotBlank() }
+        if (chosen.isEmpty()) {
+            _state.update { it.copy(error = "Kein Kapitel ausgewählt.") }
+            return
+        }
+        if (job?.isActive == true) return
+        val title = s.title.trim().ifEmpty { thread.title }
+        val multiple = chosen.size > 1
+        val now = System.currentTimeMillis()
+        val items = chosen.mapIndexed { i, ui ->
+            val n = i + 1
+            val part = ui.part
+            ImportEntry("$title – Teil $n") {
+                val date = WebDates.parseInput(ui.dateText)?.millis ?: if (ui.dateText.isBlank()) null else part.dateMillis
+                ParseResult.Ok(
+                    ParsedStory(
+                        slug = ThreadBuilder.slug(thread, part),
+                        title = partTitle(title, part, n, multiple),
+                        category = s.category,
+                        tags = emptyList(),
+                        status = "published",
+                        author = part.author,
+                        createdAt = now,
+                        updatedAt = now,
+                        publishedAt = date,
+                        body = part.text,
+                        hash = StoryHash.of(part.text),
+                        sourceText = thread.host,
+                        sourceUrl = thread.url,
+                        series = if (multiple) SeriesRef(title, n) else null,
+                    ),
+                )
+            }
+        }
+        val source = ImportSource(thread.host, items.size, items.asSequence())
+        job = viewModelScope.launch {
+            _state.update { it.copy(phase = WebPhase.SAVING, error = null) }
+            try {
+                val report = withContext(Dispatchers.IO) { StoryImporter(store).run(source) }
+                _state.update { it.copy(phase = WebPhase.DONE, report = report) }
+                runCatching { scheduler.enqueueBackupAfterChange() }
+            } catch (e: StoryImporter.CancelledWithReport) {
+                _state.update { it.copy(phase = WebPhase.DONE, report = e.report) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(phase = WebPhase.PREVIEW, error = "Speichern fehlgeschlagen: ${e.message ?: e.javaClass.simpleName}") }
+            }
+        }
+    }
+
+    /** Zurück auf Anfang für den nächsten Link. */
+    fun reset() {
+        if (job?.isActive == true) return
+        _state.value = WebImportUi()
+    }
+
+    private fun partTitle(title: String, part: WebPart, n: Int, multiple: Boolean): String {
+        if (!multiple) return title
+        val own = part.postTitle?.trim().orEmpty()
+        return if (own.isEmpty() || own.equals(title, ignoreCase = true) || own.startsWith("Re:", ignoreCase = true)) "$title – Teil $n" else own
+    }
+}

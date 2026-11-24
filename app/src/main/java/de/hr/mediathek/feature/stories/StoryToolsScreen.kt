@@ -38,6 +38,9 @@ fun StoryToolsScreen(onBack: () -> Unit, viewModel: StoryToolsViewModel = hiltVi
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) viewModel.export(uri, scope)
     }
+    val jsonLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) viewModel.export(uri, scope, json = true)
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -72,6 +75,10 @@ fun StoryToolsScreen(onBack: () -> Unit, viewModel: StoryToolsViewModel = hiltVi
                     onClick = { scope = null; launcher.launch("geschichten.zip") },
                     enabled = !export.running,
                 ) { Text("Alle Geschichten exportieren") }
+                OutlinedButton(
+                    onClick = { scope = null; jsonLauncher.launch("geschichten.json") },
+                    enabled = !export.running,
+                ) { Text("Alle als JSON-Datei exportieren (mit Datum und Link)") }
                 for (f in folders) {
                     OutlinedButton(
                         onClick = { scope = f.uuid; launcher.launch("${f.name}.zip") },

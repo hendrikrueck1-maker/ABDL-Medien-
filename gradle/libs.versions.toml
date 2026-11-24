@@ -17,6 +17,7 @@ junit = "4.13.2"
 paging = "3.3.5"
 snakeyamlEngine = "2.7"
 orgJson = "20240303"
+jsoup = "1.18.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -45,6 +46,7 @@ androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = 
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workmanager" }
 snakeyaml-engine = { group = "org.snakeyaml", name = "snakeyaml-engine", version.ref = "snakeyamlEngine" }
+jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
