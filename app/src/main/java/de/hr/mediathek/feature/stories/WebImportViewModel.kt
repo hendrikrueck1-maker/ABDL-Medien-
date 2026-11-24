@@ -9,15 +9,12 @@ import de.hr.mediathek.data.story.mdimport.ImportItem as ImportEntry
 import de.hr.mediathek.data.story.mdimport.ImportReport
 import de.hr.mediathek.data.story.mdimport.ImportSource
 import de.hr.mediathek.data.story.mdimport.ParseResult
-import de.hr.mediathek.data.story.mdimport.ParsedStory
 import de.hr.mediathek.data.story.mdimport.RoomImportStore
-import de.hr.mediathek.data.story.mdimport.SeriesRef
-import de.hr.mediathek.data.story.mdimport.StoryHash
 import de.hr.mediathek.data.story.mdimport.StoryImporter
-import de.hr.mediathek.data.story.web.ThreadBuilder
 import de.hr.mediathek.data.story.web.WebDates
 import de.hr.mediathek.data.story.web.WebFetchException
 import de.hr.mediathek.data.story.web.WebPart
+import de.hr.mediathek.data.story.web.WebStories
 import de.hr.mediathek.data.story.web.WebStoryFetcher
 import de.hr.mediathek.data.story.web.WebThread
 import kotlinx.coroutines.CancellationException
@@ -139,33 +136,13 @@ class WebImportViewModel @Inject constructor(
         }
         if (job?.isActive == true) return
         val title = s.title.trim().ifEmpty { thread.title }
-        val multiple = chosen.size > 1
         val now = System.currentTimeMillis()
-        val items = chosen.mapIndexed { i, ui ->
-            val n = i + 1
-            val part = ui.part
-            ImportEntry("$title – Teil $n") {
-                val date = WebDates.parseInput(ui.dateText)?.millis ?: if (ui.dateText.isBlank()) null else part.dateMillis
-                ParseResult.Ok(
-                    ParsedStory(
-                        slug = ThreadBuilder.slug(thread, part),
-                        title = partTitle(title, part, n, multiple),
-                        category = s.category,
-                        tags = emptyList(),
-                        status = "published",
-                        author = part.author,
-                        createdAt = now,
-                        updatedAt = now,
-                        publishedAt = date,
-                        body = part.text,
-                        hash = StoryHash.of(part.text),
-                        sourceText = thread.host,
-                        sourceUrl = thread.url,
-                        series = if (multiple) SeriesRef(title, n) else null,
-                    ),
-                )
-            }
-        }
+        val stories = WebStories.parsed(
+            thread, title, s.category,
+            chosen.map { ui -> ui.part to (WebDates.parseInput(ui.dateText)?.millis ?: if (ui.dateText.isBlank()) null else ui.part.dateMillis) },
+            now,
+        )
+        val items = stories.mapIndexed { i, story -> ImportEntry("$title – Teil ${i + 1}") { ParseResult.Ok(story) } }
         val source = ImportSource(thread.host, items.size, items.asSequence())
         job = viewModelScope.launch {
             _state.update { it.copy(phase = WebPhase.SAVING, error = null) }
@@ -187,11 +164,5 @@ class WebImportViewModel @Inject constructor(
     fun reset() {
         if (job?.isActive == true) return
         _state.value = WebImportUi()
-    }
-
-    private fun partTitle(title: String, part: WebPart, n: Int, multiple: Boolean): String {
-        if (!multiple) return title
-        val own = part.postTitle?.trim().orEmpty()
-        return if (own.isEmpty() || own.equals(title, ignoreCase = true) || own.startsWith("Re:", ignoreCase = true)) "$title – Teil $n" else own
     }
 }

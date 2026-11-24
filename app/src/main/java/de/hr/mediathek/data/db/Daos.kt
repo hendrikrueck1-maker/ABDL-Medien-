@@ -933,6 +933,10 @@ interface StoryDao {
     @Query("SELECT * FROM story WHERE slug = :slug LIMIT 1")
     suspend fun getBySlug(slug: String): StoryEntity?
 
+    /** Web-Import: Wie viele Geschichten (auch im Papierkorb) stammen schon von diesem Link? */
+    @Query("SELECT COUNT(*) FROM story WHERE sourceUrl = :url")
+    suspend fun countBySourceUrl(url: String): Int
+
     @Query("SELECT * FROM series WHERE name = :name AND deletedAt IS NULL LIMIT 1")
     suspend fun seriesByName(name: String): SeriesEntity?
 

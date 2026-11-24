@@ -56,7 +56,8 @@ class WebStoryFetcher @Inject constructor(
     private fun userAgent(): String =
         runCatching { android.webkit.WebSettings.getDefaultUserAgent(context) }.getOrDefault(USER_AGENT)
 
-    private fun normalize(raw: String): String {
+    /** Link bereinigen: https voranstellen, http auf https umstellen; wirft [WebFetchException] bei ungültigem Link. */
+    fun normalize(raw: String): String {
         var url = raw.trim()
         if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) url = "https://$url"
         // Android blockiert unverschlüsselte Verbindungen, fast alle Seiten gehen aber auch über https.
