@@ -61,11 +61,12 @@ class StoryToolsViewModel @Inject constructor(
     private val _export = MutableStateFlow(ExportUi())
     val export: StateFlow<ExportUi> = _export
 
-    fun export(target: Uri, folderUuid: String?) {
+    fun export(target: Uri, folderUuid: String?, json: Boolean = false) {
         _export.value = ExportUi(running = true)
         viewModelScope.launch {
             try {
-                val n = exporter.export(target, folderUuid) { d, t -> _export.update { it.copy(done = d, total = t) } }
+                val progress = { d: Int, t: Int -> _export.update { it.copy(done = d, total = t) } }
+                val n = if (json) exporter.exportJson(target, folderUuid, progress) else exporter.export(target, folderUuid, progress)
                 _export.value = ExportUi(message = "$n Geschichten exportiert.")
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e

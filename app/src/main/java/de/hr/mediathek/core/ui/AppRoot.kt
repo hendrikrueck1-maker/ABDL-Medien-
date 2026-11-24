@@ -66,6 +66,7 @@ import de.hr.mediathek.feature.videos.DuplicatesScreen
 import de.hr.mediathek.feature.videos.PlayerScreen
 import de.hr.mediathek.feature.videos.TrashScreen
 import de.hr.mediathek.feature.videos.VideosScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
 
@@ -85,6 +86,16 @@ fun AppRoot() {
     // Player, Bildansicht und Diashow brauchen den ganzen Bildschirm; sie haben eigene Zurück-Knöpfe.
     val route = navController.currentRoute().orEmpty()
     val fullScreenRoute = isFullScreenRoute(route)
+
+    // Link aus "Teilen" (Browser): gleich den Web-Import öffnen.
+    val sharedLink by ShareInbox.pending.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(sharedLink) {
+        val link = sharedLink ?: return@LaunchedEffect
+        ShareInbox.pending.value = null
+        // Eine schon offene Web-Import-Seite mit altem Link zuerst schließen, damit der neue Link frisch geladen wird.
+        navController.popBackStack("story-import-web?url={url}", inclusive = true)
+        navController.navigate("story-import-web?url=${android.net.Uri.encode(link)}")
+    }
 
     AppBackground(hearts = showsHearts(route)) {
     if (isWide) {
@@ -260,7 +271,14 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
             de.hr.mediathek.feature.stories.StoryImportScreen(
                 onBack = { navController.popBackStack() },
                 onMarkdown = { navController.navigate("story-import-md") },
+                onWeb = { navController.navigate("story-import-web") },
             )
+        }
+        composable(
+            "story-import-web?url={url}",
+            arguments = listOf(navArgument("url") { type = NavType.StringType; nullable = true; defaultValue = null }),
+        ) {
+            de.hr.mediathek.feature.stories.WebImportScreen(onBack = { navController.popBackStack() })
         }
         composable("story-import-md") {
             de.hr.mediathek.feature.stories.MarkdownImportScreen(onBack = { navController.popBackStack() })

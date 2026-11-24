@@ -72,6 +72,10 @@ fun StoryEditorScreen(onBack: () -> Unit, viewModel: StoryEditorViewModel = hilt
                 )
                 QuickPick(recentUrls, s.url, ::shortUrl) { pick -> viewModel.change { it.copy(url = pick) } }
                 OutlinedTextField(
+                    value = s.published, onValueChange = { v -> viewModel.change { it.copy(published = v) } },
+                    label = { Text("Erstellt am (Original, TT.MM.JJJJ HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
                     value = s.text, onValueChange = { v -> viewModel.change { it.copy(text = v) } },
                     label = { Text("Text (hier einfügen oder schreiben)") },
                     modifier = Modifier.fillMaxWidth(), minLines = 12,

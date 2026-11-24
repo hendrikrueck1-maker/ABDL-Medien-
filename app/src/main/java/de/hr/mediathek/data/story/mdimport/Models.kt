@@ -26,6 +26,8 @@ data class ParsedStory(
     val series: SeriesRef? = null,
     /** true (Katalog der Geschichten-PWA): beim erneuten Import Kategorie, Tags und Bewertung der App nicht überschreiben. */
     val preserveUserData: Boolean = false,
+    /** Link zur Originalseite (Web-Import, Export/Import zwischen Geräten); null = nicht anfassen. */
+    val sourceUrl: String? = null,
 )
 
 /** Zugehörigkeit zu einer Serie (mehrteilige Geschichte). [position] ist die laufende Nummer des Teils. */

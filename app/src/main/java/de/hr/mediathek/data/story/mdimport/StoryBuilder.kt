@@ -99,12 +99,17 @@ object StoryBuilder {
         val status = scalar(fields["status"])?.lowercase() ?: "draft"
         val author = scalar(fields["author"])
         val text = body.replace("\r\n", "\n")
+        val seriesName = scalar(fields["series"])
+        val seriesPos = (fields["seriesOrder"] as? Number)?.toInt() ?: scalar(fields["seriesOrder"])?.toIntOrNull()
 
         return ParseResult.Ok(
             ParsedStory(
                 slug = slug, title = title, category = category, tags = distinctTags, status = status,
                 author = author, createdAt = created, updatedAt = updated, publishedAt = published,
                 body = text, hash = StoryHash.of(text),
+                sourceText = scalar(fields["source"]),
+                sourceUrl = scalar(fields["sourceUrl"]) ?: scalar(fields["url"]),
+                series = seriesName?.let { SeriesRef(it, seriesPos) },
             ),
             warnings,
         )
