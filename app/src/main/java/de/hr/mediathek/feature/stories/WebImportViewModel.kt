@@ -50,6 +50,10 @@ data class WebImportUi(
     val category: StoryCategory = StoryCategory.MIXED,
     val parts: List<WebPartUi> = emptyList(),
     val report: ImportReport? = null,
+    /** Die Seite verlangt eine Anmeldung: Der Bildschirm bietet "Anmelden" an. */
+    val loginNeeded: Boolean = false,
+    /** Der Nutzer ist in die Anmelde-Ansicht gegangen; beim Zurückkommen wird neu geladen. */
+    val loginOpened: Boolean = false,
 )
 
 @HiltViewModel
@@ -88,7 +92,9 @@ class WebImportViewModel @Inject constructor(
             return
         }
         job = viewModelScope.launch {
-            _state.update { it.copy(phase = WebPhase.LOADING, pagesRead = 0, error = null, thread = null, parts = emptyList(), report = null) }
+            _state.update {
+                it.copy(phase = WebPhase.LOADING, pagesRead = 0, error = null, thread = null, parts = emptyList(), report = null, loginNeeded = false, loginOpened = false)
+            }
             try {
                 val thread = fetcher.load(url) { n -> _state.update { it.copy(pagesRead = n) } }
                 _state.update {
@@ -103,7 +109,7 @@ class WebImportViewModel @Inject constructor(
                 _state.update { it.copy(phase = WebPhase.IDLE) }
                 throw e
             } catch (e: WebFetchException) {
-                _state.update { it.copy(phase = WebPhase.IDLE, error = e.message) }
+                _state.update { it.copy(phase = WebPhase.IDLE, error = e.message, loginNeeded = e.loginNeeded) }
             } catch (e: Exception) {
                 _state.update { it.copy(phase = WebPhase.IDLE, error = "Das hat nicht geklappt: ${e.message ?: e.javaClass.simpleName}") }
             }
@@ -112,6 +118,14 @@ class WebImportViewModel @Inject constructor(
 
     fun cancel() {
         job?.cancel()
+    }
+
+    /** Wird gerufen, wenn der Nutzer zur Anmelde-Ansicht wechselt. */
+    fun loginOpened() = _state.update { it.copy(loginOpened = true) }
+
+    /** Beim Zurückkommen aus der Anmelde-Ansicht: Seite mit der neuen Anmeldung noch einmal laden. */
+    fun retryAfterLogin() {
+        if (_state.value.loginOpened && _state.value.phase == WebPhase.IDLE) load()
     }
 
     /** Speichert die gewählten Kapitel über den normalen Import (Duplikate werden erkannt, Serien angelegt). */
