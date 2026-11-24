@@ -42,8 +42,8 @@ fun LinkListScreen(onBack: () -> Unit, viewModel: LinkListViewModel = hiltViewMo
     val clipboard = LocalClipboardManager.current
     val view = LocalView.current
     // Während des Imports bleibt der Bildschirm an, sonst unterbricht Android die Verbindung.
-    DisposableEffect(state.running) {
-        view.keepScreenOn = state.running
+    DisposableEffect(state.running || state.collecting) {
+        view.keepScreenOn = state.running || state.collecting
         onDispose { view.keepScreenOn = false }
     }
 
@@ -60,6 +60,32 @@ fun LinkListScreen(onBack: () -> Unit, viewModel: LinkListViewModel = hiltViewMo
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Card(colors = glassCardColors(MaterialTheme.colorScheme.surfaceContainer), modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Links automatisch sammeln", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Link der Übersichtsseite eines Forum-Bereichs einfügen (die Seite mit der Liste aller Themen, z. B. „AB / TB / DL - Geschichten“). " +
+                            "Die App liest alle Seiten durch, beginnt dabei immer bei Seite 1 und trägt alle Themen-Links unten in die Liste ein.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedTextField(
+                        value = state.collectUrl,
+                        onValueChange = viewModel::setCollectUrl,
+                        label = { Text("Link der Übersichtsseite") },
+                        singleLine = true,
+                        enabled = !state.collecting,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (state.collecting) {
+                        Text("Seite ${state.collectPages} gelesen · ${state.collectLinks} Links gefunden")
+                        OutlinedButton(onClick = viewModel::cancelCollect) { Text("Abbrechen") }
+                    } else {
+                        Button(onClick = viewModel::collect, enabled = state.collectUrl.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Links sammeln") }
+                    }
+                    state.collectMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                }
+            }
             OutlinedTextField(
                 value = state.text,
                 onValueChange = viewModel::setText,

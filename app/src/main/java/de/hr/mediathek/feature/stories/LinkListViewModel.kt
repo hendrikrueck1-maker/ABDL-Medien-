@@ -45,6 +45,12 @@ data class LinkListUi(
     val duplicates: Int = 0,
     val failed: List<FailedLink> = emptyList(),
     val message: String? = null,
+    /** Übersichtsseite eines Forum-Bereichs, aus der die Links gesammelt werden. */
+    val collectUrl: String = "",
+    val collecting: Boolean = false,
+    val collectPages: Int = 0,
+    val collectLinks: Int = 0,
+    val collectMessage: String? = null,
 )
 
 /** Viele Links nacheinander importieren. Schon vorhandene Links werden übersprungen, so lässt sich nach einer Unterbrechung weitermachen. */
@@ -61,6 +67,47 @@ class LinkListViewModel @Inject constructor(
 
     fun setText(value: String) = _state.update { it.copy(text = value, message = null) }
     fun setCategory(c: StoryCategory) = _state.update { it.copy(category = c) }
+
+    fun setCollectUrl(value: String) = _state.update { it.copy(collectUrl = value, collectMessage = null) }
+
+    private var collectJob: Job? = null
+
+    /** Liest alle Seiten eines Forum-Bereichs und trägt die Themen-Links in die Liste ein. */
+    fun collect() {
+        if (collectJob?.isActive == true || job?.isActive == true) return
+        val url = _state.value.collectUrl.trim()
+        if (url.isEmpty()) {
+            _state.update { it.copy(collectMessage = "Bitte den Link der Übersichtsseite einfügen.") }
+            return
+        }
+        collectJob = viewModelScope.launch {
+            _state.update { it.copy(collecting = true, collectPages = 0, collectLinks = 0, collectMessage = null) }
+            try {
+                val links = fetcher.collectThreadLinks(url) { pages, count -> _state.update { it.copy(collectPages = pages, collectLinks = count) } }
+                _state.update {
+                    val existing = WebStories.extractLinks(it.text)
+                    val merged = (existing + links).distinct()
+                    it.copy(
+                        text = merged.joinToString("\n"),
+                        collectMessage = "${links.size} Links aus ${it.collectPages} Seite(n) gesammelt. Sie stehen jetzt in der Liste.",
+                    )
+                }
+            } catch (e: CancellationException) {
+                _state.update { it.copy(collectMessage = "Abgebrochen.") }
+                throw e
+            } catch (e: WebFetchException) {
+                _state.update { it.copy(collectMessage = e.message) }
+            } catch (e: Exception) {
+                _state.update { it.copy(collectMessage = "Das hat nicht geklappt: ${e.message ?: e.javaClass.simpleName}") }
+            } finally {
+                _state.update { it.copy(collecting = false) }
+            }
+        }
+    }
+
+    fun cancelCollect() {
+        collectJob?.cancel()
+    }
 
     fun linkCount(): Int = WebStories.extractLinks(_state.value.text).size
 
@@ -154,7 +201,7 @@ class LinkListViewModel @Inject constructor(
 
     fun reset() {
         if (job?.isActive == true) return
-        _state.update { LinkListUi(category = it.category) }
+        _state.update { LinkListUi(category = it.category, collectUrl = it.collectUrl) }
     }
 
     private companion object {

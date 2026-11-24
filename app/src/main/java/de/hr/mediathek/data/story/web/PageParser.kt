@@ -126,7 +126,7 @@ object PageParser {
         return t.trim()
     }
 
-    private fun nextUrl(doc: Document): String? {
+    fun nextUrl(doc: Document): String? {
         val rel = doc.selectFirst("a[rel=next][href], link[rel=next][href]")
         if (rel != null) return rel.absUrl("href").ifEmpty { null }
         val arrow = doc.select(".pagenav a[href], .pagination a[href], .pageNav a[href]")
