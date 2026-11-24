@@ -15,11 +15,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.coroutineContext
 
-class WebFetchException(message: String) : Exception(message)
+/** [loginNeeded]: Die Seite zeigt ohne Anmeldung keinen Text; die App bietet dann die Anmeldung an. */
+class WebFetchException(message: String, val loginNeeded: Boolean = false) : Exception(message)
 
 /** Lädt eine Seite (bei Foren alle Seiten des Themas) und liefert die Kapitel. Nur für den privaten Gebrauch gedacht. */
 @Singleton
-class WebStoryFetcher @Inject constructor() {
+class WebStoryFetcher @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
+) {
 
     suspend fun load(rawUrl: String, onPage: (Int) -> Unit = {}): WebThread = withContext(Dispatchers.IO) {
         val start = normalize(rawUrl)
@@ -39,6 +42,7 @@ class WebStoryFetcher @Inject constructor() {
             throw WebFetchException(
                 if (first.loginRequired) "Die Seite verlangt eine Anmeldung. Ohne Anmeldung ist der Text nicht lesbar."
                 else "Auf der Seite wurde kein Text erkannt.",
+                loginNeeded = first.loginRequired,
             )
         }
         val thread = ThreadBuilder.build(start, pages)
@@ -48,6 +52,9 @@ class WebStoryFetcher @Inject constructor() {
             thread
         }
     }
+
+    private fun userAgent(): String =
+        runCatching { android.webkit.WebSettings.getDefaultUserAgent(context) }.getOrDefault(USER_AGENT)
 
     private fun normalize(raw: String): String {
         var url = raw.trim()
@@ -72,12 +79,16 @@ class WebStoryFetcher @Inject constructor() {
             conn.instanceFollowRedirects = true
             conn.connectTimeout = 15_000
             conn.readTimeout = 30_000
-            conn.setRequestProperty("User-Agent", USER_AGENT)
+            // Dieselbe Kennung wie die Anmelde-Ansicht, damit Foren, die die Sitzung daran binden, sie akzeptieren.
+            conn.setRequestProperty("User-Agent", userAgent())
+            // Anmeldung, die der Nutzer in der eingebauten Ansicht gemacht hat.
+            runCatching { android.webkit.CookieManager.getInstance().getCookie(url) }.getOrNull()
+                ?.takeIf { it.isNotBlank() }?.let { conn.setRequestProperty("Cookie", it) }
             conn.setRequestProperty("Accept", "text/html,application/xhtml+xml;q=0.9,*/*;q=0.5")
             conn.setRequestProperty("Accept-Language", "de-DE,de;q=0.9,en;q=0.6")
             val code = conn.responseCode
             when {
-                code == 401 || code == 403 -> throw WebFetchException("Die Seite verweigert den Zugriff ($code). Vermutlich ist eine Anmeldung nötig.")
+                code == 401 || code == 403 -> throw WebFetchException("Die Seite verweigert den Zugriff ($code). Vermutlich ist eine Anmeldung nötig.", loginNeeded = true)
                 code == 404 -> throw WebFetchException("Seite nicht gefunden (404).")
                 code == 429 -> throw WebFetchException("Die Seite bremst zu viele Anfragen (429). Später erneut versuchen.")
                 code !in 200..299 -> throw WebFetchException("Die Seite antwortet mit Fehler $code.")

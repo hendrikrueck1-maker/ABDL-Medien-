@@ -36,9 +36,10 @@ import de.hr.mediathek.data.db.StoryCategory
 
 /** Geschichten von einer Webseite oder einem Forum holen: Link rein, Vorschau, speichern. */
 @Composable
-fun WebImportScreen(onBack: () -> Unit, viewModel: WebImportViewModel = hiltViewModel()) {
+fun WebImportScreen(onBack: () -> Unit, onLogin: (String) -> Unit, viewModel: WebImportViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val busy = state.phase == WebPhase.LOADING || state.phase == WebPhase.SAVING
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { viewModel.retryAfterLogin() }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -73,6 +74,14 @@ fun WebImportScreen(onBack: () -> Unit, viewModel: WebImportViewModel = hiltView
                 Button(onClick = viewModel::load, enabled = state.url.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("Laden") }
             }
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            if (state.loginNeeded && state.phase == WebPhase.IDLE) {
+                Text(
+                    "Melde dich mit deinem eigenen Konto an. Die Anmeldung bleibt gespeichert, du musst sie nur einmal machen.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(onClick = { viewModel.loginOpened(); onLogin(state.url.trim()) }, modifier = Modifier.fillMaxWidth()) { Text("Anmelden") }
+            }
         }
 
         if (state.phase == WebPhase.PREVIEW || state.phase == WebPhase.SAVING) {

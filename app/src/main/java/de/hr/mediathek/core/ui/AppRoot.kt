@@ -283,7 +283,19 @@ private fun AppNavHost(navController: NavHostController, modifier: Modifier = Mo
             "story-import-web?url={url}",
             arguments = listOf(navArgument("url") { type = NavType.StringType; nullable = true; defaultValue = null }),
         ) {
-            de.hr.mediathek.feature.stories.WebImportScreen(onBack = { navController.popBackStack() })
+            de.hr.mediathek.feature.stories.WebImportScreen(
+                onBack = { navController.popBackStack() },
+                onLogin = { navController.navigate("story-import-web-login?url=${android.net.Uri.encode(it)}") },
+            )
+        }
+        composable(
+            "story-import-web-login?url={url}",
+            arguments = listOf(navArgument("url") { type = NavType.StringType; nullable = true; defaultValue = null }),
+        ) { entry ->
+            de.hr.mediathek.feature.stories.WebLoginScreen(
+                url = entry.arguments?.getString("url").orEmpty(),
+                onDone = { navController.popBackStack() },
+            )
         }
         composable("story-import-md") {
             de.hr.mediathek.feature.stories.MarkdownImportScreen(onBack = { navController.popBackStack() })
