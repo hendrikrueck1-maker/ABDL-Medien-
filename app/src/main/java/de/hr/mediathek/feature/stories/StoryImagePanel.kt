@@ -1,5 +1,12 @@
 package de.hr.mediathek.feature.stories
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -61,6 +68,7 @@ import de.hr.mediathek.feature.images.RoundIconButton
 import kotlinx.coroutines.delay
 
 private val SLIDE_INTERVALS = listOf(3, 5, 8, 10, 20, 30, 60)
+private const val CONTROLS_HIDE_MS = 4_000L
 
 /**
  * Bildbereich neben (Tablet, Querformat) oder über (Handy) dem Text: Kopf mit Ordnerwahl und Vollbild,
@@ -94,32 +102,21 @@ internal fun StoryImagePanel(
     }
     val folderLabel = image.folder.ifEmpty { stringResource(R.string.reader_all_folders) }
 
-    Column(
-        modifier.clip(RoundedCornerShape(32.dp)).background(c.bar).padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.reader_images_title), style = MaterialTheme.typography.titleSmall, color = c.onCard, maxLines = 1)
-                Text(
-                    stringResource(R.string.reader_images_sub, folderLabel, image.position, image.total),
-                    style = MaterialTheme.typography.bodySmall, color = c.onCardVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Row(
-                Modifier.height(48.dp).clip(CircleShape).background(c.card)
-                    .clickable(onClickLabel = stringResource(R.string.reader_folder_choose), role = Role.Button) { chooseFolder = true }
-                    .padding(horizontal = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(stringResource(R.string.reader_folder_choose), style = MaterialTheme.typography.labelLarge, color = c.onCard, maxLines = 1)
-                Icon(Icons.Filled.KeyboardArrowDown, null, tint = c.onCard)
-            }
-            RoundIconButton(Icons.Filled.Fullscreen, stringResource(R.string.reader_fullscreen)) { onFullscreen() }
-            if (onCollapse != null) RoundIconButton(Icons.Filled.KeyboardArrowUp, stringResource(R.string.reader_collapse_images)) { onCollapse() }
+    // Bedienelemente blenden sich wie beim Video nach ein paar Sekunden aus; Antippen des Bildes holt sie zurück.
+    var controls by remember { mutableStateOf(true) }
+    var touch by remember { mutableIntStateOf(0) }
+    LaunchedEffect(controls, touch, chooseFolder) {
+        if (controls && !chooseFolder) {
+            delay(CONTROLS_HIDE_MS)
+            controls = false
         }
+    }
+    val poke = { touch++ }
+
+    Box(modifier.clip(RoundedCornerShape(28.dp)).background(c.bgFullscreen)) {
         Box(
-            Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.bgFullscreen)
+            Modifier.fillMaxSize()
+                .pointerInput(Unit) { detectTapGestures(onTap = { controls = !controls; touch++ }) }
                 .pointerInput(Unit) {
                     var total = 0f
                     detectHorizontalDragGestures(
@@ -142,44 +139,76 @@ internal fun StoryImagePanel(
                 )
             }
         }
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        AnimatedVisibility(
+            visible = controls || image.bitmap == null,
+            enter = fadeIn(tween(200)), exit = fadeOut(tween(200)),
+            modifier = Modifier.fillMaxSize(),
         ) {
-            RoundIconButton(Icons.Filled.SkipPrevious, stringResource(R.string.img_prev)) { onPrevious() }
-            Box(
-                Modifier.size(width = 80.dp, height = 48.dp).clip(CircleShape).background(c.hellblau)
-                    .clickable(onClickLabel = stringResource(if (paused) R.string.slideshow_resume else R.string.slideshow_pause), role = Role.Button) { paused = !paused },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    if (paused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
-                    stringResource(if (paused) R.string.slideshow_resume else R.string.slideshow_pause),
-                    tint = c.onAccent,
-                )
+            Box(Modifier.fillMaxSize().padding(8.dp)) {
+                // Oben: Knöpfe links (linke Hand), Titel dahinter.
+                Row(
+                    Modifier.align(Alignment.TopStart).fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(c.bar.copy(alpha = 0.85f)).padding(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (onCollapse != null) RoundIconButton(Icons.Filled.KeyboardArrowUp, stringResource(R.string.reader_collapse_images)) { onCollapse() }
+                    RoundIconButton(Icons.Filled.Fullscreen, stringResource(R.string.reader_fullscreen)) { onFullscreen() }
+                    Row(
+                        Modifier.height(48.dp).clip(CircleShape).background(c.card)
+                            .clickable(onClickLabel = stringResource(R.string.reader_folder_choose), role = Role.Button) { chooseFolder = true; poke() }
+                            .padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(stringResource(R.string.reader_folder_choose), style = MaterialTheme.typography.labelLarge, color = c.onCard, maxLines = 1)
+                        Icon(Icons.Filled.KeyboardArrowDown, null, tint = c.onCard)
+                    }
+                    Text(
+                        stringResource(R.string.reader_images_sub, folderLabel, image.position, image.total),
+                        style = MaterialTheme.typography.bodySmall, color = c.onCardVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                // Unten: Zurück/Pause/Weiter links, Zufall und Intervall.
+                Row(
+                    Modifier.align(Alignment.BottomStart).fillMaxWidth().clip(RoundedCornerShape(26.dp)).background(c.bar.copy(alpha = 0.85f))
+                        .horizontalScroll(rememberScrollState()).padding(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    RoundIconButton(Icons.Filled.SkipPrevious, stringResource(R.string.img_prev)) { onPrevious(); poke() }
+                    Box(
+                        Modifier.size(width = 72.dp, height = 48.dp).clip(CircleShape).background(c.hellblau)
+                            .clickable(onClickLabel = stringResource(if (paused) R.string.slideshow_resume else R.string.slideshow_pause), role = Role.Button) { paused = !paused; poke() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (paused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                            stringResource(if (paused) R.string.slideshow_resume else R.string.slideshow_pause),
+                            tint = c.onAccent,
+                        )
+                    }
+                    RoundIconButton(Icons.Filled.SkipNext, stringResource(R.string.img_next)) { onNext(); poke() }
+                    Row(
+                        Modifier.height(48.dp).clip(CircleShape)
+                            .then(if (random) Modifier.background(c.mint) else Modifier.border(2.dp, c.mint, CircleShape))
+                            .toggleable(value = random, role = Role.Switch, onValueChange = { onRandom(it); poke() })
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        val tint = if (random) c.onAccent else c.mint
+                        Icon(Icons.Filled.Shuffle, null, tint = tint)
+                        Text(stringResource(R.string.img_random_short), style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1)
+                    }
+                    Box(
+                        Modifier.height(48.dp).clip(CircleShape).background(c.card)
+                            .clickable(onClickLabel = stringResource(R.string.img_interval), role = Role.Button) {
+                                onInterval(SLIDE_INTERVALS.firstOrNull { it > seconds } ?: SLIDE_INTERVALS.first()); poke()
+                            }.padding(horizontal = 14.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { Text(stringResource(R.string.slideshow_seconds, seconds), style = MaterialTheme.typography.labelLarge, color = c.onCard) }
+                }
             }
-            RoundIconButton(Icons.Filled.SkipNext, stringResource(R.string.img_next)) { onNext() }
-            Spacer(Modifier.weight(1f))
-            Row(
-                Modifier.height(48.dp).clip(CircleShape)
-                    .then(if (random) Modifier.background(c.mint) else Modifier.border(2.dp, c.mint, CircleShape))
-                    .toggleable(value = random, role = Role.Switch, onValueChange = onRandom)
-                    .padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                val tint = if (random) c.onAccent else c.mint
-                Icon(Icons.Filled.Shuffle, null, tint = tint)
-                Text(stringResource(R.string.img_random_short), style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1)
-            }
-            Box(
-                Modifier.height(48.dp).clip(CircleShape).background(c.card)
-                    .clickable(onClickLabel = stringResource(R.string.img_interval), role = Role.Button) {
-                        onInterval(SLIDE_INTERVALS.firstOrNull { it > seconds } ?: SLIDE_INTERVALS.first())
-                    }.padding(horizontal = 14.dp),
-                contentAlignment = Alignment.Center,
-            ) { Text(stringResource(R.string.slideshow_seconds, seconds), style = MaterialTheme.typography.labelLarge, color = c.onCard) }
         }
     }
 

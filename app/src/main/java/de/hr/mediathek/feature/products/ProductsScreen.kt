@@ -56,9 +56,10 @@ fun ProductsScreen(
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
         AppCard(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Produkte", style = MaterialTheme.typography.headlineMedium, color = LocalAppColors.current.onCard, modifier = Modifier.weight(1f))
-                OutlineAccentButton(onClick = onImport, color = LocalAppColors.current.gold) { Text("Import") }
+                // Bedienknöpfe links (linke Hand), dann Titel.
                 AccentButton(onClick = { scope.launch { onOpen(viewModel.createEmpty()) } }, color = LocalAppColors.current.gold) { Text("Neu") }
+                OutlineAccentButton(onClick = onImport, color = LocalAppColors.current.gold) { Text("Import") }
+                Text("Produkte", style = MaterialTheme.typography.headlineMedium, color = LocalAppColors.current.onCard, modifier = Modifier.weight(1f))
             }
         }
         OutlinedTextField(

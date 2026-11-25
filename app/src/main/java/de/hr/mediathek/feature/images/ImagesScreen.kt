@@ -110,12 +110,7 @@ fun ImagesScreen(
     Column(Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
         if (selected.isEmpty()) {
             Row(Modifier.padding(top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(R.string.nav_images),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f),
-                )
+                // Bedienknöpfe links (linke Hand), dann Titel.
                 TextButton(onClick = { viewModel.rememberSlideshowContext(); onOpenSlideshow() }) { Text(stringResource(R.string.slideshow_open)) }
                 androidx.compose.foundation.layout.Box {
                     IconButton(onClick = { moreMenu = true }) {
@@ -125,6 +120,12 @@ fun ImagesScreen(
                         DropdownMenuItem(text = { Text(stringResource(R.string.image_dup_open)) }, onClick = { moreMenu = false; onOpenDuplicates() })
                     }
                 }
+                Text(
+                    stringResource(R.string.nav_images),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f),
+                )
             }
         } else {
             Row(
