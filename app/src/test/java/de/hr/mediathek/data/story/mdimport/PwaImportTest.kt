@@ -19,10 +19,10 @@ class PwaImportTest {
 
     private val index = """
         [
-          {"id":"s0","title":"Abby","language":"Englisch","platform":"ABDLStoriesArchive","readTime":10,"shard":0,"preview":"x","date":"2011-05-11"},
-          {"id":"s1","title":"Corporate Diapers – Part 1","language":"Englisch","platform":"Abdlfiction","shard":0,"date":"2012-01-02","seriesId":"abdlfiction-corporate","seriesTitle":"Corporate Diapers","seriesPos":1,"seriesTotal":2},
-          {"id":"s2","title":"Corporate Diapers – Part 2","language":"Englisch","platform":"Abdlfiction","shard":0,"date":"2012-01-09","seriesId":"abdlfiction-corporate","seriesTitle":"Corporate Diapers","seriesPos":2,"seriesTotal":2},
-          {"id":"s100","title":"Windeltag","language":"Deutsch","platform":"Windelgeschichten","shard":1,"date":"2020-03-04"}
+          {"id":"s0","title":"Titel A","language":"Englisch","platform":"QuelleX","readTime":10,"shard":0,"preview":"x","date":"2011-05-11"},
+          {"id":"s1","title":"Serie B – Part 1","language":"Englisch","platform":"QuelleY","shard":0,"date":"2012-01-02","seriesId":"quelley-serie","seriesTitle":"Serie B","seriesPos":1,"seriesTotal":2},
+          {"id":"s2","title":"Serie B – Part 2","language":"Englisch","platform":"QuelleY","shard":0,"date":"2012-01-09","seriesId":"quelley-serie","seriesTitle":"Serie B","seriesPos":2,"seriesTotal":2},
+          {"id":"s100","title":"Titel C","language":"Deutsch","platform":"QuelleZ","shard":1,"date":"2020-03-04"}
         ]
     """.trimIndent()
     private val shard0 = """{"s0":"Preface: ein Text.","s1":"Chapter one.","s2":"Chapter two."}"""
@@ -62,9 +62,9 @@ class PwaImportTest {
         assertEquals(5, r.created)
         assertTrue(r.errors.isEmpty())
         val s1 = store.rows.getValue("s1").story
-        assertEquals("Corporate Diapers – Part 1", s1.title)
-        assertEquals("Abdlfiction", s1.sourceText)
-        assertEquals(SeriesRef("Corporate Diapers", 1), s1.series)
+        assertEquals("Serie B – Part 1", s1.title)
+        assertEquals("QuelleY", s1.sourceText)
+        assertEquals(SeriesRef("Serie B", 1), s1.series)
         assertEquals(listOf("Englisch"), s1.tags)
         assertEquals(Instant.parse("2012-01-02T00:00:00Z").toEpochMilli(), s1.createdAt)
         assertEquals("Chapter one.", s1.body)

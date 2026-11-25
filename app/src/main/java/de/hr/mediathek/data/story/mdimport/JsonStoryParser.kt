@@ -6,7 +6,7 @@ import org.json.JSONObject
 /** Liest ein JSON-Array [{title, author?, category, tags?, content, createdAt?, status?}] (optional auch slug, updatedAt, publishedAt). */
 object JsonStoryParser {
     fun parseArray(text: String): JSONArray? = try {
-        JSONArray(text.removePrefix("﻿"))
+        JSONArray(text.removePrefix("\uFEFF"))
     } catch (e: Exception) {
         null
     }

@@ -25,13 +25,16 @@ object ListingParser {
         return u.substringBefore('#')
     }
 
+    /** Beitragslinks (`?p=123` / `&p=123`), nicht Themenlinks; `sp=` usw. bleiben erlaubt. */
+    private val POST_PARAM = Regex("[?&]p=")
+
     /** [pageNumber]: Nummer der gerade gelesenen Seite; hilft, die nächste Seite in der Seitenleiste zu finden. */
     fun parse(doc: Document, pageNumber: Int): Listing {
         var anchors = doc.select("a[id^=thread_title_]")
         if (anchors.isEmpty()) {
             anchors = doc.select("a[href*=showthread.php]").filter { a ->
                 val href = a.attr("href")
-                a.text().isNotBlank() && "goto=" !in href && "page=" !in href && "p=" !in href && "#" !in href &&
+                a.text().isNotBlank() && "goto=" !in href && "page=" !in href && !POST_PARAM.containsMatchIn(href) && "#" !in href &&
                     a.closest("#threadslist, #threads, .threadlist, table.tborder") != null
             }.let { org.jsoup.select.Elements(it) }
         }

@@ -2,6 +2,7 @@ package de.hr.mediathek.data.trash
 
 import android.content.Context
 import android.net.Uri
+import androidx.room.withTransaction
 import dagger.hilt.android.qualifiers.ApplicationContext
 import de.hr.mediathek.core.log.ErrorLogger
 import de.hr.mediathek.core.log.ErrorType
@@ -31,6 +32,7 @@ class TrashRepository @Inject constructor(
     private val mediaDao: MediaFileDao,
     private val sourceDao: SourceDao,
     private val errorLogger: ErrorLogger,
+    private val db: de.hr.mediathek.data.db.MediathekDatabase,
 ) {
     fun observe(): Flow<List<TrashRow>> = trashDao.observeMedia()
 
@@ -54,17 +56,20 @@ class TrashRepository @Inject constructor(
             val trashDir = SafOps.findOrCreateDir(resolver, tree, parentId, TRASH_DIR, noMedia = true) ?: return false
             val newId = SafOps.move(resolver, tree, docId, parentId, trashDir) ?: return false
             val now = System.currentTimeMillis()
-            trashDao.insert(
-                TrashItemEntity(
-                    entityType = EntityType.MEDIA,
-                    entityUuid = uuid,
-                    originalPath = media.relativePath,
-                    trashPath = newId,
-                    deletedAt = now,
-                    expiresAt = now + RETENTION_MS,
-                ),
-            )
-            mediaDao.markTrashed(uuid, newId, now)
+            // Eintrag und Markierung gemeinsam: entweder beides oder nichts.
+            db.withTransaction {
+                trashDao.insert(
+                    TrashItemEntity(
+                        entityType = EntityType.MEDIA,
+                        entityUuid = uuid,
+                        originalPath = media.relativePath,
+                        trashPath = newId,
+                        deletedAt = now,
+                        expiresAt = now + RETENTION_MS,
+                    ),
+                )
+                mediaDao.markTrashed(uuid, newId, now)
+            }
             return true
         } catch (e: kotlin.coroutines.cancellation.CancellationException) {
             throw e
@@ -85,8 +90,18 @@ class TrashRepository @Inject constructor(
                 ?: return@withContext false
             val newId = SafOps.move(resolver, tree, trashId, trashDirId, targetId) ?: return@withContext false
             val now = System.currentTimeMillis()
-            mediaDao.markRestored(item.entityUuid, newId, now)
-            trashDao.delete(item.uuid)
+            // Lag am Originalplatz schon eine gleichnamige Datei, vergibt Android einen neuen Namen („Name (1).mp4“).
+            // Dann Pfad und Namen nachziehen, damit Bewertung und Favorit bei dieser Datei bleiben.
+            val actualName = SafOps.stat(resolver, tree, newId)?.name
+            val originalName = item.originalPath?.substringAfterLast('/')
+            db.withTransaction {
+                mediaDao.markRestored(item.entityUuid, newId, now)
+                if (actualName != null && originalName != null && actualName != originalName) {
+                    val path = if (originalDir.isEmpty()) actualName else "$originalDir/$actualName"
+                    mediaDao.setPathAndName(item.entityUuid, path, actualName, now)
+                }
+                trashDao.delete(item.uuid)
+            }
             true
         } catch (e: kotlin.coroutines.cancellation.CancellationException) {
             throw e

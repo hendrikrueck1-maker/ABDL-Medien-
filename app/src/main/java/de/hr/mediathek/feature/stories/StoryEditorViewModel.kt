@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.hr.mediathek.data.db.StoryCategory
 import de.hr.mediathek.data.db.StoryDraftVersionEntity
 import de.hr.mediathek.data.story.StoryRepository
+import de.hr.mediathek.core.AppScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -85,7 +86,8 @@ class StoryEditorViewModel @Inject constructor(
     /** Beim Verlassen sofort speichern. */
     fun flush() {
         saveJob?.cancel()
-        if (!_state.value.saved) viewModelScope.launch { persist() }
+        // App-Bereich: Beim Verlassen des Editors darf das Speichern nicht abgebrochen werden.
+        if (!_state.value.saved) AppScope.launch { persist() }
     }
 
     fun showDrafts(show: Boolean) {

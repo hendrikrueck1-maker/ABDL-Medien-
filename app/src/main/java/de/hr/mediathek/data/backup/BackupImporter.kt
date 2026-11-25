@@ -155,6 +155,9 @@ class BackupImporter @Inject constructor(
         return if (hasStamp && incoming > local) {
             cv.remove("id")
             cv.remove("uuid")
+            // Vorhandene Medien: nur Nutzerangaben übernehmen. Pfad, Größe, Fingerabdruck und Status sind Wissen dieses
+            // Geräts (z. B. nach einer Komprimierung) und dürfen von einem Backup nicht überschrieben werden.
+            if (table == "media_file") cv.keySet().retainAll(MEDIA_USER_FIELDS)
             sql.update(table, SQLiteDatabase.CONFLICT_ABORT, cv, "uuid = ?", arrayOf(uuid))
             if (table == "story") wonStories += uuid
             Outcome.UPDATED
@@ -211,6 +214,12 @@ class BackupImporter @Inject constructor(
     }
 
     companion object {
+        /** Felder eines Mediums, die ein Backup bei vorhandenen Einträgen überschreiben darf. */
+        val MEDIA_USER_FIELDS = setOf(
+            "rating", "favorite", "markedDelete", "markedPee", "playCount", "lastPlayedAt", "resumePositionMs", "seenState",
+            "userUpdatedAt", "deletedAt",
+        )
+
         const val TOMBSTONE_RETENTION_MS = 365L * 24 * 60 * 60 * 1000
 
         /** Gerätespezifisch: nie aus einem Backup übernehmen. */

@@ -86,7 +86,19 @@ class CompressionJobExecutor @Inject constructor(
         for (r in dao.allUnfinished()) {
             if (CompressionRecovery.restartFromScratch(r.phase)) discard(r) else forward += r
         }
+        cleanWorkDirs(forward.mapNotNull { it.localTemp }.toSet())
         forward
+    }
+
+    /** Zwischendateien in den Arbeitsordnern löschen, die zu keinem offenen Lauf mehr gehören (nach Absturz). */
+    private fun cleanWorkDirs(keep: Set<String>) {
+        val dirs = buildList {
+            add(File(context.filesDir, "compress"))
+            context.getExternalFilesDirs(null).filterNotNull().forEach { add(File(it, "compress")) }
+        }
+        for (d in dirs) {
+            d.listFiles()?.forEach { f -> if (f.isFile && f.absolutePath !in keep) runCatching { f.delete() } }
+        }
     }
 
     // --- Neuer Lauf --------------------------------------------------------------------------
@@ -135,7 +147,14 @@ class CompressionJobExecutor @Inject constructor(
         val parentId = SafOps.resolveDir(resolver, tree, parentRel) ?: return JobOutcome.Failed("Ordner nicht gefunden")
         val baseName = media.displayName.substringBeforeLast('.', media.displayName)
         val targetName = "$baseName.mp4"
-        if (SafOps.children(resolver, tree, parentId).any { it.name == targetName && it.docId != docId }) {
+        val siblings = SafOps.children(resolver, tree, parentId)
+        // Schon vor dem stundenlangen Kodieren prüfen, ob im _alt-Ordner ein gleichnamiges Original liegt.
+        siblings.firstOrNull { it.isDir && it.name == ALT_DIR }?.let { alt ->
+            if (SafOps.children(resolver, tree, alt.docId).any { it.name == media.displayName }) {
+                return JobOutcome.Failed("Im Ordner _alt liegt schon eine gleichnamige Datei (älteres Original). Bitte zuerst dort aufräumen")
+            }
+        }
+        if (siblings.any { it.name == targetName && it.docId != docId }) {
             return JobOutcome.Failed("Im Ordner gibt es schon eine Datei mit dem Zielnamen")
         }
 
@@ -158,8 +177,9 @@ class CompressionJobExecutor @Inject constructor(
                 Step(h265, target, 0, false),
                 Step(h265, (target * 0.65).toLong(), 0, false),
                 Step(h264, (target * 0.80).toLong(), 0, false),
-                Step(h265, (target * 0.45).toLong(), 720, true),
-                Step(h264, (target * 0.55).toLong(), 720, true),
+                // Letzte Stufen: weiter in voller Auflösung (kein 720p-Rückfall), dafür mit Ersatz-Encoder.
+                Step(h265, (target * 0.45).toLong(), 0, true),
+                Step(h264, (target * 0.55).toLong(), 0, true),
             )
             var failure: VerifyFailure? = VerifyFailure.NOT_SMALLER
             var lastError: Throwable? = null
@@ -300,8 +320,13 @@ class CompressionJobExecutor @Inject constructor(
     // --- Zu Ende führen (ab VERIFIED, auch nach Neustart) ------------------------------------
 
     private suspend fun finish(start: CompressionRecordEntity, ctx: JobContext): JobOutcome {
+        val sourceUuid = start.sourceUuid ?: return JobOutcome.Failed("Journal unvollständig")
+        // Original verschieben, umbenennen und Datenbank umhängen nie gleichzeitig mit einem Scan derselben Quelle.
+        return de.hr.mediathek.core.jobs.SourceLocks.withSource(sourceUuid) { finishLocked(start, sourceUuid, ctx) }
+    }
+
+    private suspend fun finishLocked(start: CompressionRecordEntity, sourceUuid: String, ctx: JobContext): JobOutcome {
         var r = start
-        val sourceUuid = r.sourceUuid ?: return JobOutcome.Failed("Journal unvollständig")
         val source = sourceDao.getByUuid(sourceUuid) ?: return JobOutcome.Failed("Quelle nicht gefunden")
         val tree = Uri.parse(source.treeUri)
         if (!SafOps.rootReachable(resolver, tree)) return JobOutcome.Failed("Speicherkarte nicht erreichbar, wird später fortgesetzt")
@@ -386,7 +411,10 @@ class CompressionJobExecutor @Inject constructor(
     // --- Aufräumen ---------------------------------------------------------------------------
 
     /** Verwirft einen Lauf vor VERIFIED: lokale und angelegte Temp-Datei weg, Journal-Eintrag löschen. */
-    private suspend fun discard(r: CompressionRecordEntity) {
+    private suspend fun discard(stale: CompressionRecordEntity) {
+        // Frisch lesen: Während des Kopierens wird tempPath nur in der Datenbank gesetzt, nicht im übergebenen Objekt.
+        // Sonst bliebe eine halbe .tmp-Datei (bis mehrere GB) auf der Speicherkarte liegen.
+        val r = dao.byId(stale.id) ?: stale
         r.localTemp?.let { runCatching { File(it).delete() } }
         val tempId = r.tempPath
         val sourceUuid = r.sourceUuid

@@ -53,7 +53,7 @@ class PackageImportExecutor @Inject constructor(
 
         ctx.report("Paket wird gelesen", null, force = true)
         val manifest = try {
-            parse(resolver.openInputStream(DocumentsContract.buildDocumentUriUsingTree(tree, manifestDoc.docId))!!.use { it.readBytes().toString(Charsets.UTF_8) })
+            PackageLogic.decode(PackageLogic.readLimited(resolver.openInputStream(DocumentsContract.buildDocumentUriUsingTree(tree, manifestDoc.docId))!!))
         } catch (e: Exception) {
             return@withContext JobOutcome.Failed("Manifest nicht lesbar")
         }
@@ -134,18 +134,4 @@ class PackageImportExecutor @Inject constructor(
         JobOutcome.Completed("Paket eingebunden: $attached Medien$extra")
     }
 
-    private fun parse(text: String): PackageManifest {
-        val o = JSONObject(text)
-        require(o.getInt("format") == PackageLogic.FORMAT) { "Format unbekannt" }
-        val arr = o.getJSONArray("files")
-        val files = (0 until arr.length()).map {
-            val f = arr.getJSONObject(it)
-            ManifestFile(
-                f.getString("mediaUuid"), f.getString("type"), f.getString("path"), f.getLong("size"),
-                if (f.isNull("originalFingerprint")) null else f.getString("originalFingerprint"),
-                f.getString("packageFingerprint"), f.optBoolean("compressed", false),
-            )
-        }
-        return PackageManifest(o.getInt("schemaVersion"), o.optString("appVersion"), o.optLong("createdAt"), o.optString("name", "Paket"), files)
-    }
 }

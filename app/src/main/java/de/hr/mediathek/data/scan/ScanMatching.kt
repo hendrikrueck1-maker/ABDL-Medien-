@@ -5,6 +5,33 @@ import kotlin.math.abs
 
 /** Reine Zuordnungslogik des Scans (ohne Android-Abhängigkeit, daher unit-testbar). */
 object ScanMatching {
+    /**
+     * „Wird gerade noch geschrieben“: in den letzten [windowMs] geändert. Eine Zeit in der Zukunft (falsche Kamerauhr,
+     * Zeitzonenversatz auf exFAT) gilt nicht als kürzlich, sonst würde die Datei nie eingelesen.
+     */
+    fun isRecent(now: Long, lastModified: Long, windowMs: Long): Boolean {
+        if (lastModified <= 0) return false
+        val diff = now - lastModified
+        return diff in 0 until windowMs
+    }
+
+    /**
+     * Pfade, die eine unfertige Komprimierung gerade bearbeitet (Original und Zieldatei .mp4): Der Scan behandelt sie
+     * als „gesehen, unverändert“ und legt für sie nie einen neuen Eintrag an.
+     */
+    fun protectedPaths(records: List<Pair<String?, String?>>): Set<String> {
+        val out = HashSet<String>()
+        for ((relativePath, targetName) in records) {
+            if (relativePath.isNullOrBlank()) continue
+            out += relativePath
+            if (!targetName.isNullOrBlank()) {
+                val parent = relativePath.substringBeforeLast('/', "")
+                out += if (parent.isEmpty()) targetName else "$parent/$targetName"
+            }
+        }
+        return out
+    }
+
     /** exFAT/FAT speichern Zeiten nur auf 2 Sekunden genau. */
     const val MTIME_TOLERANCE_MS = 2_000L
 

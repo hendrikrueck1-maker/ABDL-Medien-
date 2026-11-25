@@ -125,7 +125,7 @@ object ContainerSource {
 
     /** Eine einzelne JSON-Datei: Liste, PWA-Sicherung oder eine eigene Geschichte. */
     fun fromJsonText(json: String, now: Long = System.currentTimeMillis()): ImportSource {
-        val clean = json.removePrefix("﻿").trimStart()
+        val clean = json.removePrefix("\uFEFF").trimStart()
         fun failing(reason: String) = ImportSource("JSON", 1, sequenceOf(ImportItem("JSON-Datei") { ParseResult.Fail(reason) }))
         return try {
             if (clean.startsWith("[")) {

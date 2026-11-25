@@ -72,6 +72,9 @@ object StoryBuilder {
         if (titleRaw is Map<*, *> || titleRaw is Iterable<*>) return ParseResult.Fail("Feld title ist kein Text")
         val title = scalar(titleRaw) ?: return ParseResult.Fail("Pflichtfeld title fehlt")
         if (body.isBlank()) return ParseResult.Fail("Text ist leer")
+        // Kennung aus einem App-Export hat Vorrang vor der aus Titel/Dateiname abgeleiteten.
+        val ownSlug = scalar(fields["slug"])?.lowercase()?.replace(Regex("[^a-z0-9.-]+"), "-")?.trim('-')?.takeIf { it.isNotEmpty() }
+        val slug = ownSlug ?: slug
         if (slug.isBlank()) return ParseResult.Fail("Kein Dateiname/Kennung")
 
         val warnings = ArrayList<String>()
@@ -110,8 +113,23 @@ object StoryBuilder {
                 sourceText = scalar(fields["source"]),
                 sourceUrl = scalar(fields["sourceUrl"]) ?: scalar(fields["url"]),
                 series = seriesName?.let { SeriesRef(it, seriesPos) },
+                rating = ratingOf(fields["rating"]),
+                continueFlag = flag(fields["continueFlag"]),
+                favorite = flag(fields["favorite"]),
             ),
             warnings,
         )
+    }
+
+    /** Bewertung 1–5 (Zahl oder Text); alles andere = keine Angabe. */
+    private fun ratingOf(v: Any?): Int? {
+        val n = (v as? Number)?.toInt() ?: scalar(v)?.toIntOrNull() ?: return null
+        return n.takeIf { it in 1..5 }
+    }
+
+    private fun flag(v: Any?): Boolean? = when (v) {
+        is Boolean -> v
+        null -> null
+        else -> when (scalar(v)?.lowercase()) { "true", "ja", "yes", "1" -> true; "false", "nein", "no", "0" -> false; else -> null }
     }
 }

@@ -34,7 +34,20 @@ class ProductPdfImporter @Inject constructor(@ApplicationContext private val con
     suspend fun read(uri: Uri, name: String): RawProductFile = withContext(Dispatchers.IO) {
         try {
             if (name.lowercase().endsWith(".docx")) {
-                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("nicht lesbar")
+                val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+                    // Höchstens 20 MB lesen (wie bei Geschichten), sonst droht Speichermangel.
+                    val buf = java.io.ByteArrayOutputStream()
+                    val chunk = ByteArray(64 * 1024)
+                    var total = 0L
+                    while (true) {
+                        val n = input.read(chunk)
+                        if (n < 0) break
+                        total += n
+                        if (total > MAX_DOCX_BYTES) return@withContext RawProductFile(name, null, emptyList(), "Datei ist größer als 20 MB", emptyList())
+                        buf.write(chunk, 0, n)
+                    }
+                    buf.toByteArray()
+                } ?: error("nicht lesbar")
                 RawProductFile(name, DocxReader.read(bytes), emptyList(), null, emptyList())
             } else {
                 readPdf(uri, name)
@@ -91,6 +104,7 @@ class ProductPdfImporter @Inject constructor(@ApplicationContext private val con
 
     companion object {
         private const val MAX_PIXELS = 40_000_000L
+        private const val MAX_DOCX_BYTES = 20L * 1024 * 1024
 
         /** Regel: Seite 3 und 4 = Trocken/Nass-Paare, Seite 5 = erstes Bild Verpackung, danach Produktfotos. */
         fun assign(images: List<ExtractedImage>) {

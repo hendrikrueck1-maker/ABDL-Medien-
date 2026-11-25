@@ -39,7 +39,10 @@ fun StoryToolsScreen(onBack: () -> Unit, viewModel: StoryToolsViewModel = hiltVi
         if (uri != null) viewModel.export(uri, scope)
     }
     val jsonLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        if (uri != null) viewModel.export(uri, scope, json = true)
+        if (uri != null) viewModel.export(uri, scope, StoryToolsViewModel.Format.JSON)
+    }
+    val linksLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri != null) viewModel.export(uri, scope, StoryToolsViewModel.Format.LINKS)
     }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -79,6 +82,15 @@ fun StoryToolsScreen(onBack: () -> Unit, viewModel: StoryToolsViewModel = hiltVi
                     onClick = { scope = null; jsonLauncher.launch("geschichten.json") },
                     enabled = !export.running,
                 ) { Text("Alle als JSON-Datei exportieren (mit Datum und Link)") }
+                Text(
+                    "Handy → Tablet: Die JSON-Datei überträgt alles (Bewertung, Favorit, „weiterschreiben“, Datum). " +
+                        "Alternativ nur die Links exportieren und am Tablet in die Link-Liste einfügen.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                OutlinedButton(
+                    onClick = { scope = null; linksLauncher.launch("geschichten-links.txt") },
+                    enabled = !export.running,
+                ) { Text("Nur die Links exportieren (Textdatei)") }
                 for (f in folders) {
                     OutlinedButton(
                         onClick = { scope = f.uuid; launcher.launch("${f.name}.zip") },

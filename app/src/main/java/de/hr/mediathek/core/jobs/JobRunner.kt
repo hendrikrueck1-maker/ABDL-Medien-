@@ -40,6 +40,7 @@ class JobRunner @Inject constructor(
     private val packageImporter: de.hr.mediathek.data.pkg.PackageImportExecutor,
     private val compressionExecutor: de.hr.mediathek.data.compress.CompressionJobExecutor,
     private val compressionSettings: de.hr.mediathek.data.compress.CompressionSettings,
+    private val linkImporter: de.hr.mediathek.data.story.web.LinkImportExecutor,
     private val errorLogger: ErrorLogger,
 ) {
     private val runLock = Mutex()
@@ -52,6 +53,12 @@ class JobRunner @Inject constructor(
 
     /** Läuft gerade ein Komprimierungslauf in diesem Prozess? */
     fun isCompressing(): Boolean = compressLock.isLocked
+
+    /** Führt [block] nur aus, wenn gerade keine Komprimierung läuft (Sperre wird so lange gehalten); sonst null. */
+    suspend fun <T> whileCompressionIdle(block: suspend () -> T): T? {
+        if (!compressLock.tryLock()) return null
+        return try { block() } finally { compressLock.unlock() }
+    }
 
     /** Bittet den laufenden Job mit dieser UUID, an der nächsten Stelle abzubrechen. */
     fun requestCancel(jobUuid: String) {
@@ -162,6 +169,7 @@ class JobRunner @Inject constructor(
         JobType.COMPRESS -> compressionExecutor.execute(job, context)
         JobType.PACKAGE_EXPORT -> packageExporter.execute(job, context)
         JobType.PACKAGE_IMPORT -> packageImporter.execute(job, context)
+        JobType.LINK_IMPORT -> linkImporter.execute(context)
         else -> JobOutcome.Failed("Job-Typ ${job.type} ist noch nicht verfügbar")
     }
 
@@ -170,7 +178,7 @@ class JobRunner @Inject constructor(
         JobType.BACKUP, JobType.MIRROR_COPY -> ErrorType.BACKUP
         JobType.COMPRESS -> ErrorType.COMPRESSION
         JobType.PACKAGE_EXPORT, JobType.PACKAGE_IMPORT -> ErrorType.PACKAGE
-        JobType.PDF_IMPORT -> ErrorType.IMPORT
+        JobType.PDF_IMPORT, JobType.LINK_IMPORT -> ErrorType.IMPORT
         JobType.PHASH, JobType.THUMBNAILS -> ErrorType.SCAN
     }
 

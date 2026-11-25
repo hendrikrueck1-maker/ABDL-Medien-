@@ -41,7 +41,8 @@ class ErrorLogger @Inject constructor(
 
     suspend fun logNow(type: String, message: String) {
         try {
-            dao.record(type, message.take(MAX_MESSAGE), System.currentTimeMillis(), MAX_ENTRIES)
+            // Schon beim Schreiben unkenntlich machen: Dateinamen und Pfade landen nie im Klartext in der Datenbank.
+            dao.record(type, de.hr.mediathek.data.stats.Redactor.redact(message).take(MAX_MESSAGE), System.currentTimeMillis(), MAX_ENTRIES)
         } catch (e: Exception) {
             // Das Protokoll darf nie selbst zum Fehler werden.
         }

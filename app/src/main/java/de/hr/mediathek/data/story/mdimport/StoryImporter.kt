@@ -19,6 +19,7 @@ data class ExistingStory(
     val tags: Set<String>,
     val rating: Int = 0,
     val continueFlag: Boolean = false,
+    val sourceUrl: String? = null,
 )
 
 /** Speicherzugriff des Importers; getrennt, damit die Logik ohne Datenbank getestet werden kann. */
@@ -171,12 +172,22 @@ class StoryImporter(private val store: ImportStore, private val batchSize: Int =
         return Outcome.Updated
     }
 
-    private suspend fun apply(story: ParsedStory): Outcome {
-        val existing = store.find(story.slug)
+    private suspend fun apply(input: ParsedStory): Outcome {
+        var story = input
+        var existing = store.find(story.slug)
+        // Gleiche Kennung, aber eine andere Geschichte (anderer Link, anderer Text): nicht überschreiben,
+        // sondern unter einer freien Kennung neu anlegen (z. B. zwei Geschichten mit gleichem Titel).
+        if (existing != null && !existing.trashed && existing.hash != story.hash && differentSource(existing.sourceUrl, story.sourceUrl)) {
+            var n = 2
+            var candidate = story.copy(slug = "${input.slug}-$n")
+            while (store.find(candidate.slug) != null && n < 50) candidate = story.copy(slug = "${input.slug}-${++n}")
+            story = candidate
+            existing = null
+        }
         if (existing != null) {
             if (existing.trashed) return Outcome.Note("${ImportReport.TRASH_NOTE} und wurde nicht wiederhergestellt")
             val tagSet = story.tags.map { de.hr.mediathek.data.tag.TagNames.normalize(it) }.toSet()
-            val same = existing.hash == story.hash && existing.title == story.title &&
+            val same = existing.hash == story.hash && (story.keepTitle || existing.title == story.title) &&
                 (story.rating == null || existing.rating == story.rating) &&
                 (story.continueFlag == null || existing.continueFlag == story.continueFlag) &&
                 if (story.preserveUserData) true else (
@@ -191,5 +202,15 @@ class StoryImporter(private val store: ImportStore, private val batchSize: Int =
         store.duplicateOf(story)?.let { return Outcome.Duplicate(it) }
         store.insert(story)
         return Outcome.Created
+    }
+
+    companion object {
+        /** Beide Links bekannt und verschieden (ohne Schema, www., Schrägstrich am Ende und Sprungmarke verglichen). */
+        fun differentSource(a: String?, b: String?): Boolean {
+            if (a.isNullOrBlank() || b.isNullOrBlank()) return false
+            fun norm(u: String) = u.trim().substringBefore('#').lowercase()
+                .removePrefix("https://").removePrefix("http://").removePrefix("www.").trimEnd('/')
+            return norm(a) != norm(b)
+        }
     }
 }

@@ -36,7 +36,7 @@ object PwaFormat {
 
     /** Beschreibt den Katalog als Liste; der Text wird erst beim Parsen aus dem passenden Shard geholt. */
     fun catalogItems(indexJson: String, shard: (Int) -> Map<String, String>?, now: Long): List<ImportItem> {
-        val arr = JSONArray(indexJson.removePrefix("﻿"))
+        val arr = JSONArray(indexJson.removePrefix("\uFEFF"))
         return (0 until arr.length()).mapNotNull { i ->
             val o = arr.optJSONObject(i) ?: return@mapNotNull null
             val id = str(o, "id") ?: return@mapNotNull null
@@ -58,7 +58,7 @@ object PwaFormat {
 
     /** Parst Shard-Dateien (Objekt id → Text). */
     fun parseShard(json: String): Map<String, String>? = try {
-        val o = JSONObject(json.removePrefix("﻿"))
+        val o = JSONObject(json.removePrefix("\uFEFF"))
         o.keys().asSequence().associateWith { o.optString(it) }
     } catch (e: Exception) {
         null

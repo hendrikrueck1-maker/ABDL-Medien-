@@ -96,4 +96,60 @@ object PackageLogic {
     /** Pfad im Paket darf den Ordner nie verlassen. */
     fun isSafePath(path: String): Boolean =
         path.isNotEmpty() && !path.startsWith("/") && !path.contains("\\") && path.split('/').none { it == ".." || it.isEmpty() }
+
+    /** Höchstgröße der Manifest-Datei (Schutz gegen kaputte oder riesige Dateien). */
+    const val MANIFEST_MAX_BYTES = 8L * 1024 * 1024
+
+    /** Liest höchstens [MANIFEST_MAX_BYTES]; größere Dateien gelten als ungültig. */
+    fun readLimited(input: java.io.InputStream): String = input.use {
+        val bytes = it.readNBytesCompat(MANIFEST_MAX_BYTES + 1)
+        require(bytes.size <= MANIFEST_MAX_BYTES) { "Manifest zu groß" }
+        bytes.toString(Charsets.UTF_8)
+    }
+
+    private fun java.io.InputStream.readNBytesCompat(max: Long): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(64 * 1024)
+        var total = 0L
+        while (total < max) {
+            val n = read(buf, 0, minOf(buf.size.toLong(), max - total).toInt())
+            if (n < 0) break
+            out.write(buf, 0, n); total += n
+        }
+        return out.toByteArray()
+    }
+
+    fun decode(text: String): PackageManifest {
+        val o = org.json.JSONObject(text)
+        require(o.getInt("format") == FORMAT) { "Format unbekannt" }
+        val arr = o.getJSONArray("files")
+        val files = (0 until arr.length()).map {
+            val f = arr.getJSONObject(it)
+            ManifestFile(
+                f.getString("mediaUuid"), f.getString("type"), f.getString("path"), f.getLong("size"),
+                if (f.isNull("originalFingerprint")) null else f.getString("originalFingerprint"),
+                f.getString("packageFingerprint"), f.optBoolean("compressed", false),
+            )
+        }
+        return PackageManifest(o.getInt("schemaVersion"), o.optString("appVersion"), o.optLong("createdAt"), o.optString("name", "Paket"), files)
+    }
+
+    /**
+     * Welche Dateien beim „Paket entfernen + Dateien löschen“ gelöscht werden dürfen: nur die im Manifest genannten
+     * Paketdateien (samt liegengebliebener .part-Reste), das Manifest und die Metadaten. Nie fremde Dateien, nie Ordner mit Inhalt.
+     */
+    fun deletionPlan(manifest: PackageManifest): Set<String> {
+        val plan = LinkedHashSet<String>()
+        for (f in manifest.files) {
+            if (!isSafePath(f.path)) continue
+            val dir = f.path.substringBefore('/', "")
+            if (dir != DIR_VIDEOS && dir != DIR_IMAGES) continue
+            if (f.path.count { it == '/' } != 1) continue
+            plan += f.path
+            plan += f.path + ".part"
+        }
+        plan += MANIFEST_NAME
+        plan += METADATA_NAME
+        return plan
+    }
 }

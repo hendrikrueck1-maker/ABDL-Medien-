@@ -70,6 +70,10 @@ class StoryRepository @Inject constructor(private val dao: StoryDao) {
     suspend fun drafts(uuid: String): List<StoryDraftVersionEntity> = dao.drafts(uuid)
 
     /** Merkt die Leseposition und den Fortschritt; nur wirklich gelesen (nicht bloß geöffnet) zählt als "zuletzt gelesen". */
+    suspend fun setRating(uuid: String, rating: Int) = dao.setRating(uuid, rating, nowMillis())
+    suspend fun setFavorite(uuid: String, favorite: Boolean) = dao.setFavorite(uuid, favorite, nowMillis())
+    suspend fun setContinue(uuid: String, flag: Boolean) = dao.setContinue(uuid, flag, nowMillis())
+
     suspend fun saveReading(uuid: String, paragraph: Int, offset: Int, paragraphCount: Int) {
         val progress = if (paragraphCount <= 1) 0f else (paragraph.toFloat() / (paragraphCount - 1)).coerceIn(0f, 1f)
         if (paragraph == 0 && offset == 0) {

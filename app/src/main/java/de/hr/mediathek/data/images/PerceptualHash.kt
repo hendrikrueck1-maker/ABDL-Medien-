@@ -37,7 +37,11 @@ class HashedItem(val id: String, val hash: Long)
 /**
  * Bildet Gruppen ähnlicher Bilder ohne Paarvergleich aller Bilder: Die 64 Bit werden in (Schwelle + 1) Abschnitte geteilt;
  * zwei Hashes mit höchstens [maxDistance] unterschiedlichen Bits stimmen in mindestens einem Abschnitt vollständig überein.
- * Nur Hashes mit gleichem Abschnitt werden verglichen, die Treffer werden vereinigt.
+ * Nur Hashes mit gleichem Abschnitt werden verglichen.
+ *
+ * Gruppen bilden sich um ein **Referenzbild**: Jedes Mitglied liegt höchstens [maxDistance] Bits vom Referenzbild entfernt
+ * (keine Ketten A≈B≈C, bei denen A und C sich kaum ähneln). Jedes Bild gehört zu genau einer Gruppe; das Referenzbild steht
+ * in der Gruppe immer zuerst.
  */
 object SimilarImageGroups {
     const val MAX_DISTANCE = 10
@@ -50,25 +54,7 @@ object SimilarImageGroups {
         val idsByHash = LinkedHashMap<Long, MutableList<String>>()
         for (item in items) idsByHash.getOrPut(item.hash) { ArrayList() } += item.id
         val hashes = idsByHash.keys.toLongArray()
-        val parent = IntArray(hashes.size) { it }
-
-        fun find(x: Int): Int {
-            var r = x
-            while (parent[r] != r) r = parent[r]
-            var c = x
-            while (parent[c] != r) {
-                val next = parent[c]
-                parent[c] = r
-                c = next
-            }
-            return r
-        }
-
-        fun union(a: Int, b: Int) {
-            val ra = find(a)
-            val rb = find(b)
-            if (ra != rb) parent[ra] = rb
-        }
+        val neighbors = Array(hashes.size) { HashSet<Int>() }
 
         if (d > 0) {
             val chunks = d + 1
@@ -86,7 +72,9 @@ object SimilarImageGroups {
                     if (bucket.size < 2) continue
                     for (i in 0 until bucket.size) {
                         for (j in i + 1 until bucket.size) {
-                            if (PerceptualHash.distance(hashes[bucket[i]], hashes[bucket[j]]) <= d) union(bucket[i], bucket[j])
+                            val a = bucket[i]
+                            val b = bucket[j]
+                            if (PerceptualHash.distance(hashes[a], hashes[b]) <= d) { neighbors[a] += b; neighbors[b] += a }
                         }
                     }
                 }
@@ -94,10 +82,21 @@ object SimilarImageGroups {
             }
         }
 
-        val groups = HashMap<Int, MutableList<String>>()
-        for (i in hashes.indices) {
-            groups.getOrPut(find(i)) { ArrayList() } += idsByHash.getValue(hashes[i])
+        // Referenzen: zuerst die Hashes mit den meisten Bildern bzw. Nachbarn (Mittelpunkt einer Gruppe), bei Gleichstand
+        // die zuerst gefundenen.
+        val weight = IntArray(hashes.size) { i -> idsByHash.getValue(hashes[i]).size + neighbors[i].sumOf { idsByHash.getValue(hashes[it]).size } }
+        val order = hashes.indices.sortedWith(compareByDescending<Int> { weight[it] }.thenBy { it })
+        val assigned = BooleanArray(hashes.size)
+        val groups = ArrayList<List<String>>()
+        for (ref in order) {
+            if (assigned[ref]) continue
+            assigned[ref] = true
+            val members = ArrayList<String>(idsByHash.getValue(hashes[ref]))
+            for (n in neighbors[ref].sortedBy { PerceptualHash.distance(hashes[ref], hashes[it]) }) {
+                if (!assigned[n]) { assigned[n] = true; members += idsByHash.getValue(hashes[n]) }
+            }
+            if (members.size > 1) groups += members
         }
-        return groups.values.filter { it.size > 1 }.sortedByDescending { it.size }
+        return groups.sortedByDescending { it.size }
     }
 }

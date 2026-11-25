@@ -56,16 +56,21 @@ class PerceptualHashTest {
             HashedItem("i$i", hash).also { remember(it) }
         }
         val d = 6
-        val fast = SimilarImageGroups.build(items, d).map { it.toSet() }.toSet()
-        // Referenz: Vereinigung aller Paare mit Abstand <= d
-        val parent = IntArray(items.size) { it }
-        fun find(x: Int): Int { var r = x; while (parent[r] != r) r = parent[r]; return r }
-        for (i in items.indices) for (j in i + 1 until items.size) {
-            if (PerceptualHash.distance(items[i].hash, items[j].hash) <= d) parent[find(i)] = find(j)
+        val groups = SimilarImageGroups.build(items, d)
+        val byId = items.associateBy { it.id }
+        // Gruppen um ein Referenzbild (freigegeben 20.11.2026): keine Ketten, jedes Bild in höchstens einer Gruppe.
+        val all = groups.flatten()
+        assertEquals("ein Bild in mehreren Gruppen", all.size, all.toSet().size)
+        for (g in groups) {
+            val ref = byId.getValue(g.first()).hash
+            for (id in g) assertTrue("Mitglied zu weit vom Referenzbild", PerceptualHash.distance(ref, byId.getValue(id).hash) <= d)
         }
-        val reference = items.indices.groupBy { find(it) }.values.filter { it.size > 1 }
-            .map { g -> g.map { items[it].id }.toSet() }.toSet()
-        assertEquals(reference, fast)
+        // Vollständigkeit der Vorauswahl: zwei Bilder, die beide in keiner Gruppe sind, dürfen sich nicht ähneln.
+        val grouped = all.toSet()
+        val loose = items.filter { it.id !in grouped }
+        for (i in loose.indices) for (j in i + 1 until loose.size) {
+            assertTrue("ähnliches Paar ohne Gruppe", PerceptualHash.distance(loose[i].hash, loose[j].hash) > d)
+        }
     }
 
     private val seen = ArrayList<HashedItem>()

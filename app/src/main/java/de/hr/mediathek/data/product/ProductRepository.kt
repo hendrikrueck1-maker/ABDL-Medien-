@@ -155,7 +155,12 @@ class ProductRepository @Inject constructor(
         dao.get(uuid)?.let { dao.update(it.copy(favorite = favorite, updatedAt = nowMillis(), userUpdatedAt = nowMillis())) }
     }
 
-    suspend fun delete(uuid: String) = dao.softDelete(uuid, nowMillis())
+    /** Löscht das Produkt samt Fotos (auch die Bilddateien im Arbeitsordner) und Kriterienwerten. */
+    suspend fun delete(uuid: String) {
+        val files = dao.photos(uuid).map { it.filePath }
+        dao.softDeleteWithChildren(uuid, nowMillis())
+        for (path in files) runCatching { photoStore.delete(path) }
+    }
 
     suspend fun addPhoto(productUuid: String, kind: PhotoKind, rowIndex: Int, path: String) {
         dao.insertPhoto(ProductPhotoEntity(productUuid = productUuid, kind = kind, rowIndex = rowIndex, filePath = path))

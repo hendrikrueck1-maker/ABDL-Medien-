@@ -66,6 +66,7 @@ fun StoriesScreen(
     val resume by viewModel.continueReading.collectAsStateWithLifecycle()
     val folders by viewModel.folders.collectAsStateWithLifecycle()
     val folderItems by viewModel.folderItems.collectAsStateWithLifecycle()
+    val backupMissing by viewModel.backupMissing.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     var menu by remember { mutableStateOf(false) }
@@ -116,6 +117,15 @@ fun StoriesScreen(
                 } else {
                     TextButton(onClick = { viewModel.update { it.copy(trash = false) } }) { Text("Zurück") }
                 }
+            }
+            if (!filter.trash && backupMissing) {
+                Text(
+                    "ⓘ Geschichten werden nicht automatisch gesichert: In den Einstellungen unter „Medienquellen und Arbeitsordner“ einen Arbeitsordner wählen " +
+                        "oder regelmäßig über ⋮ → „Statistik und Export“ sichern.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = de.hr.mediathek.core.ui.theme.LocalAppColors.current.gold,
+                    modifier = Modifier.padding(vertical = 4.dp),
+                )
             }
             if (!filter.trash) {
                 OutlinedTextField(

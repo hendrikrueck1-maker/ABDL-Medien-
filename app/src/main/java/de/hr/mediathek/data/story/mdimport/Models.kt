@@ -17,7 +17,7 @@ data class ParsedStory(
     val publishedAt: Long?,
     val body: String,
     val hash: String,
-    /** Quelle/Plattform (z. B. "Germandiaperstories"); null bei Markdown-Dateien. */
+    /** Quelle/Plattform (z. B. "QuelleX"); null bei Markdown-Dateien. */
     val sourceText: String? = null,
     /** Bewertung 1–5, wenn die Quelle eine kennt; null = nicht anfassen. */
     val rating: Int? = null,
@@ -26,6 +26,10 @@ data class ParsedStory(
     val series: SeriesRef? = null,
     /** true (Katalog der Geschichten-PWA): beim erneuten Import Kategorie, Tags und Bewertung der App nicht überschreiben. */
     val preserveUserData: Boolean = false,
+    /** Beim Aktualisieren den Titel in der App behalten (Web-Import: eigener Titel bleibt). */
+    val keepTitle: Boolean = false,
+    /** Favorit (aus einem App-Export); null = unverändert. */
+    val favorite: Boolean? = null,
     /** Link zur Originalseite (Web-Import, Export/Import zwischen Geräten); null = nicht anfassen. */
     val sourceUrl: String? = null,
 )

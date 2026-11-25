@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import de.hr.mediathek.core.AppScope
 import de.hr.mediathek.core.jobs.JobScheduler
 import de.hr.mediathek.data.db.JobDao
 import de.hr.mediathek.data.db.JobEntity
@@ -151,20 +152,46 @@ class PackageViewModel @Inject constructor(
         viewModelScope.launch { scheduler.cancel(job.uuid) }
     }
 
-    /** Paket entkoppeln; die Einträge bleiben offline. Optional werden die Dateien im Paketordner gelöscht. */
+    /**
+     * Paket entkoppeln; die Einträge bleiben offline. Optional werden die Paketdateien gelöscht – nur die Dateien,
+     * die im Manifest stehen, dazu Manifest und Metadaten. Fremde Dateien und Unterordner bleiben immer unangetastet.
+     */
     fun removePackage(row: PackageSourceRow, deleteFiles: Boolean) {
-        viewModelScope.launch {
+        // Läuft auch weiter, wenn der Bildschirm verlassen wird (halb gelöschte Pakete vermeiden).
+        AppScope.launch {
+            var note = ""
             if (deleteFiles) {
                 val tree = Uri.parse(row.treeUri)
-                withContext(Dispatchers.IO) {
-                    runCatching {
-                        val root = DocumentsContract.getTreeDocumentId(tree)
-                        for (c in SafOps.children(context.contentResolver, tree, root)) SafOps.delete(context.contentResolver, tree, c.docId)
-                    }
-                }
+                note = withContext(Dispatchers.IO) { runCatching { deletePackageFiles(tree) }.getOrElse { " – Dateien konnten nicht gelöscht werden" } }
             }
             storage.removeSource(row.uuid, removeEntries = false)
-            message.value = "Paket entfernt"
+            message.value = "Paket entfernt$note"
         }
+    }
+
+    private fun deletePackageFiles(tree: Uri): String {
+        val resolver = context.contentResolver
+        val root = DocumentsContract.getTreeDocumentId(tree)
+        val top = SafOps.children(resolver, tree, root)
+        val manifestDoc = top.firstOrNull { !it.isDir && it.name == PackageLogic.MANIFEST_NAME }
+            ?: return " – kein Manifest gefunden, es wurden keine Dateien gelöscht"
+        val manifest = PackageLogic.decode(
+            PackageLogic.readLimited(resolver.openInputStream(DocumentsContract.buildDocumentUriUsingTree(tree, manifestDoc.docId))!!),
+        )
+        val plan = PackageLogic.deletionPlan(manifest)
+        var deleted = 0
+        // Dateien in videos/ und bilder/: nur Namen aus dem Plan.
+        for (dir in listOf(PackageLogic.DIR_VIDEOS, PackageLogic.DIR_IMAGES)) {
+            val dirDoc = top.firstOrNull { it.isDir && it.name == dir } ?: continue
+            for (c in SafOps.children(resolver, tree, dirDoc.docId)) {
+                if (!c.isDir && "$dir/${c.name}" in plan && SafOps.delete(resolver, tree, c.docId)) deleted++
+            }
+            // Ordner nur löschen, wenn er jetzt leer ist.
+            if (SafOps.children(resolver, tree, dirDoc.docId).isEmpty()) SafOps.delete(resolver, tree, dirDoc.docId)
+        }
+        // Metadaten zuerst, Manifest zuletzt (ohne Manifest ist das Paket als unvollständig erkennbar).
+        top.firstOrNull { !it.isDir && it.name == PackageLogic.METADATA_NAME }?.let { if (SafOps.delete(resolver, tree, it.docId)) deleted++ }
+        if (SafOps.delete(resolver, tree, manifestDoc.docId)) deleted++
+        return " – $deleted Paketdateien gelöscht"
     }
 }

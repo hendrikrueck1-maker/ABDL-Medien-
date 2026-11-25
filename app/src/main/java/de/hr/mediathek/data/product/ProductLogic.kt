@@ -93,10 +93,15 @@ object PriceParser {
     private val UNCERTAIN_WORDS = Regex("\\b(ca|circa|etwa|ungefähr|ab)\\b\\.?|~")
     private val RANGE_SEP = Regex("(?<=\\d|€|r|o)\\s*(?:-|–|—|bis)\\s*(?=\\d|€)")
 
+    /** Leerzeichen als Tausendertrenner („1 500,00 €“, auch geschütztes Leerzeichen). */
+    private val THOUSANDS_SPACE = Regex("(?<=\\d)[ \u00A0\u202F](?=\\d{3}(?!\\d))")
+    /** Minuszeichen direkt vor der Zahl (Preise sind nie negativ: als unsicher markieren). */
+    private val NEGATIVE = Regex("(^|\\s)[-−]\\s*\\d")
+
     fun parse(raw: String?, packSize: Int? = null): PriceResult {
-        val text = raw?.trim()?.lowercase().orEmpty()
+        val text = raw?.trim()?.lowercase()?.replace(THOUSANDS_SPACE, "").orEmpty()
         if (text.isEmpty()) return PriceResult(null, null, false, false)
-        var uncertain = UNCERTAIN_WORDS.containsMatchIn(text)
+        var uncertain = UNCERTAIN_WORDS.containsMatchIn(text) || NEGATIVE.containsMatchIn(text)
 
         // Packungspreis "15 € / 10 Stk"
         PACK.find(text)?.let { m ->
@@ -139,7 +144,8 @@ object PriceParser {
                 }
                 hasComma -> {
                     if (token.count { it == ',' } > 1) token.replace(",", "").toDouble() to true
-                    else token.replace(',', '.').toDouble() to false
+                    // „1,500“: Dezimalkomma oder englischer Tausendertrenner? → unsicher.
+                    else token.replace(',', '.').toDouble() to (token.substringAfterLast(',').length == 3)
                 }
                 hasDot -> {
                     val after = token.substringAfterLast('.')

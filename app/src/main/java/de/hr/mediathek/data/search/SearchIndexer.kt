@@ -25,14 +25,18 @@ class SearchIndexer @Inject constructor(
         Area(
             "STORY",
             "SELECT (SELECT COUNT(*) FROM story WHERE deletedAt IS NULL) || '-' || COALESCE((SELECT MAX(updatedAt) FROM story WHERE deletedAt IS NULL), 0) || '-' || COALESCE((SELECT SUM(LENGTH(text)) FROM story_text), 0)",
-            "INSERT INTO search_index(kind, uuid, title, body) SELECT 'STORY', s.uuid, s.title, COALESCE(s.sourceText, '') || ' ' || COALESCE(t.text, '') " +
-                "FROM story s LEFT JOIN story_text t ON t.storyUuid = s.uuid WHERE s.deletedAt IS NULL",
+            folded(
+                "SELECT 'STORY' AS k, s.uuid AS u, s.title AS t, COALESCE(s.sourceText, '') || ' ' || COALESCE(t.text, '') AS b " +
+                    "FROM story s LEFT JOIN story_text t ON t.storyUuid = s.uuid WHERE s.deletedAt IS NULL",
+            ),
         ),
         Area(
             "PRODUCT",
             "SELECT (SELECT COUNT(*) FROM product WHERE deletedAt IS NULL) || '-' || COALESCE((SELECT MAX(updatedAt) FROM product WHERE deletedAt IS NULL), 0) || '-' || COALESCE((SELECT MAX(updatedAt) FROM brand), 0)",
-            "INSERT INTO search_index(kind, uuid, title, body) SELECT 'PRODUCT', p.uuid, p.title, COALESCE(b.name, '') || ' ' || COALESCE(p.sizeLabel, '') || ' ' || COALESCE(p.overallNote, '') " +
-                "FROM product p LEFT JOIN brand b ON b.uuid = p.brandUuid WHERE p.deletedAt IS NULL",
+            folded(
+                "SELECT 'PRODUCT' AS k, p.uuid AS u, p.title AS t, COALESCE(b.name, '') || ' ' || COALESCE(p.sizeLabel, '') || ' ' || COALESCE(p.overallNote, '') AS b " +
+                    "FROM product p LEFT JOIN brand b ON b.uuid = p.brandUuid WHERE p.deletedAt IS NULL",
+            ),
         ),
         mediaArea("VIDEO"),
         mediaArea("IMAGE"),
@@ -41,9 +45,17 @@ class SearchIndexer @Inject constructor(
     private fun mediaArea(type: String) = Area(
         type,
         "SELECT COUNT(*) || '-' || COALESCE(MAX(updatedAt), 0) FROM media_file WHERE type = '$type' AND deletedAt IS NULL AND status != 'TRASHED'",
-        "INSERT INTO search_index(kind, uuid, title, body) SELECT '$type', uuid, displayName, relativePath FROM media_file " +
-            "WHERE type = '$type' AND deletedAt IS NULL AND status != 'TRASHED'",
+        folded(
+            "SELECT '$type' AS k, uuid AS u, displayName AS t, relativePath AS b FROM media_file " +
+                "WHERE type = '$type' AND deletedAt IS NULL AND status != 'TRASHED'",
+        ),
     )
+
+    /** ß wird beim Indexieren zu ss (wie bei der Suche), damit „strasse“ auch „Straße“ findet. */
+    private fun folded(select: String): String =
+        "INSERT INTO search_index(kind, uuid, title, body) SELECT k, u, ${fold("t")}, ${fold("b")} FROM ($select)"
+
+    private fun fold(col: String) = "REPLACE(REPLACE($col, 'ß', 'ss'), 'ẞ', 'SS')"
 
     /** Baut veraltete Bereiche neu auf. Gibt die Zahl der neu aufgebauten Bereiche zurück. */
     suspend fun sync(force: Boolean = false): Int = withContext(Dispatchers.IO) {
@@ -51,7 +63,8 @@ class SearchIndexer @Inject constructor(
         createTable(sql)
         var rebuilt = 0
         for (a in areas) {
-            val sig = sql.query(a.signatureSql).use { c -> if (c.moveToFirst()) c.getString(0) else "" }
+            // Versionszusatz: ändert sich das Indexformat (z. B. ß-Faltung), wird jeder Bereich einmal neu aufgebaut.
+            val sig = INDEX_VERSION + sql.query(a.signatureSql).use { c -> if (c.moveToFirst()) c.getString(0) else "" }
             val key = KEY_PREFIX + a.kind
             if (!force && settings.get(key) == sig) continue
             sql.beginTransaction()
@@ -89,6 +102,7 @@ class SearchIndexer @Inject constructor(
     }
 
     companion object {
+        private const val INDEX_VERSION = "v2:"
         private const val KEY_PREFIX = "search_sig_"
 
         /** Wird beim Öffnen der Datenbank aufgerufen. */

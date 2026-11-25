@@ -1,6 +1,7 @@
 package de.hr.mediathek.core.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -92,6 +93,9 @@ object TilePalette {
 @Composable
 fun MediathekTheme(content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalAppColors provides AppColors()) {
-        MaterialTheme(colorScheme = NightScheme, typography = AppTypography, shapes = PlayfulShapes, content = content)
+        MaterialTheme(colorScheme = NightScheme, typography = AppTypography, shapes = PlayfulShapes) {
+            // Ohne diese Vorgabe ist die Schriftfarbe außerhalb von Karten Schwarz (durchsichtiges Grundgerüst).
+            CompositionLocalProvider(LocalContentColor provides NightScheme.onSurface, content = content)
+        }
     }
 }

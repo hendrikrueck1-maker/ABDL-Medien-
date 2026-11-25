@@ -21,7 +21,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
-        ShareInbox.accept(intent)
+        shareOrHint(intent)
+    }
+
+    /** Geteilter Text ohne Link: kurz Bescheid geben statt still nichts zu tun. */
+    private fun shareOrHint(intent: android.content.Intent?) {
+        if (!ShareInbox.accept(intent) && intent?.action == android.content.Intent.ACTION_SEND) {
+            android.widget.Toast.makeText(this, "Kein Link gefunden – bitte einen Link teilen.", android.widget.Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,7 +43,7 @@ class MainActivity : ComponentActivity() {
                 else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
             }
         }
-        if (savedInstanceState == null) ShareInbox.accept(intent)
+        if (savedInstanceState == null) shareOrHint(intent)
         setContent {
             MediathekTheme {
                 AppRoot()

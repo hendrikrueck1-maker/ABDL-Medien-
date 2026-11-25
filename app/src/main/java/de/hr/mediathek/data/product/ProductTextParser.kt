@@ -54,7 +54,18 @@ object ProductTextParser {
                 applyRemainder(c, matched, line.substring(end).trim().trimStart(':', '|', '-').trim())
                 continue
             }
-            if (!started) continue
+            if (!started) {
+                // Vor dem ersten erkannten Kriterium: ein Kriterium mit Tippfehler nicht verlieren, sondern als „Nicht zugeordnet“ führen.
+                val unk = UNKNOWN.matchEntire(line)
+                if (unk != null && looksLikeLabel(unk.groupValues[1])) {
+                    unknownLabels += unk.groupValues[1].trim()
+                    unknownNums += unk.groupValues[2].toInt()
+                    unknownNotes += StringBuilder(unk.groupValues[3])
+                    currentUnknown = unknownLabels.lastIndex
+                    started = true
+                }
+                continue
+            }
             // Fortsetzungszeile eines bekannten Kriteriums
             val cur = current
             val curDef = currentDef
@@ -90,7 +101,20 @@ object ProductTextParser {
         return ParsedProduct(title, byKey.values.toList(), unassigned)
     }
 
-    private fun looksLikeLabel(s: String): Boolean = s.trim().length in 3..45 && s.trim().first().isUpperCase()
+    /** Wörter, mit denen eine Anmerkung beginnt, aber nie ein Kriterium („Nach 3 Stunden noch trocken“). */
+    private val NOTE_STARTS = setOf(
+        "nach", "bei", "mit", "ab", "für", "im", "in", "am", "um", "zu", "ohne", "seit", "bis", "über", "unter", "vor",
+        "auch", "und", "aber", "dann", "noch", "nur", "sehr", "etwa", "ca", "fast", "erst", "schon", "so", "da", "wenn",
+    )
+
+    private fun looksLikeLabel(s: String): Boolean {
+        val t = s.trim()
+        if (t.length !in 3..45 || !t.first().isUpperCase()) return false
+        val words = t.split(Regex("\\s+"))
+        if (words.first().lowercase().trimEnd('.', ',') in NOTE_STARTS) return false
+        // Einzelne kurze Wörter sind eher Satzanfänge als Kriterien.
+        return words.size >= 2 || t.length >= 6
+    }
 
     private fun applyRemainder(c: ParsedCriterion, def: CriterionDef, rest: String) {
         if (rest.isEmpty()) return

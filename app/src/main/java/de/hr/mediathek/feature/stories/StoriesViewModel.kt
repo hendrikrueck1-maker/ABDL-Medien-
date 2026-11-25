@@ -24,7 +24,16 @@ class StoriesViewModel @Inject constructor(
     private val repository: StoryRepository,
     private val organizer: StoryOrganizer,
     private val settings: SettingDao,
+    private val storage: de.hr.mediathek.data.storage.StorageRepository,
 ) : ViewModel() {
+    /** Kein Arbeitsordner gewählt: Geschichten werden nicht automatisch gesichert (z. B. auf dem Handy). */
+    private val _backupMissing = MutableStateFlow(false)
+    val backupMissing: StateFlow<Boolean> = _backupMissing
+
+    init {
+        viewModelScope.launch { _backupMissing.value = storage.getWorkFolderUri() == null }
+    }
+
     private val _filter = MutableStateFlow(StoryFilter())
     val filter: StateFlow<StoryFilter> = _filter
 

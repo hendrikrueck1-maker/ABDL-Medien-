@@ -32,7 +32,7 @@ class RoomImportStore @Inject constructor(
             uuid = s.uuid, trashed = s.deletedAt != null, hash = s.importHash, title = s.title, category = s.category,
             author = s.author, status = s.status, publishedAt = s.publishedAt,
             tags = dao.tagNames(s.uuid).map { TagNames.normalize(it) }.toSet(),
-            rating = s.rating, continueFlag = s.continueFlag,
+            rating = s.rating, continueFlag = s.continueFlag, sourceUrl = s.sourceUrl,
         )
     }
 
@@ -43,7 +43,7 @@ class RoomImportStore @Inject constructor(
     override suspend fun insert(story: ParsedStory) {
         val entity = StoryEntity(
             title = story.title, category = story.category, sourceText = story.sourceText, sourceUrl = story.sourceUrl,
-            rating = story.rating ?: 0, continueFlag = story.continueFlag ?: false,
+            rating = story.rating ?: 0, continueFlag = story.continueFlag ?: false, favorite = story.favorite ?: false,
             seriesUuid = seriesFor(story.series)?.first, seriesOrder = story.series?.position,
             textHash = TextCleaner.hash(story.body),
             createdAt = story.createdAt, updatedAt = story.updatedAt, userUpdatedAt = story.updatedAt,
@@ -68,7 +68,12 @@ class RoomImportStore @Inject constructor(
         val series = seriesFor(story.series)
         val changed = if (story.preserveUserData) {
             entity.copy(
-                title = story.title, sourceText = story.sourceText ?: entity.sourceText,
+                title = if (story.keepTitle && entity.title.isNotBlank()) entity.title else story.title,
+                sourceText = story.sourceText ?: entity.sourceText,
+                publishedAt = entity.publishedAt ?: story.publishedAt,
+                rating = if (entity.rating == 0) story.rating ?: 0 else entity.rating,
+                continueFlag = story.continueFlag ?: entity.continueFlag,
+                favorite = story.favorite ?: entity.favorite,
                 sourceUrl = story.sourceUrl ?: entity.sourceUrl,
                 seriesUuid = series?.first ?: entity.seriesUuid, seriesOrder = story.series?.position ?: entity.seriesOrder,
                 importHash = story.hash, textHash = TextCleaner.hash(story.body),
@@ -80,6 +85,7 @@ class RoomImportStore @Inject constructor(
                 publishedAt = story.publishedAt, importHash = story.hash, textHash = TextCleaner.hash(story.body),
                 sourceText = story.sourceText ?: entity.sourceText, sourceUrl = story.sourceUrl ?: entity.sourceUrl,
                 rating = story.rating ?: entity.rating, continueFlag = story.continueFlag ?: entity.continueFlag,
+                favorite = story.favorite ?: entity.favorite,
                 seriesUuid = series?.first ?: entity.seriesUuid, seriesOrder = story.series?.position ?: entity.seriesOrder,
                 updatedAt = story.updatedAt, userUpdatedAt = story.updatedAt,
             )
