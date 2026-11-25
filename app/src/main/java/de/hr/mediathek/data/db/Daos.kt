@@ -475,6 +475,9 @@ interface JobDao {
     )
     suspend fun findActive(type: JobType, pattern: String): JobEntity?
 
+    @Query("SELECT COUNT(*) FROM job WHERE type = :type AND status = 'QUEUED'")
+    suspend fun countQueued(type: JobType): Int
+
     @Query("SELECT * FROM job WHERE type = :type ORDER BY createdAt DESC LIMIT 1")
     fun observeLatest(type: JobType): Flow<JobEntity?>
 
@@ -819,7 +822,7 @@ interface StoryDao {
 
     @Query(
         "SELECT uuid, title, category, rating, favorite, continueFlag, sourceText, createdAt, updatedAt, deletedAt, seriesUuid, seriesOrder, author, lastReadAt, readProgress, wordCount " +
-            "FROM story WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC",
+            "FROM story WHERE deletedAt IS NOT NULL AND (status IS NULL OR status != 'purged') ORDER BY deletedAt DESC",
     )
     fun observeDeleted(): Flow<List<StoryRow>>
 
@@ -944,7 +947,7 @@ interface StoryDao {
     suspend fun getBySlug(slug: String): StoryEntity?
 
     /** Web-Import: Wie viele Geschichten (auch im Papierkorb) stammen schon von diesem Link? */
-    @Query("SELECT COUNT(*) FROM story WHERE sourceUrl = :url")
+    @Query("SELECT COUNT(*) FROM story WHERE sourceUrl = :url AND (status IS NULL OR status != 'purged')")
     suspend fun countBySourceUrl(url: String): Int
 
     @Query("SELECT * FROM series WHERE name = :name AND deletedAt IS NULL LIMIT 1")
@@ -1014,7 +1017,7 @@ interface StoryDao {
     @Query("UPDATE story SET deletedAt = NULL, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
     suspend fun restore(uuid: String, now: Long)
 
-    @Query("SELECT uuid FROM story WHERE deletedAt IS NOT NULL AND deletedAt < :before")
+    @Query("SELECT uuid FROM story WHERE deletedAt IS NOT NULL AND deletedAt < :before AND (status IS NULL OR status != 'purged')")
     suspend fun expiredUuids(before: Long): List<String>
 
     @Query("DELETE FROM story WHERE uuid = :uuid")
@@ -1026,12 +1029,36 @@ interface StoryDao {
     @Query("DELETE FROM story_draft_version WHERE storyUuid = :uuid")
     suspend fun deleteDrafts(uuid: String)
 
+    /**
+     * Endgültig löschen: Text und Entwürfe weg, die Zeile bleibt aber als leerer Grabstein (status 'purged') mit
+     * aktuellem Zeitstempel stehen. So holt ein älteres Backup oder Mobil-Paket die Geschichte nicht zurück.
+     * Kennung und Hashes werden geleert, damit ein bewusster Neu-Import derselben Geschichte möglich bleibt.
+     */
     @Transaction
     suspend fun purge(uuid: String) {
+        val now = System.currentTimeMillis()
         deleteText(uuid)
         deleteDrafts(uuid)
-        deleteStory(uuid)
+        tombstoneStory(uuid, now)
+        tombstoneStoryTags(uuid, now)
+        tombstoneStoryFolderItems(uuid, now)
+        tombstoneStoryBookmarks(uuid, now)
     }
+
+    @Query(
+        "UPDATE story SET title = '', sourceText = NULL, sourceUrl = NULL, author = NULL, slug = NULL, importHash = NULL, " +
+            "textHash = NULL, status = 'purged', deletedAt = COALESCE(deletedAt, :now), updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid",
+    )
+    suspend fun tombstoneStory(uuid: String, now: Long)
+
+    @Query("UPDATE tag_assignment SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE entityType = 'STORY' AND entityUuid = :uuid AND deletedAt IS NULL")
+    suspend fun tombstoneStoryTags(uuid: String, now: Long)
+
+    @Query("UPDATE story_folder_item SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE storyUuid = :uuid AND deletedAt IS NULL")
+    suspend fun tombstoneStoryFolderItems(uuid: String, now: Long)
+
+    @Query("UPDATE story_bookmark SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE storyUuid = :uuid AND deletedAt IS NULL")
+    suspend fun tombstoneStoryBookmarks(uuid: String, now: Long)
 
     @Insert
     suspend fun insertDraft(draft: StoryDraftVersionEntity)
@@ -1090,6 +1117,20 @@ interface ProductDao {
 
     @Query("UPDATE product SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
     suspend fun softDelete(uuid: String, now: Long)
+
+    @Query("UPDATE product_photo SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE productUuid = :uuid AND deletedAt IS NULL")
+    suspend fun softDeletePhotosOf(uuid: String, now: Long)
+
+    @Query("UPDATE product_criterion_value SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE productUuid = :uuid AND deletedAt IS NULL")
+    suspend fun softDeleteValuesOf(uuid: String, now: Long)
+
+    /** Produkt samt Fotos und Kriterienwerten als gelöscht markieren (Tracker-Einträge behalten ihren Schnappschuss). */
+    @Transaction
+    suspend fun softDeleteWithChildren(uuid: String, now: Long) {
+        softDelete(uuid, now)
+        softDeletePhotosOf(uuid, now)
+        softDeleteValuesOf(uuid, now)
+    }
 
     @Query("SELECT uuid FROM product WHERE deletedAt IS NULL AND lower(title) = lower(:title) LIMIT 1")
     suspend fun uuidByTitle(title: String): String?

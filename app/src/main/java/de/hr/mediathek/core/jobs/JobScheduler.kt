@@ -35,9 +35,18 @@ class JobScheduler @Inject constructor(
         return true
     }
 
-    /** Sichert nach größeren Änderungen (z. B. Geschichten-Import) sofort, sofern ein Arbeitsordner gewählt ist. */
+    /**
+     * Sichert nach größeren Änderungen (z. B. Geschichten-Import) sofort, sofern ein Arbeitsordner gewählt ist.
+     * Läuft gerade eine Sicherung, wird eine zweite dahinter eingereiht, damit die neuen Änderungen nicht fehlen.
+     */
     suspend fun enqueueBackupAfterChange() {
         if (storage.getWorkFolderUri() == null) return
+        val active = jobDao.findActive(JobType.BACKUP, "%")
+        if (active != null && active.status == JobStatus.RUNNING && jobDao.countQueued(JobType.BACKUP) == 0) {
+            jobDao.insert(JobEntity(type = JobType.BACKUP, priority = JobPriority.HIGH))
+            trigger()
+            return
+        }
         enqueueBackup()
     }
 
