@@ -41,6 +41,7 @@ fun CompressionCard(viewModel: CompressionViewModel = hiltViewModel()) {
     val paused by viewModel.paused.collectAsStateWithLifecycle()
     val onlyCharging by viewModel.onlyCharging.collectAsStateWithLifecycle()
     val keepOriginals by viewModel.keepOriginals.collectAsStateWithLifecycle()
+    val waitingForApp by viewModel.waitingForApp.collectAsStateWithLifecycle()
     var confirm by remember { mutableStateOf(false) }
     val onColor = MaterialTheme.colorScheme.onSecondaryContainer
     val running = job?.status == JobStatus.QUEUED || job?.status == JobStatus.RUNNING
@@ -83,6 +84,14 @@ fun CompressionCard(viewModel: CompressionViewModel = hiltViewModel()) {
                 style = MaterialTheme.typography.bodySmall,
                 color = onColor,
             )
+            if (waitingForApp && queue.isNotEmpty()) {
+                Text(
+                    "ⓘ Die Komprimierung wartet, bis die App geöffnet ist: Android erlaubt den Start im Hintergrund gerade nicht. " +
+                        "Lass die App kurz offen, dann läuft sie mit Benachrichtigung weiter.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = de.hr.mediathek.core.ui.theme.LocalAppColors.current.gold,
+                )
+            }
             if (queue.isNotEmpty() || paused) {
                 Text(
                     stringResource(if (paused) R.string.compress_queue_paused else R.string.compress_queue_title, queue.size),

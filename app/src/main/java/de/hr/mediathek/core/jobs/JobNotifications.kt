@@ -17,6 +17,10 @@ import de.hr.mediathek.R
 object JobNotifications {
     private const val CHANNEL_ID = "jobs"
     private const val NOTIFICATION_ID = 4711
+    /** Eigene Nummer für die Komprimierungs-Spur, damit sich die Texte beider Spuren nicht überschreiben. */
+    private const val NOTIFICATION_ID_COMPRESS = 4712
+
+    private fun idFor(compress: Boolean) = if (compress) NOTIFICATION_ID_COMPRESS else NOTIFICATION_ID
 
     fun ensureChannel(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java)
@@ -32,8 +36,8 @@ object JobNotifications {
         manager.createNotificationChannel(channel)
     }
 
-    fun foregroundInfo(context: Context, text: String, progress: Float?): ForegroundInfo =
-        ForegroundInfo(NOTIFICATION_ID, build(context, text, progress), foregroundType())
+    fun foregroundInfo(context: Context, text: String, progress: Float?, compress: Boolean = false): ForegroundInfo =
+        ForegroundInfo(idFor(compress), build(context, text, progress), foregroundType())
 
     /** Ab Android 15 zusätzlich mediaProcessing, damit die Komprimierung nicht am dataSync-Limit hängt. */
     private fun foregroundType(): Int =
@@ -43,9 +47,9 @@ object JobNotifications {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
         }
 
-    fun update(context: Context, text: String, progress: Float?) {
+    fun update(context: Context, text: String, progress: Float?, compress: Boolean = false) {
         val manager = context.getSystemService(NotificationManager::class.java)
-        manager.notify(NOTIFICATION_ID, build(context, text, progress))
+        manager.notify(idFor(compress), build(context, text, progress))
     }
 
     private fun build(context: Context, text: String, progress: Float?): Notification {

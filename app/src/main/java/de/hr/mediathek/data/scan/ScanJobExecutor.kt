@@ -77,9 +77,15 @@ class ScanJobExecutor @Inject constructor(
     private val mediaDao: MediaFileDao,
     private val fingerprinter: Fingerprinter,
     private val errorLogger: ErrorLogger,
+    private val compressionDao: de.hr.mediathek.data.db.CompressionDao,
 ) {
     suspend fun execute(job: JobEntity, ctx: JobContext): JobOutcome {
         val sourceUuid = JSONObject(job.paramsJson).getString("sourceUuid")
+        // Nie gleichzeitig mit dem Abschluss einer Komprimierung derselben Quelle (siehe SourceLocks).
+        return de.hr.mediathek.core.jobs.SourceLocks.withSource(sourceUuid) { executeLocked(job, sourceUuid, ctx) }
+    }
+
+    private suspend fun executeLocked(job: JobEntity, sourceUuid: String, ctx: JobContext): JobOutcome {
         val source = sourceDao.getByUuid(sourceUuid) ?: return JobOutcome.Failed("Quelle nicht gefunden")
         val tree = Uri.parse(source.treeUri)
         val scanId = job.uuid
@@ -111,12 +117,21 @@ class ScanJobExecutor @Inject constructor(
         ctx.report("Abgleich mit der Datenbank …", null, force = true)
         val rows = mediaDao.scanRows(source.uuid)
         val byPath = rows.associateBy { it.relativePath }
+        val busy = ScanMatching.protectedPaths(
+            compressionDao.allUnfinished().filter { it.sourceUuid == source.uuid }.map { it.relativePath to it.targetName },
+        )
         val seenUuids = HashSet<String>()
         val seenIds = ArrayList<Long>()
         val work = ArrayList<Work>()
         for (entry in entries) {
             val row = byPath[entry.relativePath]
-            val recentlyModified = entry.lastModified > 0 && now - entry.lastModified < RECENT_MS
+            val recentlyModified = ScanMatching.isRecent(now, entry.lastModified, RECENT_MS)
+            if (entry.relativePath in busy) {
+                // Wird gerade von einer Komprimierung bearbeitet: nichts ändern, nichts neu anlegen.
+                if (row != null) { seenUuids += row.uuid; seenIds += row.id }
+                stats.skippedRecent++
+                continue
+            }
             if (row != null) {
                 seenUuids += row.uuid
                 when {
@@ -137,6 +152,8 @@ class ScanJobExecutor @Inject constructor(
                 work += Work.New(entry)
             }
         }
+        // Einträge in Bearbeitung durch die Komprimierung (Original gerade im _alt-Ordner) gelten als gesehen.
+        for (row in rows) if (row.relativePath in busy && seenUuids.add(row.uuid)) seenIds += row.id
         db.withTransaction {
             seenIds.chunked(SQL_CHUNK).forEach { mediaDao.markSeen(it, scanId, now) }
         }

@@ -348,7 +348,7 @@
     <string name="storage_msg_remove_failed">Entkoppeln fehlgeschlagen.</string>
     <string name="compress_keep_originals">Originale behalten</string>
     <string name="compress_keep_hint_on">Originale bleiben im Ordner „_alt“ und sind im Player abrufbar.</string>
-    <string name="compress_keep_hint_off">Originale werden nach der Schonfrist automatisch gelöscht.</string>
+    <string name="compress_keep_hint_off">Originale bleiben 7 Tage im Ordner „_alt“ (Schonfrist) und werden dann automatisch gelöscht.</string>
     <string name="sort_added_asc">Älteste zuerst hinzugefügt</string>
     <string name="sort_date_asc">Datum (älteste zuerst)</string>
     <string name="sort_rating_asc">Bewertung (schlechteste zuerst)</string>

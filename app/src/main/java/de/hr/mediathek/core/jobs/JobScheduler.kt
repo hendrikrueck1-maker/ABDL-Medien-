@@ -223,8 +223,9 @@ class JobScheduler @Inject constructor(
     /** Beim Start: laufende Jobs eines früheren Prozesses wieder einreihen und Alt-Einträge aufräumen. */
     suspend fun recover() {
         jobDao.resetRunning()
-        // Angefangene Komprimierungen: vor VERIFIED verwerfen, danach zu Ende führen.
-        compressionExecutor.abandonInterrupted().forEach {
+        // Angefangene Komprimierungen: vor VERIFIED verwerfen, danach zu Ende führen. Nur wenn nicht gerade ein
+        // Komprimierungslauf (z. B. ein sofort gestarteter Worker) arbeitet, sonst würde dessen Zwischendatei gelöscht.
+        runner.whileCompressionIdle { compressionExecutor.abandonInterrupted() }.orEmpty().forEach {
             enqueueCompress(
                 de.hr.mediathek.data.compress.CompressionParams(
                     it.mediaUuid,

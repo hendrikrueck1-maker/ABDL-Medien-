@@ -70,6 +70,10 @@ class CompressionViewModel @Inject constructor(
     val onlyCharging: StateFlow<Boolean> = settings.observeOnlyCharging()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    /** Komprimierung wartet, bis die App geöffnet ist (Vordergrunddienst ließ sich nicht starten). */
+    val waitingForApp: StateFlow<Boolean> = settings.observeWaitingForApp()
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), false)
+
     val keepOriginals: StateFlow<Boolean> = settings.observeKeepOriginals()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 

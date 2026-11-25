@@ -740,6 +740,9 @@ interface CompressionDao {
     @Query("DELETE FROM compression_record WHERE id = :id")
     suspend fun delete(id: Long)
 
+    @Query("SELECT * FROM compression_record WHERE id = :id")
+    suspend fun byId(id: Long): CompressionRecordEntity?
+
     /** Ein Eintrag, der noch zu Ende geführt werden muss (Phase ENCODING bis RENAMED). */
     @Query(
         "SELECT * FROM compression_record WHERE mediaUuid = :mediaUuid " +

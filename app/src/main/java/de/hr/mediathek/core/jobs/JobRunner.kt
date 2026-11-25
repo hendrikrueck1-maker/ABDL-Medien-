@@ -54,6 +54,12 @@ class JobRunner @Inject constructor(
     /** Läuft gerade ein Komprimierungslauf in diesem Prozess? */
     fun isCompressing(): Boolean = compressLock.isLocked
 
+    /** Führt [block] nur aus, wenn gerade keine Komprimierung läuft (Sperre wird so lange gehalten); sonst null. */
+    suspend fun <T> whileCompressionIdle(block: suspend () -> T): T? {
+        if (!compressLock.tryLock()) return null
+        return try { block() } finally { compressLock.unlock() }
+    }
+
     /** Bittet den laufenden Job mit dieser UUID, an der nächsten Stelle abzubrechen. */
     fun requestCancel(jobUuid: String) {
         cancelRequestedFor = jobUuid

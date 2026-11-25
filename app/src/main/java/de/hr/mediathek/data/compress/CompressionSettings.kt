@@ -21,10 +21,18 @@ class CompressionSettings @Inject constructor(
     /** Standard: auch im Akkubetrieb (nur bei Einstellung \"1\" nur am Ladegerät). */
     fun observeOnlyCharging(): Flow<Boolean> = settings.observe(KEY_ONLY_CHARGING).map { it == "1" }
 
-    /** Standard: Originale bleiben im Ordner _alt und lassen sich weiter abspielen, bis du sie löschst. */
-    fun observeKeepOriginals(): Flow<Boolean> = settings.observe(KEY_KEEP_ORIGINALS).map { it != "0" }
+    /**
+     * Standard: Originale liegen 7 Tage im Ordner _alt (Schonfrist) und werden dann gelöscht.
+     * Nur wer „Originale behalten“ ausdrücklich eingeschaltet hat ("1"), behält sie dauerhaft.
+     */
+    fun observeKeepOriginals(): Flow<Boolean> = settings.observe(KEY_KEEP_ORIGINALS).map { it == "1" }
 
-    suspend fun keepOriginals(): Boolean = settings.get(KEY_KEEP_ORIGINALS) != "0"
+    suspend fun keepOriginals(): Boolean = settings.get(KEY_KEEP_ORIGINALS) == "1"
+
+    /** Die Komprimierung konnte nicht als Vordergrunddienst starten und wartet, bis die App geöffnet wird. */
+    fun observeWaitingForApp(): Flow<Boolean> = settings.observe(KEY_WAITING).map { it == "1" }
+
+    suspend fun setWaitingForApp(value: Boolean) = settings.set(SettingEntity(KEY_WAITING, if (value) "1" else "0"))
 
     suspend fun setKeepOriginals(value: Boolean) =
         settings.set(SettingEntity(KEY_KEEP_ORIGINALS, if (value) "1" else "0"))
@@ -45,5 +53,6 @@ class CompressionSettings @Inject constructor(
         const val KEY_PAUSED = "compress_paused"
         const val KEY_ONLY_CHARGING = "compress_only_charging"
         const val KEY_KEEP_ORIGINALS = "compress_keep_originals"
+        const val KEY_WAITING = "compress_waiting_for_app"
     }
 }
