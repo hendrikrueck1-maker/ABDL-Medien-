@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hr.mediathek.BuildConfig
+import de.hr.mediathek.core.ui.glass
 import de.hr.mediathek.R
 import de.hr.mediathek.core.ui.AccentButton
 import de.hr.mediathek.core.ui.AppBackgroundViewModel
@@ -120,6 +121,8 @@ fun HomeScreen(
             stringResource(R.string.version_label, BuildConfig.VERSION_NAME),
             style = MaterialTheme.typography.labelSmall,
             color = c.onCardVariant,
+            // Eigene Glas-Pille: steht sonst direkt auf dem Hintergrundbild.
+            modifier = Modifier.glass(c.card, CircleShape).padding(horizontal = 12.dp, vertical = 4.dp),
         )
     }
 }

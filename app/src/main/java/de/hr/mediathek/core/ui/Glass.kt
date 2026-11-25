@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -17,18 +18,20 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 
 /**
- * Deckende Fläche in der Farbe [tint] mit abgerundeten Ecken (früher Milchglas). Der Name bleibt, damit alle
- * bestehenden Bildschirme sofort die neue, immer lesbare Optik bekommen.
+ * Glasfläche in der Farbe [tint] mit abgerundeten Ecken. Die Deckkraft folgt dem Hintergrundbild
+ * (dunkles Bild: 40 %, helles Bild: bis 85 %), siehe [de.hr.mediathek.core.ui.theme.GlassLevel].
  */
-fun Modifier.glass(tint: Color, shape: Shape = RoundedCornerShape(28.dp)): Modifier =
-    this.clip(shape).background(tint.copy(alpha = 0.4f), shape)
+fun Modifier.glass(tint: Color, shape: Shape = RoundedCornerShape(28.dp)): Modifier = composed {
+    val alpha = de.hr.mediathek.core.ui.theme.LocalAppColors.current.card.alpha
+    this.clip(shape).background(tint.copy(alpha = alpha), shape)
+}
 
-/** Kartenfarben: deckend, damit Karten auf jedem Hintergrundbild lesbar sind. */
+/** Kartenfarben: Glas mit der an das Hintergrundbild angepassten Deckkraft. */
 @Composable
 fun glassCardColors(tint: Color): CardColors =
     CardDefaults.cardColors(containerColor = tint.copy(alpha = de.hr.mediathek.core.ui.theme.LocalAppColors.current.card.alpha))
 
-/** Überschrift als Pille auf deckender Fläche. */
+/** Überschrift als Pille auf einer Glasfläche. */
 @Composable
 fun GlassTitle(
     text: String,

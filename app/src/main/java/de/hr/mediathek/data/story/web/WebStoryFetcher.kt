@@ -25,7 +25,8 @@ class WebStoryFetcher @Inject constructor(
 ) {
 
     suspend fun load(rawUrl: String, onPage: (Int) -> Unit = {}): WebThread = withContext(Dispatchers.IO) {
-        val start = normalize(rawUrl)
+        // Forenlinks auf Seite 3 o. Ä. immer ab Seite 1 laden, damit der erste Verfasser stimmt.
+        val start = ThreadBuilder.forumFirstPage(normalize(rawUrl))
         val pages = ArrayList<WebPage>()
         val seen = HashSet<String>()
         var next: String? = start

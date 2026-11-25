@@ -92,7 +92,7 @@ fun WebImportScreen(onBack: () -> Unit, onLogin: (String) -> Unit, viewModel: We
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                thread.warnings.forEach { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                thread.warnings.forEach { Text("ⓘ $it", style = MaterialTheme.typography.bodySmall, color = de.hr.mediathek.core.ui.theme.LocalAppColors.current.gold) }
                 OutlinedTextField(
                     value = state.title,
                     onValueChange = viewModel::setTitle,

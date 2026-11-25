@@ -101,13 +101,13 @@ fun AppRoot() {
     if (isWide) {
         Row(Modifier.fillMaxSize()) {
             if (!fullScreenRoute) AppNavigationRail(navController)
-            Scaffold(Modifier.weight(1f), containerColor = Color.Transparent) { padding ->
+            Scaffold(Modifier.weight(1f), containerColor = Color.Transparent, contentColor = LocalAppColors.current.onCard) { padding ->
                 ScreenPanel(fullScreenRoute, route in CARD_ROUTES, storyAlpha(route), Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
             }
         }
     } else {
         Scaffold(
-            containerColor = Color.Transparent,
+            containerColor = Color.Transparent, contentColor = LocalAppColors.current.onCard,
             bottomBar = { if (!fullScreenRoute) AppBottomBar(navController) },
         ) { padding ->
             ScreenPanel(fullScreenRoute, route in CARD_ROUTES, storyAlpha(route), Modifier.padding(padding)) { AppNavHost(navController, Modifier.fillMaxSize()) }
@@ -117,7 +117,7 @@ fun AppRoot() {
 }
 
 /** Schwebende Herzen nur auf Übersicht und in den Listen, nie im Vollbild, Leser oder Editor. */
-/** Bildschirme, die nur aus deckenden Karten bestehen: dort bleibt das große Fenster durchsichtig (Hintergrundbild sichtbar). */
+/** Bildschirme, die nur aus Karten bestehen: dort bleibt das große Fenster durchsichtig (Hintergrundbild sichtbar). */
 private val CARD_ROUTES = setOf(Destination.Home.route, Destination.Videos.route, Destination.Tracker.route)
 
 private fun showsHearts(route: String): Boolean =
@@ -127,8 +127,8 @@ private fun isFullScreenRoute(route: String?): Boolean =
     route != null && (route.startsWith("player/") || route.startsWith("image/{") || route.startsWith("slideshow") || route.startsWith("story/{"))
 
 /**
- * Deckende Fläche hinter jedem normalen Bildschirm, mit Rand, damit das Hintergrundbild an den Seiten sichtbar bleibt.
- * Schrift liegt nie direkt auf dem Bild. Vollbild-Seiten (Player, Bilder) bleiben unverändert;
+ * Glasfläche hinter jedem normalen Bildschirm, mit Rand, damit das Hintergrundbild an den Seiten sichtbar bleibt.
+ * Die Deckkraft folgt dem Hintergrundbild (siehe GlassLevel). Vollbild-Seiten (Player, Bilder) bleiben unverändert;
  * der Inhalt behält dabei seinen Platz im Baum, damit beim Wechsel nichts neu aufgebaut wird.
  */
 /** Geschichten-Übersicht: deckend (1,0); übrige Geschichten-Teile 0,8; sonst null. */
@@ -142,9 +142,8 @@ private fun storyAlpha(route: String): Float? = when {
 private fun ScreenPanel(fullScreen: Boolean, transparent: Boolean, storyAlpha: Float?, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     // Geschichten-Teile: dunkle Flächen nur zu 20 % durchsichtig (Alpha 0,8) statt 60 %.
     val base = LocalAppColors.current
-    val colors = if (storyAlpha != null) base.copy(
-        bar = base.bar.copy(alpha = storyAlpha ?: 1f), card = base.card.copy(alpha = storyAlpha ?: 1f), cardInset = base.cardInset.copy(alpha = storyAlpha ?: 1f),
-    ) else base
+    // Nie durchsichtiger als das an das Hintergrundbild angepasste Glas.
+    val colors = if (storyAlpha != null) base.withGlass(maxOf(storyAlpha, base.card.alpha)) else base
     androidx.compose.runtime.CompositionLocalProvider(LocalAppColors provides colors) {
         ScreenPanelBody(fullScreen, transparent, modifier, content)
     }

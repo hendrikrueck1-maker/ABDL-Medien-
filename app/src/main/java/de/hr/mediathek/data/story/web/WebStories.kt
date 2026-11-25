@@ -27,6 +27,9 @@ object WebStories {
                 sourceText = thread.host,
                 sourceUrl = thread.url,
                 series = if (multiple) SeriesRef(title, n) else null,
+                // Erneutes Holen: nur Text und neue Kapitel übernehmen; Titel, Kategorie, Tags, Datum, Bewertung bleiben.
+                preserveUserData = true,
+                keepTitle = true,
             )
         }
     }

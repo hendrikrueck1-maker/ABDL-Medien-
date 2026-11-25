@@ -3,10 +3,13 @@ package de.hr.mediathek.core.ui.theme
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-/** Farb-Tokens „Nacht-Pastell“. Ein festes dunkles Design; Flächen sind immer deckend. */
+/**
+ * Farb-Tokens „Nacht-Pastell“. Ein festes dunkles Design. Die dunklen Flächen sind Glas: auf dunklen Hintergrundbildern
+ * zu 60 % durchsichtig, auf hellen Bildern automatisch dichter (siehe [withGlass]), damit Schrift immer lesbar bleibt.
+ */
 data class AppColors(
     val bgFullscreen: Color = Color(0xFF07060D),
-    /** Dunkle Flächen: zu 60 % durchsichtig (Glasoptik); [solid] liefert die deckende Variante für Menüs und Dialoge. */
+    /** Dunkle Flächen: Grundwert 40 % deckend (Glasoptik); [withGlass] passt die Deckkraft an das Bild an, [solid] ist deckend für Menüs und Dialoge. */
     val bar: Color = Color(0xFF1E1A33).copy(alpha = 0.4f),
     val card: Color = Color(0xFF2A2442).copy(alpha = 0.4f),
     val cardInset: Color = Color(0xFF3A3360).copy(alpha = 0.4f),
@@ -19,11 +22,31 @@ data class AppColors(
     val mint: Color = Color(0xFF7EEBC4),
     val gold: Color = Color(0xFFFFE08A),
     val lavendel: Color = Color(0xFFC9B2FF),
-    val warnung: Color = Color(0xFFFF8A8A),
+    val warnung: Color = Color(0xFFFFA3A3),
     val shadow: Color = Color(0xFF140E28),
 ) {
     /** Dieselben Farben, aber deckend. */
     fun solid() = copy(bar = bar.copy(alpha = 1f), card = card.copy(alpha = 1f), cardInset = cardInset.copy(alpha = 1f))
+
+    /** Dieselben Farben mit der Deckkraft [alpha] für alle dunklen Flächen. */
+    fun withGlass(alpha: Float) = copy(bar = bar.copy(alpha = alpha), card = card.copy(alpha = alpha), cardInset = cardInset.copy(alpha = alpha))
+}
+
+/**
+ * Anpassung des Glases an die Helligkeit des Hintergrundbilds. [brightness] ist die relative Leuchtdichte (0–1) der
+ * hellsten 5 % des Bildes. Gerechnet für weißen, grauen und schwarzen Hintergrund: jede Schriftfarbe bleibt ≥ 4,5 : 1.
+ */
+object GlassLevel {
+    const val MIN_ALPHA = 0.4f
+    const val MAX_ALPHA = 0.85f
+    const val MAX_VEIL = 0.35f
+    /** Heller Schimmer oben links auf Karten (klein, sonst sinkt der Kontrast). */
+    const val GLOSS = 0.04f
+
+    /** 0 = dunkles Bild (volles Glas), 1 = helles Bild (dichteste Stufe). */
+    fun level(brightness: Float): Float = ((brightness - 0.04f) / 0.3f).coerceIn(0f, 1f)
+    fun cardAlpha(level: Float): Float = MIN_ALPHA + (MAX_ALPHA - MIN_ALPHA) * level
+    fun veilAlpha(level: Float): Float = MAX_VEIL * level
 }
 
 /** Rotierende Tönungen für eigene Kategorien: Fläche und Text. */

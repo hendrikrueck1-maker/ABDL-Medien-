@@ -30,7 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import de.hr.mediathek.core.ui.theme.LocalAppColors
 
-/** Standardkarte: deckend, Radius 30, weicher Schatten. [bar] = die dunklere Variante für Kopfkarten und Leisten. */
+/** Standardkarte: Glas (Deckkraft passt sich dem Hintergrundbild an), Radius 30. [bar] = die dunklere Variante für Kopfkarten und Leisten. */
 @Composable
 fun AppCard(
     modifier: Modifier = Modifier,
@@ -47,9 +47,9 @@ fun AppCard(
         contentColor = c.onCard,
         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.28f)),
     ) {
-        // Glanz: heller Schimmer von links oben, dazu der feine helle Rand.
+        // Glanz: leichter Schimmer von links oben (klein gehalten, sonst leidet die Lesbarkeit), dazu der feine helle Rand.
         Column(
-            Modifier.background(Brush.linearGradient(listOf(Color.White.copy(alpha = 0.16f), Color.Transparent))).padding(padding),
+            Modifier.background(Brush.linearGradient(listOf(Color.White.copy(alpha = de.hr.mediathek.core.ui.theme.GlassLevel.GLOSS), Color.Transparent))).padding(padding),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             content = content,
         )
