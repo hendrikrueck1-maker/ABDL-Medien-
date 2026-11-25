@@ -194,6 +194,8 @@ data class StoryEntity(
     val rating: Int = 0,
     val favorite: Boolean = false,
     val continueFlag: Boolean = false,
+    /** Eigene Markierung: Es fehlen noch Teile (Fortsetzung erwartet). */
+    @ColumnInfo(defaultValue = "0") val partsMissing: Boolean = false,
     val seriesUuid: String? = null,
     val seriesOrder: Int? = null,
     val textHash: String? = null,

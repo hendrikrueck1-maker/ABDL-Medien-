@@ -803,6 +803,8 @@ data class StoryRow(
     val lastReadAt: Long?,
     val readProgress: Float,
     val wordCount: Int,
+    /** „Teile fehlen noch“. */
+    val partsMissing: Boolean = false,
 )
 
 data class SeriesRow(val uuid: String, val name: String)
@@ -825,13 +827,13 @@ data class RecentStory(val uuid: String, val title: String)
 @Dao
 interface StoryDao {
     @Query(
-        "SELECT uuid, title, category, rating, favorite, continueFlag, sourceText, createdAt, updatedAt, deletedAt, seriesUuid, seriesOrder, author, lastReadAt, readProgress, wordCount " +
+        "SELECT uuid, title, category, rating, favorite, continueFlag, partsMissing, sourceText, createdAt, updatedAt, deletedAt, seriesUuid, seriesOrder, author, lastReadAt, readProgress, wordCount " +
             "FROM story WHERE deletedAt IS NULL",
     )
     fun observeActive(): Flow<List<StoryRow>>
 
     @Query(
-        "SELECT uuid, title, category, rating, favorite, continueFlag, sourceText, createdAt, updatedAt, deletedAt, seriesUuid, seriesOrder, author, lastReadAt, readProgress, wordCount " +
+        "SELECT uuid, title, category, rating, favorite, continueFlag, partsMissing, sourceText, createdAt, updatedAt, deletedAt, seriesUuid, seriesOrder, author, lastReadAt, readProgress, wordCount " +
             "FROM story WHERE deletedAt IS NOT NULL AND (status IS NULL OR status != 'purged') ORDER BY deletedAt DESC",
     )
     fun observeDeleted(): Flow<List<StoryRow>>
@@ -898,6 +900,12 @@ interface StoryDao {
 
     @Query("UPDATE story SET continueFlag = :flag, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
     suspend fun setContinue(uuid: String, flag: Boolean, now: Long)
+
+    @Query("UPDATE story SET partsMissing = :flag, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun setPartsMissing(uuid: String, flag: Boolean, now: Long)
+
+    @Query("UPDATE story SET category = :category, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun setCategory(uuid: String, category: StoryCategory, now: Long)
 
     // --- Ordner ---
     @Query("SELECT * FROM story_folder WHERE deletedAt IS NULL ORDER BY name COLLATE NOCASE")

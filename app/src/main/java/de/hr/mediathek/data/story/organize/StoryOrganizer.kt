@@ -142,6 +142,19 @@ class StoryOrganizer @Inject constructor(
         renumber(seriesUuid, order)
     }
 
+    /**
+     * Geschichten von Hand zu einer Serie zusammenführen (für Teile, die nicht automatisch erkannt wurden). Liegt eine der
+     * Geschichten schon in einer Serie, werden die anderen dort angehängt; sonst entsteht eine neue Serie mit [name].
+     * Reihenfolge = Reihenfolge der Auswahl. Gibt die UUID der Serie zurück.
+     */
+    suspend fun mergeIntoSeries(name: String, storyUuids: List<String>): String {
+        val existing = storyUuids.firstNotNullOfOrNull { dao.get(it)?.seriesUuid }
+        val seriesUuid = existing ?: SeriesEntity(name = name.trim().ifBlank { "Serie" }).also { dao.insertSeries(it) }.uuid
+        if (existing != null && name.isNotBlank()) renameSeries(existing, name)
+        addParts(seriesUuid, storyUuids)
+        return seriesUuid
+    }
+
     /** Löst die Serie auf: die Geschichten bleiben, nur die Zuordnung entfällt. */
     suspend fun dissolveSeries(seriesUuid: String) {
         val now = nowMillis()

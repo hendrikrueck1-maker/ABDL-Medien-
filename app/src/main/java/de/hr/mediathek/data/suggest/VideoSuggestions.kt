@@ -13,6 +13,7 @@ data class Suggestion<T>(val item: T, val kind: SuggestionKind)
  */
 object VideoSuggestions {
     private const val POOL = 6
+    private val DISPLAY_ORDER = listOf(SuggestionKind.NEVER, SuggestionKind.RARE, SuggestionKind.OFTEN)
 
     fun <T> pick(
         often: List<T>,
@@ -39,7 +40,7 @@ object VideoSuggestions {
         if (result.size < 5) take(never, SuggestionKind.NEVER, 5 - result.size)
         if (result.size < 5) take(rare, SuggestionKind.RARE, 5 - result.size)
         if (result.size < 5) take(often, SuggestionKind.OFTEN, 5 - result.size)
-        // Reihenfolge: oft, selten, nie
-        return result.sortedBy { it.kind.ordinal }
+        // Reihenfolge der Anzeige: zuerst noch nie gesehen, dann selten, zuletzt oft gesehen.
+        return result.sortedBy { DISPLAY_ORDER.indexOf(it.kind) }
     }
 }
