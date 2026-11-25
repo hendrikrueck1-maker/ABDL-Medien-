@@ -48,6 +48,16 @@ class TrackerRepository @Inject constructor(
         return entry.uuid
     }
 
+    /** Freier Eintrag ohne Produkt (z. B. „Marke X, Größe M“), optional mit Stückpreis. */
+    suspend fun addFree(name: String, unitPrice: Double? = null, note: String? = null, instant: Long = nowMillis()): String {
+        val entry = TrackerEntryEntity(
+            productUuid = null, productNameSnapshot = name.trim().ifBlank { "Eintrag" }, unitPriceSnapshot = unitPrice,
+            instant = instant, zoneId = ZoneId.systemDefault().id, note = note?.ifBlank { null },
+        )
+        dao.insert(entry)
+        return entry.uuid
+    }
+
     suspend fun undo(uuid: String) = dao.softDelete(uuid, nowMillis())
 
     suspend fun get(uuid: String) = dao.get(uuid)

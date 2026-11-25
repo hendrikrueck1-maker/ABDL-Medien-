@@ -75,6 +75,17 @@ class ProductRepository @Inject constructor(
         brandDao.update(b.copy(aliases = (list + alias).joinToString("\n"), updatedAt = nowMillis(), userUpdatedAt = nowMillis()))
     }
 
+    /**
+     * Produkt schnell anlegen (aus dem Tracker): Titel, optional Marke und Preis je Stück; die Bewertung kommt später.
+     */
+    suspend fun createQuick(title: String, brandName: String?, unitPrice: Double?): String {
+        ensureSeeded()
+        val brand = brandName?.trim()?.takeIf { it.isNotEmpty() }?.let { brandUuidFor(it) }
+        val p = ProductEntity(title = title.trim(), brandUuid = brand, unitPriceOverride = unitPrice)
+        dao.insert(p)
+        return p.uuid
+    }
+
     suspend fun createEmpty(): String {
         ensureSeeded()
         val p = ProductEntity(title = "")

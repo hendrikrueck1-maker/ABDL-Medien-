@@ -31,10 +31,40 @@ class RawProductFile(
 @Singleton
 class ProductPdfImporter @Inject constructor(@ApplicationContext private val context: Context) {
 
+    /**
+     * Wie die Datei gelesen wird: normale Dateien direkt; Google-Docs aus Drive sind „virtuelle“ Dateien ohne eigenen Inhalt
+     * und werden über den Drive-Anbieter als PDF (mit Bildern) oder sonst als Word-Datei abgerufen.
+     */
+    private class Source(val docx: Boolean, val open: () -> java.io.InputStream?)
+
+    private fun sourceFor(uri: Uri, name: String): Source {
+        val resolver = context.contentResolver
+        val mime = runCatching { resolver.getType(uri) }.getOrNull()
+        val virtual = mime == GOOGLE_DOC || isVirtual(uri)
+        if (virtual) {
+            val types = runCatching { resolver.getStreamTypes(uri, "*/*") }.getOrNull().orEmpty()
+            val pick = when {
+                PDF in types -> PDF
+                DOCX in types -> DOCX
+                else -> error("Google-Dokument lässt sich nicht als PDF oder Word abrufen")
+            }
+            return Source(pick == DOCX) { resolver.openTypedAssetFileDescriptor(uri, pick, null)?.createInputStream() }
+        }
+        return Source(mime == DOCX || name.lowercase().endsWith(".docx")) { resolver.openInputStream(uri) }
+    }
+
+    private fun isVirtual(uri: Uri): Boolean = runCatching {
+        if (!android.provider.DocumentsContract.isDocumentUri(context, uri)) return false
+        context.contentResolver.query(uri, arrayOf(android.provider.DocumentsContract.Document.COLUMN_FLAGS), null, null, null)?.use { c ->
+            c.moveToFirst() && (c.getInt(0) and android.provider.DocumentsContract.Document.FLAG_VIRTUAL_DOCUMENT) != 0
+        } ?: false
+    }.getOrDefault(false)
+
     suspend fun read(uri: Uri, name: String): RawProductFile = withContext(Dispatchers.IO) {
         try {
-            if (name.lowercase().endsWith(".docx")) {
-                val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+            val source = sourceFor(uri, name)
+            if (source.docx) {
+                val bytes = source.open()?.use { input ->
                     // Höchstens 20 MB lesen (wie bei Geschichten), sonst droht Speichermangel.
                     val buf = java.io.ByteArrayOutputStream()
                     val chunk = ByteArray(64 * 1024)
@@ -50,20 +80,21 @@ class ProductPdfImporter @Inject constructor(@ApplicationContext private val con
                 } ?: error("nicht lesbar")
                 RawProductFile(name, DocxReader.read(bytes), emptyList(), null, emptyList())
             } else {
-                readPdf(uri, name)
+                readPdf(source.open, name)
             }
         } catch (e: InvalidPasswordException) {
             RawProductFile(name, null, emptyList(), "PDF ist passwortgeschützt", emptyList())
         } catch (e: OutOfMemoryError) {
             RawProductFile(name, null, emptyList(), "Speicher reicht nicht für diese Datei", emptyList())
         } catch (e: Exception) {
-            RawProductFile(name, null, emptyList(), "Datei nicht lesbar", emptyList())
+            val why = if (e is IllegalStateException && e.message != null) ": ${e.message}" else ""
+            RawProductFile(name, null, emptyList(), "Datei nicht lesbar$why", emptyList())
         }
     }
 
-    private fun readPdf(uri: Uri, name: String): RawProductFile {
+    private fun readPdf(open: () -> java.io.InputStream?, name: String): RawProductFile {
         PDFBoxResourceLoader.init(context)
-        val stream = context.contentResolver.openInputStream(uri) ?: error("nicht lesbar")
+        val stream = open() ?: error("nicht lesbar")
         val doc = stream.use { PDDocument.load(it, MemoryUsageSetting.setupTempFileOnly()) }
         val dir = File(context.cacheDir, "product-import").apply { mkdirs() }
         val warnings = ArrayList<String>()
@@ -105,6 +136,9 @@ class ProductPdfImporter @Inject constructor(@ApplicationContext private val con
     companion object {
         private const val MAX_PIXELS = 40_000_000L
         private const val MAX_DOCX_BYTES = 20L * 1024 * 1024
+        const val GOOGLE_DOC = "application/vnd.google-apps.document"
+        const val PDF = "application/pdf"
+        const val DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
         /** Regel: Seite 3 und 4 = Trocken/Nass-Paare, Seite 5 = erstes Bild Verpackung, danach Produktfotos. */
         fun assign(images: List<ExtractedImage>) {

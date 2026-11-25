@@ -20,6 +20,8 @@ data class StoryFilter(
     val category: StoryCategory? = null,
     val favoritesOnly: Boolean = false,
     val continueOnly: Boolean = false,
+    /** Nur Geschichten mit der Markierung „Teile fehlen noch“. */
+    val partsMissingOnly: Boolean = false,
     val sort: StorySort = StorySort.NEWEST,
     val trash: Boolean = false,
     val view: StoryView = StoryView.LIST,
@@ -69,6 +71,7 @@ object StoryListBuilder {
         return (f.category == null || s.category == f.category) &&
             (!f.favoritesOnly || s.favorite) &&
             (!f.continueOnly || s.continueFlag) &&
+            (!f.partsMissingOnly || s.partsMissing) &&
             when (f.readState) {
                 ReadState.ALL -> true
                 ReadState.UNREAD -> s.lastReadAt == null && s.readProgress <= 0f

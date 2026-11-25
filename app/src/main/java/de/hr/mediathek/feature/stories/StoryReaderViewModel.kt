@@ -268,6 +268,19 @@ class StoryReaderViewModel @Inject constructor(
         AppScope.launch { repository.setFavorite(uuid, value) }
     }
 
+    fun togglePartsMissing() {
+        val current = _state.value.story ?: return
+        val value = !current.partsMissing
+        _state.update { it.copy(story = current.copy(partsMissing = value)) }
+        AppScope.launch { repository.setPartsMissing(uuid, value) }
+    }
+
+    fun setCategory(category: de.hr.mediathek.data.db.StoryCategory) {
+        val current = _state.value.story ?: return
+        _state.update { it.copy(story = current.copy(category = category)) }
+        AppScope.launch { repository.setCategory(uuid, category) }
+    }
+
     fun toggleContinue() {
         val current = _state.value.story ?: return
         val value = !current.continueFlag

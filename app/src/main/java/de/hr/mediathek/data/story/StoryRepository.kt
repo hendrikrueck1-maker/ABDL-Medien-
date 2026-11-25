@@ -73,6 +73,8 @@ class StoryRepository @Inject constructor(private val dao: StoryDao) {
     suspend fun setRating(uuid: String, rating: Int) = dao.setRating(uuid, rating, nowMillis())
     suspend fun setFavorite(uuid: String, favorite: Boolean) = dao.setFavorite(uuid, favorite, nowMillis())
     suspend fun setContinue(uuid: String, flag: Boolean) = dao.setContinue(uuid, flag, nowMillis())
+    suspend fun setPartsMissing(uuid: String, flag: Boolean) = dao.setPartsMissing(uuid, flag, nowMillis())
+    suspend fun setCategory(uuid: String, category: de.hr.mediathek.data.db.StoryCategory) = dao.setCategory(uuid, category, nowMillis())
 
     suspend fun saveReading(uuid: String, paragraph: Int, offset: Int, paragraphCount: Int) {
         val progress = if (paragraphCount <= 1) 0f else (paragraph.toFloat() / (paragraphCount - 1)).coerceIn(0f, 1f)

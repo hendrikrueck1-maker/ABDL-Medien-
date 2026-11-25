@@ -1,5 +1,9 @@
 package de.hr.mediathek.feature.stories
 
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -201,17 +205,9 @@ internal fun ReadingCard(
             ReaderFont.MONO -> FontFamily.Monospace
         }
 
-        // Kopf
-        Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Kopf: Bedienknöpfe links unter der linken Hand, Titel dahinter.
+        Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             HeaderIcon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.diag_back), fg, onBack)
-            Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
-                Text(story.title, color = fg, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    if (chapters.size >= 2) stringResource(R.string.reader_progress, currentChapter + 1, chapters.size, percent)
-                    else stringResource(R.string.reader_progress_plain, percent),
-                    color = fg.copy(alpha = 0.75f), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-            }
             if (wide) {
                 HeaderText("A−", stringResource(R.string.reader_font_smaller), fg) {
                     viewModel.setSettings(settings.copy(fontSize = (settings.fontSize - 1f).coerceAtLeast(14f)))
@@ -265,6 +261,14 @@ internal fun ReadingCard(
                     )
                 }
             }
+            Column(Modifier.weight(1f).padding(horizontal = 4.dp)) {
+                Text(story.title, color = fg, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (chapters.size >= 2) stringResource(R.string.reader_progress, currentChapter + 1, chapters.size, percent)
+                    else stringResource(R.string.reader_progress_plain, percent),
+                    color = fg.copy(alpha = 0.75f), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
         // Serie, Angaben und Bewertung
@@ -305,14 +309,17 @@ internal fun ReadingCard(
             story.status?.takeIf { it != "published" }?.let { statusLabel(it) },
             tags.takeIf { it.isNotEmpty() }?.joinToString(" · ") { "#$it" },
         ).joinToString("  ·  ")
-        if (info.isNotEmpty()) {
-            Text(info, color = fg.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 20.dp))
-        }
-        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        // Eine Zeile: Bewertung, Kategorie, Weiterschreiben, Teile fehlen, Angaben – spart Platz für den Text.
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             PageStars(story.rating, page, viewModel::setRating)
-            if (story.continueFlag) {
-                Text("✏ weiterschreiben", color = fg, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(start = 8.dp))
-            }
+            ReaderCategoryChip(story.category, fg) { viewModel.setCategory(it) }
+            ReaderToggle("✏ weiterschreiben", story.continueFlag, fg) { viewModel.toggleContinue() }
+            ReaderToggle("🧩 Teile fehlen", story.partsMissing, fg) { viewModel.togglePartsMissing() }
+            if (info.isNotEmpty()) Text(info, color = fg.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall, maxLines = 1)
         }
 
         // Kapitelzeile
@@ -436,4 +443,35 @@ private fun LocalContentColorFallback(): Color = LocalAppColors.current.onCardVa
 internal fun statusLabel(status: String): String = when (status) {
     "draft" -> "Entwurf"
     else -> status
+}
+
+/** Kategorie im Leser: in der Farbe der Leseseite (auch auf Sepia/Hell lesbar). */
+@Composable
+private fun ReaderCategoryChip(category: de.hr.mediathek.data.db.StoryCategory, fg: Color, onChange: (de.hr.mediathek.data.db.StoryCategory) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Text(
+            categoryLabel(category) + " ▾", color = fg, style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.clip(RoundedCornerShape(50)).border(1.dp, fg.copy(alpha = 0.6f), RoundedCornerShape(50))
+                .clickable(onClickLabel = "Kategorie ändern") { open = true }.defaultMinSize(minHeight = 40.dp).padding(horizontal = 12.dp, vertical = 9.dp),
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            for (c in de.hr.mediathek.data.db.StoryCategory.entries) {
+                DropdownMenuItem(text = { Text((if (c == category) "✓ " else "") + categoryLabel(c)) }, onClick = { open = false; if (c != category) onChange(c) })
+            }
+        }
+    }
+}
+
+/** Umschalter als Pille in der Farbe der Leseseite; aktiv = gefüllt. */
+@Composable
+private fun ReaderToggle(label: String, active: Boolean, fg: Color, onToggle: () -> Unit) {
+    Text(
+        label, color = fg.copy(alpha = if (active) 1f else 0.55f), style = MaterialTheme.typography.labelLarge,
+        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+        modifier = Modifier.clip(RoundedCornerShape(50))
+            .then(if (active) Modifier.background(fg.copy(alpha = 0.18f)) else Modifier.border(1.dp, fg.copy(alpha = 0.35f), RoundedCornerShape(50)))
+            .toggleable(value = active, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = { onToggle() })
+            .defaultMinSize(minHeight = 40.dp).padding(horizontal = 12.dp, vertical = 9.dp),
+    )
 }

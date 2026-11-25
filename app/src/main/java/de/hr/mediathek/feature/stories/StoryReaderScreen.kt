@@ -106,13 +106,15 @@ fun StoryReaderScreen(
         )
     }
 
-    Box(Modifier.fillMaxSize().safeDrawingPadding().padding(12.dp)) {
+    // Liegend: Status- und Navigationsleiste ausblenden, damit Text und Bilder den ganzen Bildschirm nutzen.
+    de.hr.mediathek.core.ui.ImmersiveMode(cfg.orientation == Configuration.ORIENTATION_LANDSCAPE)
+    Box(Modifier.fillMaxSize().safeDrawingPadding().padding(if (sideBySide) 6.dp else 12.dp)) {
         when {
             sideBySide && !textOnly -> Row(Modifier.fillMaxSize().onSizeChanged { rowWidthPx = it.width.coerceAtLeast(1) }) {
                 card(Modifier.weight(1f - fraction).fillMaxHeight())
                 // Teiler: Griff 20 × 80 dp; Verhältnis wird gemerkt (Text 35–75 %).
                 Box(
-                    Modifier.width(20.dp).fillMaxHeight()
+                    Modifier.width(16.dp).fillMaxHeight()
                         .semantics { contentDescription = "" }
                         .pointerInput(rowWidthPx, settings.splitFraction) {
                             detectHorizontalDragGestures(

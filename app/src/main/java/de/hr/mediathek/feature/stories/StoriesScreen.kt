@@ -17,6 +17,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -67,6 +69,8 @@ fun StoriesScreen(
     val folders by viewModel.folders.collectAsStateWithLifecycle()
     val folderItems by viewModel.folderItems.collectAsStateWithLifecycle()
     val backupMissing by viewModel.backupMissing.collectAsStateWithLifecycle()
+    val selection by viewModel.selection.collectAsStateWithLifecycle()
+    var mergeName by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     var menu by remember { mutableStateOf(false) }
@@ -96,26 +100,44 @@ fun StoriesScreen(
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
+            // Bedienknöpfe links (Bedienung mit der linken Hand), Titel dahinter.
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    if (filter.trash) "Papierkorb" else "Geschichten",
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.weight(1f),
-                )
                 if (!filter.trash) {
-                    OutlinedButton(onClick = onImport) { Text("Importieren") }
-                    Button(onClick = { scope.launch { onEdit(viewModel.createEmpty()) } }) { Text("Neu") }
                     Box {
-                        TextButton(onClick = { menu = true }) { Text("⋮") }
+                        TextButton(onClick = { menu = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(text = { Text("Zu Serie zusammenführen …") }, onClick = { menu = false; viewModel.startSelection() })
                             DropdownMenuItem(text = { Text("Duplikate suchen") }, onClick = { menu = false; onDuplicates() })
                             DropdownMenuItem(text = { Text("Serien erkennen") }, onClick = { menu = false; onSeriesSuggest() })
                             DropdownMenuItem(text = { Text("Statistik und Export") }, onClick = { menu = false; onTools() })
                             DropdownMenuItem(text = { Text("Papierkorb") }, onClick = { menu = false; viewModel.update { it.copy(trash = true) } })
                         }
                     }
+                    Button(onClick = { scope.launch { onEdit(viewModel.createEmpty()) } }) { Text("Neu") }
+                    OutlinedButton(onClick = onImport) { Text("Importieren") }
                 } else {
-                    TextButton(onClick = { viewModel.update { it.copy(trash = false) } }) { Text("Zurück") }
+                    TextButton(onClick = { viewModel.update { it.copy(trash = false) } }) { Text("← Zurück") }
+                }
+                Text(
+                    if (filter.trash) "Papierkorb" else "Geschichten",
+                    style = MaterialTheme.typography.headlineMedium,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            selection?.let { sel ->
+                // Auswahl zum Zusammenführen: Antippen wählt aus statt zu öffnen.
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(onClick = { mergeName = firstTitleOf(sel, items) }, enabled = sel.size >= 2) { Text("Zusammenführen") }
+                    OutlinedButton(onClick = viewModel::cancelSelection) { Text("Abbrechen") }
+                    Text(
+                        if (sel.size < 2) "Geschichten in der gewünschten Reihenfolge antippen (mind. 2)" else "${sel.size} ausgewählt",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
             if (!filter.trash && backupMissing) {
@@ -135,7 +157,7 @@ fun StoriesScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
                 )
-                val activeFilters = listOf(filter.favoritesOnly, filter.continueOnly, filter.readState != ReadState.ALL).count { it }
+                val activeFilters = listOf(filter.favoritesOnly, filter.continueOnly, filter.partsMissingOnly, filter.readState != ReadState.ALL).count { it }
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -207,8 +229,8 @@ fun StoriesScreen(
                             is ListItem.Folder -> FolderCard(item) { viewModel.update { f -> f.copy(folder = item.folder.uuid) } }
                             is ListItem.SeriesGroup -> SeriesCard(
                                 item,
-                                highlight = item.parts.any { it.uuid == lastOpened },
-                                onToggle = { viewModel.toggleExpanded(item.key) },
+                                highlight = item.parts.any { it.uuid == lastOpened } || selection?.let { sel -> item.parts.all { it.uuid in sel } } == true,
+                                onToggle = { if (selection != null) viewModel.toggleSelected(item.parts.map { it.uuid }) else viewModel.toggleExpanded(item.key) },
                                 onResume = { onOpen(item.resumePart.uuid) },
                                 onFolder = { pickFor = item.parts.map { it.uuid } },
                                 onEdit = { onEditSeries(item.uuid) },
@@ -216,7 +238,11 @@ fun StoriesScreen(
                             is ListItem.Single -> StoryCard(
                                 item.row, item.indent,
                                 highlight = item.row.uuid == lastOpened,
-                                onOpen = { onOpen(item.row.uuid) },
+                                selectedIndex = selection?.indexOf(item.row.uuid)?.takeIf { it >= 0 }?.plus(1),
+                                selecting = selection != null,
+                                onOpen = { if (selection != null) viewModel.toggleSelected(listOf(item.row.uuid)) else onOpen(item.row.uuid) },
+                                onCategory = { viewModel.setCategory(item.row, it) },
+                                onPartsMissing = { viewModel.togglePartsMissing(item.row) },
                                 onRate = { viewModel.setRating(item.row, it) },
                                 onFavorite = { viewModel.toggleFavorite(item.row) },
                                 onContinue = { viewModel.toggleContinue(item.row) },
@@ -248,6 +274,12 @@ fun StoriesScreen(
             onCreate = { name -> viewModel.createFolderAndAdd(name, ids) },
             onDismiss = { pickFor = null },
         )
+    }
+    mergeName?.let { initial ->
+        NameDialog("Name der Serie", initial, onDismiss = { mergeName = null }) { name ->
+            mergeName = null
+            scope.launch { viewModel.mergeSelected(name)?.let(onEditSeries) }
+        }
     }
     if (showView) StoryViewDialog(filter, onDismiss = { showView = false }) { f -> viewModel.update { f } }
     if (showFilter) StoryFilterDialog(filter, onDismiss = { showFilter = false }) { f -> viewModel.update { f } }
@@ -310,7 +342,10 @@ private fun SeriesCard(item: ListItem.SeriesGroup, highlight: Boolean, onToggle:
         modifier = Modifier.fillMaxWidth().padding(start = (item.indent * 16).dp).bounceClick(onClick = onToggle),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text((if (item.expanded) "▾ " else "▸ ") + "📚 " + item.name, style = MaterialTheme.typography.titleMedium)
+            Text(
+                (if (item.expanded) "▾ " else "▸ ") + "📚 " + item.name + if (item.parts.any { it.partsMissing }) "  🧩" else "",
+                style = MaterialTheme.typography.titleMedium,
+            )
             Text(
                 "${item.parts.size} Kapitel · ${item.doneCount} gelesen" +
                     (item.parts.sumOf { it.wordCount }.takeIf { it > 0 }?.let { " · ${formatWords(it)}" } ?: ""),
@@ -333,44 +368,89 @@ private fun StoryCard(
     row: StoryRow,
     indent: Int,
     highlight: Boolean,
+    selectedIndex: Int?,
+    selecting: Boolean,
     onOpen: () -> Unit,
+    onCategory: (StoryCategory) -> Unit,
+    onPartsMissing: () -> Unit,
     onRate: (Int) -> Unit,
     onFavorite: () -> Unit,
     onContinue: () -> Unit,
     onFolder: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val selected = selectedIndex != null
     Card(
         colors = glassCardColors(MaterialTheme.colorScheme.surfaceContainer),
-        border = if (highlight) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+        border = if (highlight || selected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         modifier = Modifier.fillMaxWidth().padding(start = (indent * 16).dp).bounceClick(onClick = onOpen),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(row.title, style = MaterialTheme.typography.titleMedium)
-            val meta = listOfNotNull(
-                categoryLabel(row.category),
-                row.author?.takeIf { it.isNotBlank() }?.let { "von $it" },
-                row.sourceText?.takeIf { it.isNotBlank() },
-                row.wordCount.takeIf { it > 0 }?.let(::formatWords),
-            ).joinToString(" · ")
-            Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                (selectedIndex?.let { "$it. " } ?: if (selecting) "○ " else "") + row.title + if (row.partsMissing) "  🧩" else "",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CategoryChip(row.category, onCategory)
+                val meta = listOfNotNull(
+                    row.author?.takeIf { it.isNotBlank() }?.let { "von $it" },
+                    row.sourceText?.takeIf { it.isNotBlank() },
+                    row.wordCount.takeIf { it > 0 }?.let(::formatWords),
+                ).joinToString(" · ")
+                Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+            }
             if (row.readProgress >= READ_DONE_AT) {
                 Text("✓ gelesen", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             } else if (row.lastReadAt != null) {
                 LinearProgressIndicator(progress = { row.readProgress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                StarRow(row.rating, onRate)
-                Text(if (row.favorite) "♥" else "♡", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable(onClick = onFavorite).padding(10.dp))
-                Text("✏", style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = if (row.continueFlag) 1f else 0.3f),
-                    modifier = Modifier.clickable(onClick = onContinue).padding(10.dp))
-                Text("📁", style = MaterialTheme.typography.titleLarge, modifier = Modifier.clickable(onClick = onFolder).padding(10.dp))
-                Text("🗑", style = MaterialTheme.typography.titleLarge, modifier = Modifier.clickable(onClick = onDelete).padding(10.dp))
+            if (!selecting) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    StarRow(row.rating, onRate)
+                    Text(if (row.favorite) "♥" else "♡", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable(onClickLabel = "Favorit", onClick = onFavorite).padding(10.dp))
+                    Text("✏", style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = if (row.continueFlag) 1f else 0.3f),
+                        modifier = Modifier.clickable(onClickLabel = "Weiterschreiben", onClick = onContinue).padding(10.dp))
+                    Text("🧩", style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.graphicsLayer { alpha = if (row.partsMissing) 1f else 0.3f }
+                            .clickable(onClickLabel = "Teile fehlen noch", onClick = onPartsMissing).padding(10.dp))
+                    Text("📁", style = MaterialTheme.typography.titleLarge, modifier = Modifier.clickable(onClick = onFolder).padding(10.dp))
+                    Text("🗑", style = MaterialTheme.typography.titleLarge, modifier = Modifier.clickable(onClick = onDelete).padding(10.dp))
+                }
             }
         }
     }
+}
+
+/** Kategorie als Chip; Antippen öffnet die Auswahl Männer / Frauen / Gemischt. */
+@Composable
+internal fun CategoryChip(category: StoryCategory, onChange: (StoryCategory) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        AssistChip(onClick = { open = true }, label = { Text(categoryLabel(category) + " ▾") })
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            for (c in StoryCategory.entries) {
+                DropdownMenuItem(
+                    text = { Text((if (c == category) "✓ " else "") + categoryLabel(c)) },
+                    onClick = { open = false; if (c != category) onChange(c) },
+                )
+            }
+        }
+    }
+}
+
+/** Vorschlag für den Seriennamen: Titel der zuerst gewählten Geschichte ohne „Teil 1“. */
+private fun firstTitleOf(selection: List<String>, items: List<ListItem>): String {
+    val first = selection.firstOrNull() ?: return ""
+    val title = items.firstNotNullOfOrNull { i ->
+        when (i) {
+            is ListItem.Single -> i.row.title.takeIf { i.row.uuid == first }
+            is ListItem.SeriesGroup -> i.name.takeIf { i.parts.any { it.uuid == first } }
+            else -> null
+        }
+    }.orEmpty()
+    return title.replace(Regex("\\s*[–-]?\\s*(Teil|Kapitel|Part)\\s*\\d+\\s*$", RegexOption.IGNORE_CASE), "").trim()
 }
 
 internal fun formatWords(n: Int): String = if (n >= 1000) "${n / 1000} Tsd. Wörter" else "$n Wörter"
@@ -516,6 +596,7 @@ private fun StoryFilterDialog(filter: StoryFilter, onDismiss: () -> Unit, onChan
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = filter.favoritesOnly, onClick = { onChange(filter.copy(favoritesOnly = !filter.favoritesOnly)) }, label = { Text("♥ Favoriten") })
                     FilterChip(selected = filter.continueOnly, onClick = { onChange(filter.copy(continueOnly = !filter.continueOnly)) }, label = { Text("✏ Weiterschreiben") })
+                    FilterChip(selected = filter.partsMissingOnly, onClick = { onChange(filter.copy(partsMissingOnly = !filter.partsMissingOnly)) }, label = { Text("🧩 Teile fehlen") })
                 }
                 Text("Lesestand", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

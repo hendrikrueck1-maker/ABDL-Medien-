@@ -6,6 +6,8 @@ import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.horizontalScroll
@@ -350,24 +352,28 @@ private fun ReadyPlayer(
                         Text(playerInfo(state), style = MaterialTheme.typography.bodySmall, color = c.onCardVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                // Oben rechts: Sterne, Favorit, Pee.
-                Row(
-                    Modifier.align(Alignment.TopEnd).clip(RoundedCornerShape(32.dp)).background(c.bar).padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                // Links hochkant: Favorit, 💧 und Sterne (unter der linken Hand), blendet mit den übrigen Knöpfen aus.
+                Column(
+                    Modifier.align(Alignment.CenterStart)
+                        .padding(top = 84.dp, bottom = 150.dp)
+                        .verticalScroll(rememberScrollState())
+                        .clip(RoundedCornerShape(32.dp)).background(c.bar).padding(horizontal = 4.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Row(Modifier.selectableGroup()) {
-                        (1..5).forEach { star ->
+                    MarkIcon(stringResource(R.string.mark_fav_long), Icons.Filled.Favorite, state.favorite, c.rosa) { viewModel.toggleFavorite(); poke() }
+                    MarkIcon(stringResource(R.string.mark_pee), Icons.Filled.WaterDrop, state.markedPee, c.hellblau) { viewModel.toggleMarkedPee(); poke() }
+                    Column(Modifier.selectableGroup(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        // Oben der höchste Stern, damit die Reihe wie eine Skala von oben nach unten wirkt.
+                        (5 downTo 1).forEach { star ->
                             Box(
-                                Modifier.size(48.dp).selectable(selected = star == state.rating, role = Role.RadioButton, onClick = { viewModel.setRating(star); poke() }),
+                                Modifier.size(46.dp).selectable(selected = star == state.rating, role = Role.RadioButton, onClick = { viewModel.setRating(star); poke() }),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Icon(if (star <= state.rating) Icons.Filled.Star else Icons.Outlined.StarBorder, stringResource(R.string.video_rate, star), tint = if (star <= state.rating) c.gold else c.onCardVariant)
                             }
                         }
                     }
-                    MarkToggle(stringResource(R.string.mark_fav_long), Icons.Filled.Favorite, state.favorite, c.rosa) { viewModel.toggleFavorite(); poke() }
-                    MarkToggle(stringResource(R.string.mark_pee), Icons.Filled.WaterDrop, state.markedPee, c.hellblau) { viewModel.toggleMarkedPee(); poke() }
                 }
                 // Unten: Zeitleiste und Bedienung.
                 Column(
@@ -474,18 +480,17 @@ private fun RoundTool(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
 }
 
 /** Schalter als Pille mit Form, Farbe und Wort: aktiv gefüllt, inaktiv nur Umriss. */
+/** Runder Umschalter nur mit Symbol (für die senkrechte Leiste links). */
 @Composable
-private fun MarkToggle(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, active: Boolean, color: Color, onToggle: () -> Unit) {
+private fun MarkIcon(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, active: Boolean, color: Color, onToggle: () -> Unit) {
     val c = LocalAppColors.current
-    Row(
-        Modifier.height(48.dp).clip(CircleShape)
+    Box(
+        Modifier.size(48.dp).clip(CircleShape)
             .then(if (active) Modifier.background(color) else Modifier.border(2.dp, color, CircleShape))
             .toggleable(value = active, role = Role.Switch, onValueChange = { onToggle() })
-            .padding(horizontal = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, null, tint = if (active) c.onAccent else color, modifier = Modifier.size(18.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge, color = if (active) c.onAccent else color, maxLines = 1)
+        Icon(icon, null, tint = if (active) c.onAccent else color, modifier = Modifier.size(22.dp))
     }
 }

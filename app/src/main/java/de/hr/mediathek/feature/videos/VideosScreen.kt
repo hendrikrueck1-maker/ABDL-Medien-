@@ -154,6 +154,18 @@ fun VideosScreen(
         if (selected.isEmpty()) {
             AppCard(Modifier.fillMaxWidth(), bar = true, padding = PaddingValues(horizontal = 24.dp, vertical = 14.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Bedienknöpfe links (linke Hand), dann Titel.
+                    AccentButton(onClick = { viewModel.openRandom(onOpen) { noRandom = true } }, color = c.mint) { Text(stringResource(R.string.video_random)) }
+                    Box {
+                        IconButton(onClick = { moreMenu = true }) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.menu_more), tint = c.onCard)
+                        }
+                        DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.playlist_title)) }, onClick = { moreMenu = false; showPlaylistDialog = true })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.dup_title)) }, onClick = { moreMenu = false; onOpenDuplicates() })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.trash_title)) }, onClick = { moreMenu = false; onOpenTrash() })
+                        }
+                    }
                     Column(Modifier.weight(if (wide) 1f else 1f)) {
                         Text(stringResource(R.string.nav_videos), style = if (wide) MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium, color = c.onCard)
                         Text(
@@ -170,17 +182,6 @@ fun VideosScreen(
                             shape = CircleShape,
                             modifier = Modifier.width(320.dp),
                         )
-                    }
-                    AccentButton(onClick = { viewModel.openRandom(onOpen) { noRandom = true } }, color = c.mint) { Text(stringResource(R.string.video_random)) }
-                    Box {
-                        IconButton(onClick = { moreMenu = true }) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.menu_more), tint = c.onCard)
-                        }
-                        DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
-                            DropdownMenuItem(text = { Text(stringResource(R.string.playlist_title)) }, onClick = { moreMenu = false; showPlaylistDialog = true })
-                            DropdownMenuItem(text = { Text(stringResource(R.string.dup_title)) }, onClick = { moreMenu = false; onOpenDuplicates() })
-                            DropdownMenuItem(text = { Text(stringResource(R.string.trash_title)) }, onClick = { moreMenu = false; onOpenTrash() })
-                        }
                     }
                 }
                 if (!wide) {

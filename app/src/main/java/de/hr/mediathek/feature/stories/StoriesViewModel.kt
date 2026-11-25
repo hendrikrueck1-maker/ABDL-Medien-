@@ -122,12 +122,31 @@ class StoriesViewModel @Inject constructor(
 
     suspend fun createEmpty(): String = repository.create("", "")
 
-    fun toggleFavorite(row: StoryRow) = edit(row.uuid) { it.copy(favorite = !it.favorite) }
-    fun toggleContinue(row: StoryRow) = edit(row.uuid) { it.copy(continueFlag = !it.continueFlag) }
-    fun setRating(row: StoryRow, rating: Int) = edit(row.uuid) { it.copy(rating = if (it.rating == rating) 0 else rating) }
+    // Gezielte Einzel-Updates (nie die ganze Geschichte zurückschreiben, siehe Leser).
+    fun toggleFavorite(row: StoryRow) = viewModelScope.launch { repository.setFavorite(row.uuid, !row.favorite) }
+    fun toggleContinue(row: StoryRow) = viewModelScope.launch { repository.setContinue(row.uuid, !row.continueFlag) }
+    fun togglePartsMissing(row: StoryRow) = viewModelScope.launch { repository.setPartsMissing(row.uuid, !row.partsMissing) }
+    fun setCategory(row: StoryRow, category: StoryCategory) = viewModelScope.launch { repository.setCategory(row.uuid, category) }
+    fun setRating(row: StoryRow, rating: Int) = viewModelScope.launch { repository.setRating(row.uuid, if (row.rating == rating) 0 else rating) }
 
-    private fun edit(uuid: String, block: (de.hr.mediathek.data.db.StoryEntity) -> de.hr.mediathek.data.db.StoryEntity) {
-        viewModelScope.launch { repository.get(uuid)?.let { repository.update(block(it)) } }
+    // --- Zusammenführen (Mehrfachauswahl) ---
+    private val _selection = MutableStateFlow<List<String>?>(null)
+    /** null = keine Auswahl aktiv; sonst die gewählten Geschichten in der Reihenfolge des Antippens. */
+    val selection: StateFlow<List<String>?> = _selection
+
+    fun startSelection() { _selection.value = emptyList() }
+    fun cancelSelection() { _selection.value = null }
+    fun toggleSelected(uuids: List<String>) = _selection.update { sel ->
+        sel?.let { if (uuids.all { it in sel }) sel - uuids.toSet() else sel + uuids.filter { it !in sel } }
+    }
+
+    /** Gewählte Geschichten (auch ganze Serien) als Serie zusammenführen; gibt die UUID der Serie zurück. */
+    suspend fun mergeSelected(name: String): String? {
+        val ids = _selection.value.orEmpty()
+        if (ids.size < 2) return null
+        val series = organizer.mergeIntoSeries(name, ids)
+        _selection.value = null
+        return series
     }
 
     fun delete(row: StoryRow) = viewModelScope.launch { repository.delete(row.uuid) }

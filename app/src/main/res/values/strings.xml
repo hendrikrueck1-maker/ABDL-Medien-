@@ -511,7 +511,7 @@
     <string name="tracker_period_week">Woche</string>
     <string name="tracker_period_month">Monat</string>
     <string name="tracker_quick">Schnell eintragen</string>
-    <string name="tracker_other">Anderes</string>
+    <string name="tracker_other">＋ Anderes / Neu</string>
     <string name="tracker_hint">Tippen = eintragen, lang drücken = mit Notiz</string>
     <string name="tracker_stats_more">Mehr Statistik</string>
     <string name="tracker_chart_title">Einträge im Zeitraum</string>
