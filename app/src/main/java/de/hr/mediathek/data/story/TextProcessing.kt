@@ -191,7 +191,11 @@ object DocxReader {
 
     private fun unescape(s: String): String = s
         .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'")
-        .replace(Regex("&#(\\d+);")) { it.groupValues[1].toInt().toChar().toString() }
-        .replace(Regex("&#x([0-9a-fA-F]+);")) { it.groupValues[1].toInt(16).toChar().toString() }
+        .replace(Regex("&#(\\d+);")) { codePoint(it.groupValues[1].toIntOrNull()) }
+        .replace(Regex("&#x([0-9a-fA-F]+);")) { codePoint(it.groupValues[1].toIntOrNull(16)) }
         .replace("&amp;", "&")
+
+    /** Zeichenreferenz als Text, auch Emoji (über 0xFFFF); ungültige Werte werden zum Ersatzzeichen. */
+    private fun codePoint(cp: Int?): String =
+        if (cp != null && Character.isValidCodePoint(cp) && cp != 0) String(Character.toChars(cp)) else "\uFFFD"
 }

@@ -343,6 +343,10 @@ interface MediaFileDao {
     )
     suspend fun markRestored(uuid: String, docId: String, now: Long)
 
+    /** Nach dem Wiederherstellen unter anderem Namen (Android hängt „ (1)“ an): Pfad und Namen nachziehen. */
+    @Query("UPDATE media_file SET relativePath = :path, displayName = :name, updatedAt = :now WHERE uuid = :uuid")
+    suspend fun setPathAndName(uuid: String, path: String, name: String, now: Long)
+
     @Query("UPDATE media_file SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
     suspend fun tombstone(uuid: String, now: Long)
 

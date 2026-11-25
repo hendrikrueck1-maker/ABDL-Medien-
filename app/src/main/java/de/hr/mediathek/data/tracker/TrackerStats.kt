@@ -30,7 +30,8 @@ object TrackerStats {
 
     /** Kalendertag eines Eintrags: Einträge zwischen Mitternacht und Tagesbeginn zählen zum Vortag. */
     fun dayOf(instant: Long, zoneId: String, dayStartMinutes: Int): LocalDate =
-        Instant.ofEpochMilli(instant).atZone(zone(zoneId)).minusMinutes(dayStartMinutes.toLong()).toLocalDate()
+        // Auf der lokalen Uhrzeit rechnen (nicht auf der Zeitachse), sonst verschiebt die Zeitumstellung den Tagesbeginn.
+        Instant.ofEpochMilli(instant).atZone(zone(zoneId)).toLocalDateTime().minusMinutes(dayStartMinutes.toLong()).toLocalDate()
 
     fun bucketStart(date: LocalDate, period: StatPeriod): LocalDate = when (period) {
         StatPeriod.DAY -> date

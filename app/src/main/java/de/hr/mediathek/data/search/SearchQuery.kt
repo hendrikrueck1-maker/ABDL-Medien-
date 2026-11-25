@@ -9,6 +9,8 @@ data class ParsedQuery(val match: String, val excluded: List<String>)
  * (Phrase), Sonderzeichen werden neutralisiert, einfache Begriffe suchen als Wortanfang (Präfix).
  */
 object SearchQuery {
+    const val MAX_TERMS = 32
+
     fun parse(input: String): ParsedQuery? {
         val positive = ArrayList<String>()
         val negative = ArrayList<String>()
@@ -49,7 +51,8 @@ object SearchQuery {
             }
         }
         if (positive.isEmpty()) return null
-        return ParsedQuery(positive.joinToString(" "), negative)
+        // Sehr viele Begriffe (eingefügter Langtext) sprengen den FTS-Ausdruck: auf die ersten Begriffe begrenzen.
+        return ParsedQuery(positive.take(MAX_TERMS).joinToString(" "), negative.take(MAX_TERMS))
     }
 
     /** Zerlegt in Buchstaben-/Ziffernfolgen, alles andere (auch FTS-Sonderzeichen) wird zum Trenner. Kleingeschrieben, damit kein Operator wie OR/NOT entsteht. */
@@ -57,7 +60,8 @@ object SearchQuery {
         val result = ArrayList<String>()
         val sb = StringBuilder()
         for (ch in text) {
-            if (Character.isLetterOrDigit(ch)) sb.append(ch.lowercaseChar()) else if (sb.isNotEmpty()) { result += sb.toString(); sb.setLength(0) }
+            if (ch == 'ß' || ch == 'ẞ') sb.append("ss")
+            else if (Character.isLetterOrDigit(ch)) sb.append(ch.lowercaseChar()) else if (sb.isNotEmpty()) { result += sb.toString(); sb.setLength(0) }
         }
         if (sb.isNotEmpty()) result += sb.toString()
         return result

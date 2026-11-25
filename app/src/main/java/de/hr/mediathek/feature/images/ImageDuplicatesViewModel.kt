@@ -70,10 +70,14 @@ class ImageDuplicatesViewModel @Inject constructor(
         viewModelScope.launch { scheduler.enqueueHashes() }
     }
 
+    private var reloadJob: kotlinx.coroutines.Job? = null
+
     fun reload() {
         val current = _state.value
         _state.update { it.copy(loading = true) }
-        viewModelScope.launch {
+        // Eine noch laufende Berechnung (Regler mehrfach bewegt) abbrechen: der zuletzt gestartete Lauf gilt.
+        reloadJob?.cancel()
+        reloadJob = viewModelScope.launch {
             val groups = withContext(Dispatchers.Default) {
                 when (current.mode) {
                     DuplicateMode.EXACT -> dao.exactImageDuplicates()
@@ -85,8 +89,9 @@ class ImageDuplicatesViewModel @Inject constructor(
                         val rows = dao.perceptualHashes()
                         val ids = SimilarImageGroups.build(rows.map { HashedItem(it.uuid, it.hash) }, current.threshold)
                         ids.map { group ->
-                            val entities = group.chunked(500).flatMap { dao.byUuids(it) }
-                            DuplicateGroup(entities.sortedByDescending { it.size })
+                            // Reihenfolge der Gruppe beibehalten: das Referenzbild steht zuerst.
+                            val byUuid = group.chunked(500).flatMap { dao.byUuids(it) }.associateBy { it.uuid }
+                            DuplicateGroup(group.mapNotNull { byUuid[it] })
                         }.filter { it.images.size > 1 }
                     }
                 }
