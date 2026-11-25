@@ -136,7 +136,8 @@ internal fun StoryImagePanel(
             }
             if (image.bitmap == null) {
                 Text(
-                    stringResource(if (image.loading) R.string.reader_loading_image else R.string.reader_no_images),
+                    if (image.unavailable) "Bilder gerade nicht erreichbar (Speicherkarte?)"
+                    else stringResource(if (image.loading) R.string.reader_loading_image else R.string.reader_no_images),
                     color = c.onCardVariant, modifier = Modifier.padding(16.dp),
                 )
             }

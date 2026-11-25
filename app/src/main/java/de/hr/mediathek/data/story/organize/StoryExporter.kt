@@ -43,7 +43,12 @@ class StoryExporter @Inject constructor(
                 var n = 1
                 while (!used.add(name.lowercase())) name = dir + prefix + safe(s.title) + " (${++n})"
                 zip.putNextEntry(ZipEntry("$name.md"))
-                zip.write(markdown(s.title, s.category, tags, s.author, s.createdAt, series, s.seriesOrder, s.sourceText, s.rating, text, s.publishedAt, s.sourceUrl).toByteArray(Charsets.UTF_8))
+                zip.write(
+                    markdown(
+                        s.title, s.category, tags, s.author, s.createdAt, series, s.seriesOrder, s.sourceText, s.rating, text,
+                        s.publishedAt, s.sourceUrl, exportSlug(s.slug, s.uuid), s.status ?: "published", s.favorite, s.continueFlag,
+                    ).toByteArray(Charsets.UTF_8),
+                )
                 zip.closeEntry()
                 count++
                 if (i % 20 == 0) onProgress(i, briefs.size)
@@ -97,6 +102,13 @@ class StoryExporter @Inject constructor(
                 series?.let { w.name("series").value(it) }
                 s.seriesOrder?.let { w.name("seriesOrder").value(it.toLong()) }
                 if (s.rating > 0) w.name("rating").value(s.rating.toLong())
+                // Für die Übertragung Handy → Tablet: Kennung, Status und Markierungen, damit nichts verloren geht
+                // und keine fremde Geschichte mit gleichem Titel überschrieben wird.
+                w.name("slug").value(exportSlug(s.slug, s.uuid))
+                w.name("status").value(s.status ?: "published")
+                w.name("favorite").value(s.favorite)
+                w.name("continueFlag").value(s.continueFlag)
+                w.name("updatedAt").value(isoUtc(s.updatedAt))
                 w.endObject()
                 count++
                 if (i % 20 == 0) onProgress(i, briefs.size)
@@ -105,6 +117,22 @@ class StoryExporter @Inject constructor(
         }
         onProgress(briefs.size, briefs.size)
         count
+    }
+
+    /** Kennung für den Export: vorhandener Slug, sonst eine aus der UUID (eigene Geschichten haben keinen Slug). */
+    private fun exportSlug(slug: String?, uuid: String): String = slug?.takeIf { it.isNotBlank() } ?: "app-$uuid"
+
+    /** Alle Quell-Links (eine Zeile je Link), z. B. zum Einfügen in die Link-Liste auf dem Tablet. Gibt die Zahl zurück. */
+    suspend fun exportLinks(target: Uri, folderUuid: String?): Int = withContext(Dispatchers.IO) {
+        val wanted = wantedStories(folderUuid)
+        val links = LinkedHashSet<String>()
+        for (b in dao.briefs()) {
+            if (wanted != null && b.uuid !in wanted) continue
+            dao.get(b.uuid)?.sourceUrl?.takeIf { it.startsWith("http") }?.let { links += it }
+        }
+        val out = context.contentResolver.openOutputStream(target, "wt") ?: throw java.io.IOException("Zieldatei nicht beschreibbar")
+        out.bufferedWriter(Charsets.UTF_8).use { w -> links.forEach { w.write(it); w.write("\n") } }
+        links.size
     }
 
     private fun isoUtc(millis: Long): String =
@@ -124,6 +152,7 @@ class StoryExporter @Inject constructor(
     private fun markdown(
         title: String, category: StoryCategory, tags: List<String>, author: String?, createdAt: Long,
         series: String?, order: Int?, source: String?, rating: Int, body: String, publishedAt: Long? = null, sourceUrl: String? = null,
+        slug: String? = null, status: String? = null, favorite: Boolean = false, continueFlag: Boolean = false,
     ): String {
         val iso = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date(createdAt))
         fun q(v: String) = "\"" + v.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
@@ -140,6 +169,10 @@ class StoryExporter @Inject constructor(
             order?.let { append("seriesOrder: ").append(it).append('\n') }
             source?.takeIf { it.isNotBlank() }?.let { append("source: ").append(q(it)).append('\n') }
             if (rating > 0) append("rating: ").append(rating).append('\n')
+            slug?.let { append("slug: ").append(q(it)).append('\n') }
+            status?.let { append("status: ").append(it).append('\n') }
+            if (favorite) append("favorite: true\n")
+            if (continueFlag) append("continueFlag: true\n")
             append("---\n\n")
             append(body.trim()).append('\n')
         }

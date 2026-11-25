@@ -32,7 +32,7 @@ class RoomImportStore @Inject constructor(
             uuid = s.uuid, trashed = s.deletedAt != null, hash = s.importHash, title = s.title, category = s.category,
             author = s.author, status = s.status, publishedAt = s.publishedAt,
             tags = dao.tagNames(s.uuid).map { TagNames.normalize(it) }.toSet(),
-            rating = s.rating, continueFlag = s.continueFlag,
+            rating = s.rating, continueFlag = s.continueFlag, sourceUrl = s.sourceUrl,
         )
     }
 

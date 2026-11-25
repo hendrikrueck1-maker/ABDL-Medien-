@@ -10,6 +10,7 @@ import de.hr.mediathek.data.db.StoryEntity
 import de.hr.mediathek.data.story.StoryRepository
 import de.hr.mediathek.data.story.TextCleaner
 import kotlinx.coroutines.Dispatchers
+import de.hr.mediathek.core.AppScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -55,6 +56,8 @@ data class ReaderImage(
     val position: Int = 0,
     val total: Int = 0,
     val loading: Boolean = true,
+    /** Viele Bilder in Folge nicht lesbar (z. B. Karte entfernt): Bildstreifen hält an. */
+    val unavailable: Boolean = false,
 )
 
 /** Mehrteilige Geschichte: Name, alle Teile in Reihenfolge und Position des aktuellen Teils. */
@@ -189,6 +192,7 @@ class StoryReaderViewModel @Inject constructor(
             uuids = withContext(Dispatchers.IO) { if (f.isEmpty()) mediaDao.onlineImageUuids() else mediaDao.onlineImageUuidsIn(f) }
             order = if (uuids.isEmpty()) null else de.hr.mediathek.data.images.SlideshowOrder(uuids.size, _settings.value.slideRandom)
             shown = 1
+            failures = 0
             _image.value = ReaderImage(folder = f, total = uuids.size, loading = false)
             showCurrent()
         }
@@ -201,10 +205,19 @@ class StoryReaderViewModel @Inject constructor(
         showJob = viewModelScope.launch {
             val bmp = withContext(Dispatchers.IO) { runCatching { loadBitmap(id) }.getOrNull() }
             if (bmp == null) {
-                // Nicht lesbar: einfach weiter zum nächsten.
-                if (uuids.size > 1) { o.next(); showCurrent() }
+                // Nicht lesbar: weiter zum nächsten, aber nach vielen Fehlversuchen in Folge anhalten
+                // (z. B. Speicherkarte gezogen) statt endlos alle Bilder durchzuprobieren.
+                failures++
+                if (uuids.size > 1 && failures < MAX_FAILURES) {
+                    o.next()
+                    shown = if (shown >= uuids.size) 1 else shown + 1
+                    showCurrent()
+                } else {
+                    _image.update { it.copy(bitmap = null, unavailable = true) }
+                }
                 return@launch
             }
+            failures = 0
             _image.update { it.copy(bitmap = bmp, uuid = id, position = shown.coerceIn(1, it.total.coerceAtLeast(1))) }
         }
     }
@@ -233,22 +246,39 @@ class StoryReaderViewModel @Inject constructor(
         showCurrent()
     }
 
+    /** Läuft im App-Bereich weiter, damit die letzte Position auch beim Verlassen des Lesers gespeichert wird. */
     fun saveProgress(paragraph: Int, offset: Int) {
-        viewModelScope.launch { repository.saveReading(uuid, paragraph, offset, _state.value.paragraphs.size) }
+        val count = _state.value.paragraphs.size
+        AppScope.launch { repository.saveReading(uuid, paragraph, offset, count) }
     }
 
-    fun setRating(rating: Int) = edit { it.copy(rating = if (it.rating == rating) 0 else rating) }
-    fun toggleFavorite() = edit { it.copy(favorite = !it.favorite) }
-    fun toggleContinue() = edit { it.copy(continueFlag = !it.continueFlag) }
-
-    private fun edit(block: (StoryEntity) -> StoryEntity) {
+    // Nur das eine Feld schreiben: Ein Zurückschreiben der ganzen Geschichte würde den inzwischen
+    // gespeicherten Lesefortschritt auf den Stand beim Öffnen zurücksetzen.
+    fun setRating(rating: Int) {
         val current = _state.value.story ?: return
-        val updated = block(current)
-        _state.update { it.copy(story = updated) }
-        viewModelScope.launch { repository.update(updated) }
+        val value = if (current.rating == rating) 0 else rating
+        _state.update { it.copy(story = current.copy(rating = value)) }
+        AppScope.launch { repository.setRating(uuid, value) }
     }
+
+    fun toggleFavorite() {
+        val current = _state.value.story ?: return
+        val value = !current.favorite
+        _state.update { it.copy(story = current.copy(favorite = value)) }
+        AppScope.launch { repository.setFavorite(uuid, value) }
+    }
+
+    fun toggleContinue() {
+        val current = _state.value.story ?: return
+        val value = !current.continueFlag
+        _state.update { it.copy(story = current.copy(continueFlag = value)) }
+        AppScope.launch { repository.setContinue(uuid, value) }
+    }
+
+    private var failures = 0
 
     private companion object {
+        const val MAX_FAILURES = 20
         const val K_SIZE = "reader_font_size"
         const val K_LINE = "reader_line_spacing"
         const val K_THEME = "reader_theme"

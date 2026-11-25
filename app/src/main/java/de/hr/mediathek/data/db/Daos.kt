@@ -876,6 +876,16 @@ interface StoryDao {
     @Query("UPDATE story SET readingParagraph = :paragraph, readingOffset = :offset, readProgress = :progress, lastReadAt = :now WHERE uuid = :uuid")
     suspend fun setReadingFull(uuid: String, paragraph: Int, offset: Int, progress: Float, now: Long)
 
+    // Gezielte Änderungen: schreiben nur ein Feld, damit parallel gespeicherter Lesefortschritt nie überschrieben wird.
+    @Query("UPDATE story SET rating = :rating, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun setRating(uuid: String, rating: Int, now: Long)
+
+    @Query("UPDATE story SET favorite = :favorite, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun setFavorite(uuid: String, favorite: Boolean, now: Long)
+
+    @Query("UPDATE story SET continueFlag = :flag, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
+    suspend fun setContinue(uuid: String, flag: Boolean, now: Long)
+
     // --- Ordner ---
     @Query("SELECT * FROM story_folder WHERE deletedAt IS NULL ORDER BY name COLLATE NOCASE")
     fun observeFolders(): Flow<List<StoryFolderEntity>>

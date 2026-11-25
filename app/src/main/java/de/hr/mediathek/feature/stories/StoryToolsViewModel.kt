@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.hr.mediathek.core.AppScope
 import de.hr.mediathek.data.db.StoryFolderEntity
 import de.hr.mediathek.data.story.StoryRepository
 import de.hr.mediathek.data.story.organize.StoryExporter
@@ -37,6 +38,7 @@ data class ExportUi(val running: Boolean = false, val done: Int = 0, val total: 
 
 @HiltViewModel
 class StoryToolsViewModel @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
     repository: StoryRepository,
     private val exporter: StoryExporter,
 ) : ViewModel() {
@@ -61,16 +63,26 @@ class StoryToolsViewModel @Inject constructor(
     private val _export = MutableStateFlow(ExportUi())
     val export: StateFlow<ExportUi> = _export
 
-    fun export(target: Uri, folderUuid: String?, json: Boolean = false) {
+    enum class Format { ZIP, JSON, LINKS }
+
+    /**
+     * Export im App-Bereich: läuft auch weiter, wenn die Seite verlassen wird. Bei einem Fehler wird die halb
+     * geschriebene Datei gelöscht, damit keine unvollständige Datei liegen bleibt.
+     */
+    fun export(target: Uri, folderUuid: String?, format: Format = Format.ZIP) {
+        if (_export.value.running) return
         _export.value = ExportUi(running = true)
-        viewModelScope.launch {
+        AppScope.launch {
             try {
                 val progress = { d: Int, t: Int -> _export.update { it.copy(done = d, total = t) } }
-                val n = if (json) exporter.exportJson(target, folderUuid, progress) else exporter.export(target, folderUuid, progress)
-                _export.value = ExportUi(message = "$n Geschichten exportiert.")
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
+                val text = when (format) {
+                    Format.ZIP -> "${exporter.export(target, folderUuid, progress)} Geschichten exportiert."
+                    Format.JSON -> "${exporter.exportJson(target, folderUuid, progress)} Geschichten exportiert."
+                    Format.LINKS -> "${exporter.exportLinks(target, folderUuid)} Links exportiert. Am Tablet in die Link-Liste einfügen."
+                }
+                _export.value = ExportUi(message = text)
             } catch (e: Exception) {
+                runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver, target) }
                 _export.value = ExportUi(message = "Export fehlgeschlagen: ${e.message ?: e.javaClass.simpleName}")
             }
         }
