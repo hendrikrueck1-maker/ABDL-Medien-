@@ -66,8 +66,20 @@ fun ProductImportScreen(onBack: () -> Unit, viewModel: ProductImportViewModel = 
             Text("Bewertungen importieren", style = MaterialTheme.typography.titleLarge)
         }
         Button(onClick = {
-            picker.launch(arrayOf("application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
-        }) { Text("PDF oder Word-Dateien wählen") }
+            picker.launch(
+                arrayOf(
+                    de.hr.mediathek.data.product.ProductPdfImporter.PDF,
+                    de.hr.mediathek.data.product.ProductPdfImporter.DOCX,
+                    de.hr.mediathek.data.product.ProductPdfImporter.GOOGLE_DOC,
+                ),
+            )
+        }) { Text("PDF, Word oder Google Docs wählen") }
+        Text(
+            "Google Docs: In der Auswahl links „Drive“ antippen und die Bewertungs-Dokumente wählen. Sie werden als PDF abgerufen " +
+                "(mit Fotos), ohne dass du sie vorher exportieren musst. Dafür muss die Google-Drive-App installiert und angemeldet sein.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         state.savedCount?.let { Text("$it Produkte importiert.", color = MaterialTheme.colorScheme.primary) }
         if (state.loading || state.saving) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

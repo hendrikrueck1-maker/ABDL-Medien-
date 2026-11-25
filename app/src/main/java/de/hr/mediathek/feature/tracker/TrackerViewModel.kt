@@ -71,6 +71,31 @@ class TrackerViewModel @Inject constructor(
         }
     }
 
+    /** Freier Eintrag ohne Produkt. [priceText] z. B. "0,85" (leer = kein Preis). */
+    fun addFree(name: String, priceText: String, note: String?) {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            val price = de.hr.mediathek.data.product.PriceParser.parse(priceText).min
+            val id = tracker.addFree(name, price, note)
+            _undo.value = id to name.trim()
+            delay(UNDO_MS)
+            if (_undo.value?.first == id) _undo.value = null
+        }
+    }
+
+    /** Neues Produkt anlegen und gleich einen Eintrag dafür setzen (Bewertung später in „Produkte“). */
+    fun addQuickProduct(title: String, brand: String, priceText: String) {
+        if (title.isBlank()) return
+        viewModelScope.launch {
+            val price = de.hr.mediathek.data.product.PriceParser.parse(priceText).min
+            val uuid = products.createQuick(title, brand, price)
+            val id = tracker.add(uuid) ?: return@launch
+            _undo.value = id to title.trim()
+            delay(UNDO_MS)
+            if (_undo.value?.first == id) _undo.value = null
+        }
+    }
+
     fun undoLast() {
         val u = _undo.value ?: return
         _undo.value = null

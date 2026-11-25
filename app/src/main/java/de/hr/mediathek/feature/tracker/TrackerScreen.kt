@@ -1,5 +1,6 @@
 package de.hr.mediathek.feature.tracker
 
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -365,39 +366,82 @@ private fun OtherTile(modifier: Modifier, onClick: () -> Unit) {
     }
 }
 
+private enum class OtherMode(val label: String) { LIST("Aus der Liste"), FREE("Freier Eintrag"), NEW("Neues Produkt") }
+
+/**
+ * „Anderes“: aus allen Produkten wählen, einen freien Eintrag ohne Produkt setzen (Name, Preis) oder ein Produkt schnell
+ * anlegen (Titel, Marke, Preis) und gleich eintragen. Ohne Produkte startet der Dialog beim freien Eintrag.
+ */
 @Composable
 private fun OtherDialog(viewModel: TrackerViewModel, tiles: List<Tile>, onDismiss: () -> Unit, onPick: (Tile) -> Unit) {
     val c = LocalAppColors.current
     val filter by viewModel.filter.collectAsStateWithLifecycle()
     val brands by viewModel.brands.collectAsStateWithLifecycle()
+    var mode by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(if (tiles.isEmpty() && filter.query.isBlank()) OtherMode.FREE else OtherMode.LIST) }
+    var name by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var brand by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var price by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var note by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = c.bar.copy(alpha = 1f),
         shape = RoundedCornerShape(30.dp),
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Fertig") } },
+        confirmButton = {
+            when (mode) {
+                OtherMode.LIST -> TextButton(onClick = onDismiss) { Text("Fertig") }
+                OtherMode.FREE -> TextButton(enabled = name.isNotBlank(), onClick = { viewModel.addFree(name, price, note); onDismiss() }) { Text("Eintragen") }
+                OtherMode.NEW -> TextButton(enabled = name.isNotBlank(), onClick = { viewModel.addQuickProduct(name, brand, price); onDismiss() }) { Text("Anlegen und eintragen") }
+            }
+        },
+        dismissButton = { if (mode != OtherMode.LIST) TextButton(onClick = onDismiss) { Text("Abbrechen") } },
         title = { Text(stringResource(R.string.tracker_other)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = filter.query, onValueChange = { q -> viewModel.update { it.copy(query = q) } },
-                    label = { Text(stringResource(R.string.tracker_search)) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-                )
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (b in brands) {
-                        FilterChip(
-                            selected = filter.brandUuid == b.uuid,
-                            onClick = { viewModel.update { f -> f.copy(brandUuid = if (f.brandUuid == b.uuid) null else b.uuid) } },
-                            label = { Text(b.name) },
-                        )
-                    }
+                    for (m in OtherMode.entries) FilterChip(selected = mode == m, onClick = { mode = m }, label = { Text(m.label) })
                 }
-                LazyColumn(Modifier.height(320.dp)) {
-                    items(tiles, key = { it.uuid }) { t ->
-                        Text(
-                            t.title,
-                            Modifier.fillMaxWidth().clickable { onPick(t); onDismiss() }.defaultMinSize(minHeight = 48.dp).padding(horizontal = 4.dp, vertical = 12.dp),
-                            color = c.onCard, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                when (mode) {
+                    OtherMode.LIST -> {
+                        OutlinedTextField(
+                            value = filter.query, onValueChange = { q -> viewModel.update { it.copy(query = q) } },
+                            label = { Text(stringResource(R.string.tracker_search)) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
                         )
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            for (b in brands) {
+                                FilterChip(
+                                    selected = filter.brandUuid == b.uuid,
+                                    onClick = { viewModel.update { f -> f.copy(brandUuid = if (f.brandUuid == b.uuid) null else b.uuid) } },
+                                    label = { Text(b.name) },
+                                )
+                            }
+                        }
+                        if (tiles.isEmpty()) {
+                            Text(
+                                "Noch keine Produkte. Wähle „Freier Eintrag“ oder lege mit „Neues Produkt“ eines an – die Bewertung kannst du später ergänzen.",
+                                style = MaterialTheme.typography.bodySmall, color = c.onCardVariant,
+                            )
+                        }
+                        LazyColumn(Modifier.heightIn(max = 320.dp)) {
+                            items(tiles, key = { it.uuid }) { t ->
+                                Text(
+                                    t.title,
+                                    Modifier.fillMaxWidth().clickable { onPick(t); onDismiss() }.defaultMinSize(minHeight = 48.dp).padding(horizontal = 4.dp, vertical = 12.dp),
+                                    color = c.onCard, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                    OtherMode.FREE -> {
+                        Text("Ohne Produkt eintragen, z. B. „Marke X, Größe M“.", style = MaterialTheme.typography.bodySmall, color = c.onCardVariant)
+                        OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(price, { price = it }, label = { Text("Preis je Stück (optional, z. B. 0,85)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(note, { note = it }, label = { Text("Notiz (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    }
+                    OtherMode.NEW -> {
+                        Text("Legt ein Produkt an und trägt es gleich ein. Bewertung und Fotos später unter „Produkte“.", style = MaterialTheme.typography.bodySmall, color = c.onCardVariant)
+                        OutlinedTextField(name, { name = it }, label = { Text("Produktname") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(brand, { brand = it }, label = { Text("Marke (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(price, { price = it }, label = { Text("Preis je Stück (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }

@@ -15,6 +15,14 @@ class VideoSuggestionsTest {
         assertEquals(5, r.map { it.item }.toSet().size)
     }
 
+    @Test fun neverFirstOftenLast() {
+        val r = VideoSuggestions.pick(ids(10, "o"), ids(10, "r"), ids(10, "n"), { it }, Random(3))
+        assertEquals(
+            listOf(SuggestionKind.NEVER, SuggestionKind.RARE, SuggestionKind.RARE, SuggestionKind.OFTEN, SuggestionKind.OFTEN),
+            r.map { it.kind },
+        )
+    }
+
     @Test fun noDuplicatesAcrossGroups() {
         val shared = listOf("a", "b", "c")
         val r = VideoSuggestions.pick(shared, shared, shared, { it }, Random(2))
