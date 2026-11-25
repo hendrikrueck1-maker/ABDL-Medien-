@@ -74,6 +74,10 @@ fun StoryEditorScreen(onBack: () -> Unit, viewModel: StoryEditorViewModel = hilt
                 OutlinedTextField(
                     value = s.published, onValueChange = { v -> viewModel.change { it.copy(published = v) } },
                     label = { Text("Erstellt am (Original, TT.MM.JJJJ HH:MM)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    isError = s.published.isNotBlank() && de.hr.mediathek.data.story.web.WebDates.parseInput(s.published) == null,
+                    supportingText = if (s.published.isNotBlank() && de.hr.mediathek.data.story.web.WebDates.parseInput(s.published) == null) {
+                        { Text("Datum nicht erkannt – das bisherige Datum bleibt") }
+                    } else null,
                 )
                 OutlinedTextField(
                     value = s.text, onValueChange = { v -> viewModel.change { it.copy(text = v) } },

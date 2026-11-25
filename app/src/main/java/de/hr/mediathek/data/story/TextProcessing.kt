@@ -33,7 +33,7 @@ object TextDecoder {
     fun decode(bytes: ByteArray, encoding: TextEncoding): String {
         var text = String(bytes, encoding.charset)
         // BOM am Anfang entfernen
-        if (text.isNotEmpty() && text[0] == '﻿') text = text.substring(1)
+        if (text.isNotEmpty() && text[0] == '\uFEFF') text = text.substring(1)
         return text
     }
 

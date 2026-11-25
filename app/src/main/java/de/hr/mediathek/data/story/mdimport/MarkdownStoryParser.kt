@@ -9,7 +9,7 @@ object MarkdownStoryParser {
 
     /** Trennt Frontmatter und Text. Der Text bleibt unverändert; null, wenn kein (geschlossenes) Frontmatter da ist. */
     fun split(raw: String): Split? {
-        val text = raw.removePrefix("﻿")
+        val text = raw.removePrefix("\uFEFF")
         var pos = 0
         fun nextLine(): Pair<String, Int>? {
             if (pos > text.length || (pos == text.length)) return null
@@ -34,7 +34,7 @@ object MarkdownStoryParser {
     fun parse(fileName: String, raw: String, now: Long = System.currentTimeMillis()): ParseResult {
         val slug = Slugs.fromFileName(fileName)
         val parts = split(raw) ?: return ParseResult.Fail(
-            if (raw.removePrefix("﻿").trimStart().startsWith("---")) "Frontmatter ist nicht mit --- geschlossen"
+            if (raw.removePrefix("\uFEFF").trimStart().startsWith("---")) "Frontmatter ist nicht mit --- geschlossen"
             else "Kein YAML-Frontmatter am Dateianfang",
         )
         val data: Any? = try {

@@ -17,7 +17,7 @@ data class ParsedStory(
     val publishedAt: Long?,
     val body: String,
     val hash: String,
-    /** Quelle/Plattform (z. B. "Germandiaperstories"); null bei Markdown-Dateien. */
+    /** Quelle/Plattform (z. B. "QuelleX"); null bei Markdown-Dateien. */
     val sourceText: String? = null,
     /** Bewertung 1–5, wenn die Quelle eine kennt; null = nicht anfassen. */
     val rating: Int? = null,

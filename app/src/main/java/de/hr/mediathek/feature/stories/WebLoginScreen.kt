@@ -50,7 +50,8 @@ fun WebLoginScreen(url: String, onDone: () -> Unit) {
             Button(onClick = { finish() }) { Text("Fertig") }
         }
         Text(
-            "Melde dich an. Danach tippe oben auf „Fertig“, die Seite wird dann noch einmal geladen.",
+            "Melde dich an und setze dabei das Häkchen „Angemeldet bleiben“, sonst gilt die Anmeldung nur bis zum Schließen der App. " +
+                "Danach tippe oben auf „Fertig“, die Seite wird dann noch einmal geladen.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

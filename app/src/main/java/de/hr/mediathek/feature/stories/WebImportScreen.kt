@@ -139,6 +139,10 @@ fun WebImportScreen(onBack: () -> Unit, onLogin: (String) -> Unit, viewModel: We
                                     label = { Text("Erstellt am (TT.MM.JJJJ HH:MM)") },
                                     singleLine = true,
                                     enabled = !busy && ui.selected,
+                                    isError = ui.dateText.isNotBlank() && de.hr.mediathek.data.story.web.WebDates.parseInput(ui.dateText) == null,
+                                    supportingText = if (ui.dateText.isNotBlank() && de.hr.mediathek.data.story.web.WebDates.parseInput(ui.dateText) == null) {
+                                        { Text("Datum nicht erkannt – es bleibt das Datum von der Seite") }
+                                    } else null,
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                                 Text(

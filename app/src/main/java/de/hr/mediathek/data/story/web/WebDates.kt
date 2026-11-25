@@ -17,6 +17,8 @@ object WebDates {
 
     private val RELATIVE = Regex("""(?i)\b(heute|gestern)\b[\s,]*(?:um\s*)?(\d{1,2}):(\d{2})""")
     private val GERMAN = Regex("""\b(\d{1,2})\.\s?(\d{1,2})\.\s?(\d{4})(?:[\s,]*(?:um\s*)?(\d{1,2}):(\d{2}))?""")
+    /** Englische Foren (vBulletin mit englischer Sprachdatei): "05-12-2004, 07:04 PM" = Monat-Tag-Jahr. */
+    private val US_DATE = Regex("""\b(\d{1,2})-(\d{1,2})-(\d{4})(?:[\s,]*(\d{1,2}):(\d{2})\s*([AaPp][Mm])?)?""")
     private val ISO_DATE = Regex("""\b(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?""")
 
     /** Erste Datumsangabe im Text, sonst null. [today] nur für Tests änderbar. */
@@ -32,6 +34,15 @@ object WebDates {
             } else {
                 dateOnly(date)
             }
+        }
+        US_DATE.find(text)?.let { m ->
+            val date = safeDate(m.groupValues[3].toInt(), m.groupValues[1].toInt(), m.groupValues[2].toInt()) ?: return@let
+            if (m.groupValues[4].isEmpty()) return dateOnly(date)
+            var hour = m.groupValues[4].toInt()
+            val ampm = m.groupValues[6].lowercase()
+            if (ampm == "pm" && hour < 12) hour += 12
+            if (ampm == "am" && hour == 12) hour = 0
+            return atZone(date, hour, m.groupValues[5].toInt(), false)
         }
         ISO_DATE.find(text)?.let { m ->
             val date = safeDate(m.groupValues[1].toInt(), m.groupValues[2].toInt(), m.groupValues[3].toInt()) ?: return@let
@@ -60,6 +71,8 @@ object WebDates {
     fun format(millis: Long?): String {
         if (millis == null) return ""
         val t = java.time.Instant.ofEpochMilli(millis).atZone(ZONE)
+        // Genau Mitternacht = nur ein Datum bekannt: ohne „00:00“ anzeigen.
+        if (t.hour == 0 && t.minute == 0) return t.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
         return t.format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
     }
 

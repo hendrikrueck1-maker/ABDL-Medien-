@@ -16,66 +16,66 @@ class WebImportTest {
     private fun millis(y: Int, m: Int, d: Int, h: Int = 0, min: Int = 0) =
         java.time.LocalDateTime.of(y, m, d, h, min).atZone(berlin).toInstant().toEpochMilli()
 
-    /** Nachbau eines vBulletin-3.8-Beitrags wie im Forum "WB-Community". */
+    /** Nachbau eines vBulletin-3.8-Beitrags wie im Forum "Beispielforum". */
     private val vb3 = """
-        <html><head><title>Leere - WB-Community</title></head><body>
-        <table class="tborder"><tr><td class="navbar"><a href="/">Forum</a> &gt; <strong>Leere</strong></td></tr></table>
-        <table id="post24745" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
-          <tr><td class="thead"><a name="post24745"></a>
-            <a href="showthread.php?p=24745#post24745"><img class="inlineimg" src="x.gif"></a> 12.05.2004, 19:04
-            <a id="postcount24745" href="showpost.php?p=24745&postcount=1"><strong>#1</strong></a></td></tr>
-          <tr><td class="alt2"><a class="bigusername" href="member.php?u=1">PapaMaxi</a><div>inaktiv</div></td>
-            <td class="alt1" id="td_post_24745">
-              <div class="smallfont"><strong>Leere</strong></div><hr size="1">
-              <div id="post_message_24745">Ein Gedicht was moment sehr gut beschreibt..<br /><br />
-                <i>Voller hass auf mich selbst,<br />voller Wut auf die Menschen,<br />die mir das angetan haben,</i></div>
+        <html><head><title>Titel A - Beispielforum</title></head><body>
+        <table class="tborder"><tr><td class="navbar"><a href="/">Forum</a> &gt; <strong>Titel A</strong></td></tr></table>
+        <table id="post1001" class="tborder" cellpadding="6" cellspacing="0" border="0" width="100%" align="center">
+          <tr><td class="thead"><a name="post1001"></a>
+            <a href="showthread.php?p=1001#post1001"><img class="inlineimg" src="x.gif"></a> 12.05.2004, 19:04
+            <a id="postcount1001" href="showpost.php?p=1001&postcount=1"><strong>#1</strong></a></td></tr>
+          <tr><td class="alt2"><a class="bigusername" href="member.php?u=1">Autor A</a><div>inaktiv</div></td>
+            <td class="alt1" id="td_post_1001">
+              <div class="smallfont"><strong>Titel A</strong></div><hr size="1">
+              <div id="post_message_1001">Erster Absatz des Beispieltexts..<br /><br />
+                <i>Zeile eins des Beispiels,<br />Zeile zwei des Beispiels,<br />Zeile drei des Beispiels,</i></div>
             </td></tr>
         </table>
-        <table id="post24746" class="tborder"><tr><td class="thead"><a name="post24746"></a> 13.05.2004, 08:15 <a id="postcount24746"><strong>#2</strong></a></td></tr>
-          <tr><td class="alt2"><a class="bigusername">Anna</a></td>
-          <td class="alt1" id="td_post_24746"><div id="post_message_24746">
+        <table id="post1002" class="tborder"><tr><td class="thead"><a name="post1002"></a> 13.05.2004, 08:15 <a id="postcount1002"><strong>#2</strong></a></td></tr>
+          <tr><td class="alt2"><a class="bigusername">Autor B</a></td>
+          <td class="alt1" id="td_post_1002"><div id="post_message_1002">
             <div style="margin:20px; margin-top:5px;"><div class="smallfont" style="margin-bottom:2px">Zitat:</div>
-              <table><tr><td class="alt2">Ein Gedicht was moment</td></tr></table></div>
-            Schön!</div></td></tr>
+              <table><tr><td class="alt2">Erster Absatz des</td></tr></table></div>
+            Danke!</div></td></tr>
         </table>
-        <div class="pagenav"><a rel="next" href="showthread.php?24745-Leere&amp;page=2">&gt;</a></div>
+        <div class="pagenav"><a rel="next" href="showthread.php?1001-Titel-A&amp;page=2">&gt;</a></div>
         <div>Letzter Beitrag: 28.02.2008, 10:46</div>
         </body></html>
     """.trimIndent()
 
     @Test
     fun forumPostsTitleDateAuthor() {
-        val page = PageParser.parse(Jsoup.parse(vb3, "https://www.wb-community.com/showthread.php?24745-Leere"))
+        val page = PageParser.parse(Jsoup.parse(vb3, "https://www.forum.example/showthread.php?1001-Titel-A"))
         assertEquals("forum", page.kind)
-        assertEquals("Leere", page.threadTitle)
+        assertEquals("Titel A", page.threadTitle)
         assertEquals(2, page.posts.size)
         val p = page.posts[0]
-        assertEquals("24745", p.id)
+        assertEquals("1001", p.id)
         assertEquals(1, p.number)
-        assertEquals("PapaMaxi", p.author)
-        assertEquals("Leere", p.title)
+        assertEquals("Autor A", p.author)
+        assertEquals("Titel A", p.title)
         assertEquals(millis(2004, 5, 12, 19, 4), p.date!!.millis)
-        assertTrue(p.text.startsWith("Ein Gedicht was moment sehr gut beschreibt.."))
-        assertTrue(p.text.contains("Voller hass auf mich selbst,\nvoller Wut auf die Menschen,"))
+        assertTrue(p.text.startsWith("Erster Absatz des Beispieltexts.."))
+        assertTrue(p.text.contains("Zeile eins des Beispiels,\nZeile zwei des Beispiels,"))
         assertFalse(p.text.contains("Letzter Beitrag"))
-        assertEquals("https://www.wb-community.com/showthread.php?24745-Leere&page=2", page.nextUrl)
+        assertEquals("https://www.forum.example/showthread.php?1001-Titel-A&page=2", page.nextUrl)
     }
 
     @Test
     fun quotesAreRemoved() {
-        val page = PageParser.parse(Jsoup.parse(vb3, "https://www.wb-community.com/showthread.php?24745-Leere"))
-        assertEquals("Schön!", page.posts[1].text)
+        val page = PageParser.parse(Jsoup.parse(vb3, "https://www.forum.example/showthread.php?1001-Titel-A"))
+        assertEquals("Danke!", page.posts[1].text)
         assertEquals(millis(2004, 5, 13, 8, 15), page.posts[1].date!!.millis)
     }
 
     @Test
     fun threadSelectsOnlyStarterPosts() {
-        val page = PageParser.parse(Jsoup.parse(vb3, "https://www.wb-community.com/showthread.php?24745-Leere"))
-        val thread = ThreadBuilder.build("https://www.wb-community.com/showthread.php?24745-Leere", listOf(page))
-        assertEquals("wb-community.com", thread.host)
-        assertEquals("24745", thread.key)
+        val page = PageParser.parse(Jsoup.parse(vb3, "https://www.forum.example/showthread.php?1001-Titel-A"))
+        val thread = ThreadBuilder.build("https://www.forum.example/showthread.php?1001-Titel-A", listOf(page))
+        assertEquals("forum.example", thread.host)
+        assertEquals("1001", thread.key)
         assertEquals(listOf(true, false), thread.parts.map { it.selected })
-        assertEquals("web-wb-community.com-24745-24745", ThreadBuilder.slug(thread, thread.parts[0]))
+        assertEquals("web-forum.example-1001-1001", ThreadBuilder.slug(thread, thread.parts[0]))
         assertTrue(thread.warnings.isEmpty())
     }
 
@@ -138,7 +138,7 @@ class WebImportTest {
 
     @Test
     fun threadKeys() {
-        assertEquals("24745", ThreadBuilder.threadKey("https://www.wb-community.com/showthread.php?24745-Leere"))
+        assertEquals("1001", ThreadBuilder.threadKey("https://www.forum.example/showthread.php?1001-Titel-A"))
         assertEquals("99", ThreadBuilder.threadKey("https://x.de/showthread.php?t=99&page=2"))
         assertEquals("1234", ThreadBuilder.threadKey("https://x.de/threads/titel.1234/"))
         assertTrue(ThreadBuilder.threadKey("https://blog.example/2023/titel").startsWith("u"))
@@ -146,9 +146,9 @@ class WebImportTest {
 
     @Test
     fun cleanTitle() {
-        assertEquals("Leere", PageParser.cleanTitle("Leere - WB-Community", stripSite = true))
+        assertEquals("Titel A", PageParser.cleanTitle("Titel A - Beispielforum", stripSite = true))
         assertEquals("Teil 1 - Der Anfang", PageParser.cleanTitle("Teil 1 - Der Anfang"))
         assertEquals("Die Reise", PageParser.cleanTitle("Die Reise - Seite 2 - Beispielforum", stripSite = true))
-        assertEquals("Leere", PageParser.cleanTitle("Thema: Leere"))
+        assertEquals("Titel A", PageParser.cleanTitle("Thema: Titel A"))
     }
 }

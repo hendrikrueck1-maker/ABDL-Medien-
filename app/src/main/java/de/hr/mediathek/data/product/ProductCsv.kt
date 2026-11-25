@@ -16,7 +16,7 @@ class ExportProduct(
 )
 
 object ProductCsv {
-    const val BOM = "﻿"
+    const val BOM = "\uFEFF"
 
     fun field(v: String?): String {
         val s = v ?: return ""

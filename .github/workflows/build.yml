@@ -48,6 +48,10 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: gradle testDebugUnitTest assembleDebug assembleRelease --stacktrace --no-parallel
 
+      - name: Lint (nur melden, bricht den Build nicht ab)
+        continue-on-error: true
+        run: gradle lintDebug --no-parallel
+
       - name: Signatur des Release-APK prüfen
         run: |
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)

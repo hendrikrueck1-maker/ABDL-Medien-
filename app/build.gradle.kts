@@ -17,6 +17,11 @@ ksp {
 }
 
 android {
+    lint {
+        // Fehlalarm: der Wert wird im Erzeuger-Block gesetzt (value = …).
+        disable += "ProduceStateDoesNotAssignValue"
+        abortOnError = false
+    }
     namespace = "de.hr.mediathek"
     compileSdk = 35
 
