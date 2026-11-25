@@ -40,6 +40,7 @@ class JobRunner @Inject constructor(
     private val packageImporter: de.hr.mediathek.data.pkg.PackageImportExecutor,
     private val compressionExecutor: de.hr.mediathek.data.compress.CompressionJobExecutor,
     private val compressionSettings: de.hr.mediathek.data.compress.CompressionSettings,
+    private val linkImporter: de.hr.mediathek.data.story.web.LinkImportExecutor,
     private val errorLogger: ErrorLogger,
 ) {
     private val runLock = Mutex()
@@ -162,6 +163,7 @@ class JobRunner @Inject constructor(
         JobType.COMPRESS -> compressionExecutor.execute(job, context)
         JobType.PACKAGE_EXPORT -> packageExporter.execute(job, context)
         JobType.PACKAGE_IMPORT -> packageImporter.execute(job, context)
+        JobType.LINK_IMPORT -> linkImporter.execute(context)
         else -> JobOutcome.Failed("Job-Typ ${job.type} ist noch nicht verfügbar")
     }
 
@@ -170,7 +172,7 @@ class JobRunner @Inject constructor(
         JobType.BACKUP, JobType.MIRROR_COPY -> ErrorType.BACKUP
         JobType.COMPRESS -> ErrorType.COMPRESSION
         JobType.PACKAGE_EXPORT, JobType.PACKAGE_IMPORT -> ErrorType.PACKAGE
-        JobType.PDF_IMPORT -> ErrorType.IMPORT
+        JobType.PDF_IMPORT, JobType.LINK_IMPORT -> ErrorType.IMPORT
         JobType.PHASH, JobType.THUMBNAILS -> ErrorType.SCAN
     }
 

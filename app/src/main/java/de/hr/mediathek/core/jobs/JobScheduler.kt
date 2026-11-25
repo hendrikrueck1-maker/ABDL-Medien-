@@ -92,6 +92,21 @@ class JobScheduler @Inject constructor(
         return true
     }
 
+    /** Link-Liste im Hintergrund abarbeiten (Liste und Fortschritt liegen im LinkImportStore). */
+    suspend fun enqueueLinkImport(): Boolean {
+        if (jobDao.findActive(JobType.LINK_IMPORT, "%") != null) return false
+        jobDao.insert(JobEntity(type = JobType.LINK_IMPORT, priority = JobPriority.MEDIUM))
+        trigger()
+        return true
+    }
+
+    /** Laufenden bzw. eingereihten Link-Listen-Auftrag abbrechen; der Fortschritt bleibt gespeichert. */
+    suspend fun cancelLinkImport() {
+        jobDao.findActive(JobType.LINK_IMPORT, "%")?.let { cancel(it.uuid) }
+    }
+
+    fun observeLinkImportJob() = jobDao.observeActiveOfType(JobType.LINK_IMPORT)
+
     /** Vorschaubilder nachziehen (läuft sonst automatisch nach jedem Scan). */
     suspend fun enqueueThumbnails(): Boolean {
         if (jobDao.findActive(JobType.THUMBNAILS, "%") != null) return false

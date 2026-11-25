@@ -475,6 +475,9 @@ interface JobDao {
     )
     suspend fun findActive(type: JobType, pattern: String): JobEntity?
 
+    @Query("SELECT * FROM job WHERE type = :type AND status IN ('QUEUED', 'RUNNING', 'PAUSED') ORDER BY createdAt DESC LIMIT 1")
+    fun observeActiveOfType(type: JobType): kotlinx.coroutines.flow.Flow<JobEntity?>
+
     @Query("SELECT COUNT(*) FROM job WHERE type = :type AND status = 'QUEUED'")
     suspend fun countQueued(type: JobType): Int
 
