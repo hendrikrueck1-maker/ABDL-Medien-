@@ -67,7 +67,13 @@ class WebStoryFetcher @Inject constructor(
         var loginNeeded = false
         while (next != null && pages < MAX_LISTING_PAGES && seen.add(next)) {
             coroutineContext.ensureActive()
-            val doc = download(next)
+            val doc = try {
+                downloadPatient(next)
+            } catch (e: WebFetchException) {
+                // Eine Seite hinter der letzten gibt 404: das Gesammelte bleibt erhalten.
+                if (pages > 0 && "404" in (e.message ?: "")) break
+                throw e
+            }
             val listing = ListingParser.parse(doc, pages + 1)
             if (listing.links.isEmpty() && PageParser.parse(doc).loginRequired) loginNeeded = true
             pages++
@@ -115,6 +121,20 @@ class WebStoryFetcher @Inject constructor(
             HttpResult(0, null)
         } finally {
             conn.disconnect()
+        }
+    }
+
+    /** Wie [download], wartet aber bei „zu viele Anfragen“ (429) 30 s, 2 min und 5 min, bevor es aufgibt. */
+    private suspend fun downloadPatient(url: String): Document {
+        var waits = listOf(30_000L, 120_000L, 300_000L)
+        while (true) {
+            try {
+                return download(url)
+            } catch (e: WebFetchException) {
+                if ("(429)" !in (e.message ?: "") || waits.isEmpty()) throw e
+                delay(waits.first())
+                waits = waits.drop(1)
+            }
         }
     }
 

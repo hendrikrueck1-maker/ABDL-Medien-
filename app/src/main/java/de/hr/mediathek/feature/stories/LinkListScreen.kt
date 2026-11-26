@@ -124,8 +124,8 @@ private fun InputPart(state: LinkListUi, viewModel: LinkListViewModel) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Links automatisch sammeln", style = MaterialTheme.typography.titleSmall)
             Text(
-                "Link der Übersichtsseite eines Forum-Bereichs einfügen (die Seite mit der Liste aller Themen). " +
-                    "Die App liest alle Seiten durch, beginnt dabei immer bei Seite 1 und trägt alle Themen-Links in die Liste ein.",
+                "Link der Übersichtsseite einfügen: Forum-Bereich (Liste aller Themen) oder WordPress-Seite mit Beitragskarten und Seitenzahlen (z. B. windelgeschichten.org oder eine Kategorie). " +
+                    "Die App liest alle Seiten durch, beginnt dabei immer bei Seite 1 und trägt alle Beitrags-Links in die Liste ein. Bei „zu viele Anfragen“ wartet sie automatisch.",
                 style = MaterialTheme.typography.bodySmall,
                 color = c.onCardVariant,
             )
