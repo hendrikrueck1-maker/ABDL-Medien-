@@ -11,6 +11,10 @@ import de.hr.mediathek.data.story.web.LinkImportStore
 import de.hr.mediathek.data.story.web.WebFetchException
 import de.hr.mediathek.data.story.web.WebStories
 import de.hr.mediathek.data.story.web.WebStoryFetcher
+import de.hr.mediathek.data.story.web.blogger.BlogProblem
+import de.hr.mediathek.data.story.web.blogger.BlogResult
+import de.hr.mediathek.data.story.web.blogger.BloggerCollector
+import de.hr.mediathek.data.story.web.blogger.CollectProgress
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +40,12 @@ data class LinkListUi(
     val collectPages: Int = 0,
     val collectLinks: Int = 0,
     val collectMessage: String? = null,
+    /** Blogger-Sammler: eine Blog-Adresse pro Zeile. */
+    val blogInput: String = "",
+    val blogCollecting: Boolean = false,
+    val blogProgress: String? = null,
+    /** Zusammenfassung je Blog nach dem Lauf. */
+    val blogSummary: List<String> = emptyList(),
 )
 
 /**
@@ -111,6 +121,74 @@ class LinkListViewModel @Inject constructor(
 
     fun cancelCollect() {
         collectJob?.cancel()
+    }
+
+    private var blogJob: Job? = null
+
+    fun setBlogInput(value: String) = _state.update { it.copy(blogInput = value, blogSummary = emptyList()) }
+
+    /**
+     * Sammelt die Beitragslinks mehrerer Blogger-Blogs. Läuft über AppScope, damit „Zurück“ den Lauf nicht abbricht;
+     * am Ende werden die Links an die Liste angehängt (auch wenn die Seite inzwischen geschlossen wurde).
+     */
+    fun collectBlogs() {
+        if (blogJob?.isActive == true) return
+        val inputs = _state.value.blogInput.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        if (inputs.isEmpty()) {
+            _state.update { it.copy(blogSummary = listOf("Bitte mindestens eine Blog-Adresse eintragen.")) }
+            return
+        }
+        _state.update { it.copy(blogCollecting = true, blogProgress = "Starte …", blogSummary = emptyList()) }
+        blogJob = AppScope.launch {
+            try {
+                val collector = BloggerCollector(fetch = { fetcher.get(it) }, sleep = { kotlinx.coroutines.delay(it) })
+                val result = collector.collect(inputs) { p -> _state.update { it.copy(blogProgress = progressText(p)) } }
+                // Neu lesen: Die Liste kann sich während des Laufs geändert haben.
+                val merged = (store.draft() + result.links).distinct()
+                store.saveDraft(merged)
+                val added = merged.size
+                _state.update {
+                    it.copy(
+                        links = merged,
+                        blogSummary = result.blogs.map(::summaryLine) + "Gesamt: ${result.links.size} Links gesammelt, $added in der Liste.",
+                    )
+                }
+            } catch (e: CancellationException) {
+                _state.update { it.copy(blogSummary = listOf("Abgebrochen.")) }
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(blogSummary = listOf("Das hat nicht geklappt: ${e.message ?: e.javaClass.simpleName}")) }
+            } finally {
+                _state.update { it.copy(blogCollecting = false, blogProgress = null) }
+            }
+        }
+    }
+
+    fun cancelBlogs() {
+        blogJob?.cancel()
+    }
+
+    private fun progressText(p: CollectProgress): String {
+        val host = p.blogLabel.removePrefix("https://").removePrefix("http://")
+        val wait = p.waitingMs?.let { ms -> if (ms >= 60_000) "Blog bremst – warte ${ms / 60_000} min" else "Blog bremst – warte ${ms / 1000} s" }
+        val count = if (p.total != null) "${p.found} von ${p.total}" else "${p.found} gefunden"
+        return "Blog ${p.blogIndex} von ${p.blogCount} · $host · $count" + (wait?.let { "\n$it" } ?: "")
+    }
+
+    private fun summaryLine(b: BlogResult): String {
+        val name = (b.origin ?: b.input).removePrefix("https://").removePrefix("http://") + (b.label?.let { " · $it" } ?: "")
+        val n = b.posts.size
+        val text = when (b.problem) {
+            null -> "$n Links gesammelt" + if (b.viaHtml) " (Feed abgeschaltet – über die Seiten gesammelt)" else ""
+            BlogProblem.INVALID_ADDRESS -> "Keine Webadresse"
+            BlogProblem.NOT_BLOGGER -> "Kein Blogger-Blog – bitte den Forum-Sammler nehmen"
+            BlogProblem.PRIVATE -> "Blog nur für eingeladene Leser – geht ohne Anmeldung nicht"
+            BlogProblem.NOT_FOUND -> "Blog nicht gefunden (gelöscht?)"
+            BlogProblem.TOO_MANY_REQUESTS -> "Blog bremst – $n Links gesammelt, später erneut versuchen"
+            BlogProblem.NETWORK -> "Keine Verbindung – $n Links gesammelt"
+        }
+        val prefix = if (b.problem == null) "✓" else "✗"
+        return "$prefix ${if (b.origin == null) b.input else name}: $text"
     }
 
     /** Neue Liste starten (Hintergrundauftrag). */
