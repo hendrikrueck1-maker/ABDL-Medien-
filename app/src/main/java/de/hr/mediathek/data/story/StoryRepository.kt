@@ -100,6 +100,23 @@ class StoryRepository @Inject constructor(private val dao: StoryDao) {
     suspend fun restore(uuid: String) = dao.restore(uuid, nowMillis())
     suspend fun purge(uuid: String) = dao.purge(uuid)
 
+    /** Viele Geschichten in den Papierkorb (wiederherstellbar). Gibt die Zahl zurück. */
+    suspend fun deleteMany(uuids: Collection<String>): Int {
+        val now = nowMillis()
+        uuids.distinct().chunked(500).forEach { dao.softDeleteMany(it, now) }
+        return uuids.size
+    }
+
+    suspend fun restoreMany(uuids: Collection<String>) {
+        val now = nowMillis()
+        uuids.distinct().chunked(500).forEach { dao.restoreMany(it, now) }
+    }
+
+    /** Papierkorb leeren: alles darin endgültig entfernen. */
+    suspend fun purgeMany(uuids: Collection<String>) {
+        for (uuid in uuids) dao.purge(uuid)
+    }
+
     /** Geschichten im Papierkorb werden nach 30 Tagen endgültig entfernt. */
     suspend fun purgeExpired() {
         for (uuid in dao.expiredUuids(nowMillis() - TRASH_RETENTION_MS)) dao.purge(uuid)

@@ -17,15 +17,27 @@ import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** Welche Geschichten exportiert werden. */
+sealed interface ExportScope {
+    data object All : ExportScope
+    /** Ordner samt Unterordnern. */
+    data class Folder(val uuid: String) : ExportScope
+    /** Alle Geschichten einer Seite/Quelle; Schlüssel aus [sourceKey] ("" = ohne Quelle, z. B. eigene Geschichten). */
+    data class Source(val key: String) : ExportScope
+}
+
+/** Vergleichbarer Schlüssel der Quelle: klein geschrieben, ohne „www.“ und ohne Leerraum. */
+fun sourceKey(sourceText: String?): String = sourceText.orEmpty().trim().lowercase().removePrefix("www.")
+
 /** Exportiert Geschichten als ZIP mit Markdown-Dateien (im selben Format, das der Import wieder einliest). */
 @Singleton
 class StoryExporter @Inject constructor(
     @ApplicationContext private val context: Context,
     private val dao: StoryDao,
 ) {
-    /** [folderUuid] = null: alle Geschichten; sonst der Ordner samt Unterordnern. Gibt die Zahl der Dateien zurück. */
-    suspend fun export(target: Uri, folderUuid: String?, onProgress: (Int, Int) -> Unit = { _, _ -> }): Int = withContext(Dispatchers.IO) {
-        val wanted = wantedStories(folderUuid)
+    /** Gibt die Zahl der Dateien zurück. Beim Ordner-Export ohne Unterverzeichnisse, sonst nach Kategorie und Serie sortiert. */
+    suspend fun export(target: Uri, scope: ExportScope, onProgress: (Int, Int) -> Unit = { _, _ -> }): Int = withContext(Dispatchers.IO) {
+        val wanted = wantedStories(scope)
         val briefs = dao.briefs().filter { wanted == null || it.uuid in wanted }
         val seriesNames = HashMap<String, String>()
         val used = HashSet<String>()
@@ -37,7 +49,7 @@ class StoryExporter @Inject constructor(
                 val text = dao.getText(b.uuid).orEmpty()
                 val series = s.seriesUuid?.let { id -> seriesNames.getOrPut(id) { dao.seriesName(id) ?: "Serie" } }
                 val tags = dao.tagNames(b.uuid)
-                val dir = if (folderUuid != null) "" else categoryDir(s.category) + "/" + (series?.let { safe(it) + "/" } ?: "")
+                val dir = if (scope is ExportScope.Folder) "" else categoryDir(s.category) + "/" + (series?.let { safe(it) + "/" } ?: "")
                 val prefix = s.seriesOrder?.let { "%02d - ".format(it) } ?: ""
                 var name = dir + prefix + safe(s.title)
                 var n = 1
@@ -58,9 +70,13 @@ class StoryExporter @Inject constructor(
         count
     }
 
-    /** [folderUuid] = null: alle (null zurück); sonst die UUIDs der Geschichten im Ordner samt Unterordnern. */
-    private suspend fun wantedStories(folderUuid: String?): Set<String>? {
-        if (folderUuid == null) return null
+    /** Alle: null; sonst die UUIDs der gewünschten Geschichten. */
+    private suspend fun wantedStories(scope: ExportScope): Set<String>? {
+        val folderUuid = when (scope) {
+            ExportScope.All -> return null
+            is ExportScope.Source -> return dao.observeActive().first().filter { sourceKey(it.sourceText) == scope.key }.map { it.uuid }.toSet()
+            is ExportScope.Folder -> scope.uuid
+        }
         val folders = dao.observeFolders().first()
         val items = dao.observeFolderItems().first()
         val ids = HashSet<String>()
@@ -77,8 +93,8 @@ class StoryExporter @Inject constructor(
      * source, sourceUrl, series, seriesOrder, rating). Der JSON-Import der App liest sie wieder ein; die Datei lässt sich
      * auch in anderen Dokumentations- oder Inventar-Apps verwenden. Gibt die Zahl der Geschichten zurück.
      */
-    suspend fun exportJson(target: Uri, folderUuid: String?, onProgress: (Int, Int) -> Unit = { _, _ -> }): Int = withContext(Dispatchers.IO) {
-        val wanted = wantedStories(folderUuid)
+    suspend fun exportJson(target: Uri, scope: ExportScope, onProgress: (Int, Int) -> Unit = { _, _ -> }): Int = withContext(Dispatchers.IO) {
+        val wanted = wantedStories(scope)
         val briefs = dao.briefs().filter { wanted == null || it.uuid in wanted }
         val seriesNames = HashMap<String, String>()
         val out = context.contentResolver.openOutputStream(target) ?: throw java.io.IOException("Zieldatei nicht beschreibbar")
@@ -123,8 +139,8 @@ class StoryExporter @Inject constructor(
     private fun exportSlug(slug: String?, uuid: String): String = slug?.takeIf { it.isNotBlank() } ?: "app-$uuid"
 
     /** Alle Quell-Links (eine Zeile je Link), z. B. zum Einfügen in die Link-Liste auf dem Tablet. Gibt die Zahl zurück. */
-    suspend fun exportLinks(target: Uri, folderUuid: String?): Int = withContext(Dispatchers.IO) {
-        val wanted = wantedStories(folderUuid)
+    suspend fun exportLinks(target: Uri, scope: ExportScope): Int = withContext(Dispatchers.IO) {
+        val wanted = wantedStories(scope)
         val links = LinkedHashSet<String>()
         for (b in dao.briefs()) {
             if (wanted != null && b.uuid !in wanted) continue

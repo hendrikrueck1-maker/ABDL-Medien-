@@ -1035,6 +1035,13 @@ interface StoryDao {
     @Query("UPDATE story SET deletedAt = NULL, updatedAt = :now, userUpdatedAt = :now WHERE uuid = :uuid")
     suspend fun restore(uuid: String, now: Long)
 
+    /** Mehrere auf einmal in den Papierkorb (höchstens ~900 UUIDs je Aufruf wegen der SQLite-Grenze). */
+    @Query("UPDATE story SET deletedAt = :now, updatedAt = :now, userUpdatedAt = :now WHERE uuid IN (:uuids) AND deletedAt IS NULL")
+    suspend fun softDeleteMany(uuids: List<String>, now: Long)
+
+    @Query("UPDATE story SET deletedAt = NULL, updatedAt = :now, userUpdatedAt = :now WHERE uuid IN (:uuids)")
+    suspend fun restoreMany(uuids: List<String>, now: Long)
+
     @Query("SELECT uuid FROM story WHERE deletedAt IS NOT NULL AND deletedAt < :before AND (status IS NULL OR status != 'purged')")
     suspend fun expiredUuids(before: Long): List<String>
 
