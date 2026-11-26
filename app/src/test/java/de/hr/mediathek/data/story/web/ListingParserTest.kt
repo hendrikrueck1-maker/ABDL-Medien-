@@ -54,3 +54,38 @@ class ListingParserTest {
         assertEquals("https://x.de/forumdisplay.php?f=12", ListingParser.firstPageUrl("https://x.de/forumdisplay.php?f=12"))
     }
 }
+
+class WordPressListingTest {
+    private fun page(n: Int, pager: String) = """
+        <html><body><nav><a href="/category/jungs/">Jungs</a></nav>
+        <article><h3><a href="https://www.windelgeschichten.org/ein-super-urlaub-2/">Ein Super Urlaub (2)</a></h3>
+          <div><a href="#comments">1 comment</a> <a href="/category/jungs/">Jungs</a> <a href="/gastautor-beitraege/?guest_author=Nils">Nils</a></div>
+          <a title="Read More" href="https://www.windelgeschichten.org/ein-super-urlaub-2/">Read More</a></article>
+        <article><h3><a href="/ein-traum-mit-folgen-7/">Ein Traum mit Folgen (7)</a></h3>
+          <a title="Read More" href="/ein-traum-mit-folgen-7/">Read More</a></article>
+        <div class="pager">$pager</div></body></html>
+    """.trimIndent()
+
+    @Test
+    fun collectsPostLinksAndBuildsNextPage() {
+        val doc = Jsoup.parse(page(1, """<span>1</span><a href="/page/2/">2</a><a href="/page/3/">3</a><a href="/page/211/">211</a>"""), "https://www.windelgeschichten.org/")
+        val l = ListingParser.parse(doc, 1)
+        assertEquals(
+            listOf("https://www.windelgeschichten.org/ein-super-urlaub-2/", "https://www.windelgeschichten.org/ein-traum-mit-folgen-7/"),
+            l.links,
+        )
+        assertEquals("https://www.windelgeschichten.org/page/2/", l.nextUrl)
+    }
+
+    @Test
+    fun lastPageHasNoNext() {
+        val doc = Jsoup.parse(page(211, """<a href="/page/209/">209</a><a href="/page/210/">210</a><span>211</span>"""), "https://www.windelgeschichten.org/page/211/")
+        assertEquals(null, ListingParser.parse(doc, 211).nextUrl)
+    }
+
+    @Test
+    fun firstPageUrlStripsWordPressPaging() {
+        assertEquals("https://www.windelgeschichten.org/", ListingParser.firstPageUrl("https://www.windelgeschichten.org/page/62/"))
+        assertEquals("https://x.org/category/jungs/", ListingParser.firstPageUrl("https://x.org/category/jungs/page/3/"))
+    }
+}
