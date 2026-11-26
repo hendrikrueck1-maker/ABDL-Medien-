@@ -1,6 +1,15 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package de.hr.mediathek.feature.stories
 
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -82,6 +91,9 @@ fun StoriesScreen(
     var newFolder by remember { mutableStateOf<String?>(null) } // Name im Eingabedialog
     var renameFolder by remember { mutableStateOf<String?>(null) }
     var confirmDeleteFolder by remember { mutableStateOf(false) }
+    var confirmBulk by remember { mutableStateOf<List<String>?>(null) }
+    var confirmEmptyTrash by remember { mutableStateOf(false) }
+    val lastBulk by viewModel.lastBulk.collectAsStateWithLifecycle()
     val currentFolder = folders.firstOrNull { it.uuid == filter.folder }
     val items = paged.items
     val stripShown = resume.isNotEmpty() && paged.page == 0
@@ -101,12 +113,20 @@ fun StoriesScreen(
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, top = 8.dp)) {
             // Bedienknöpfe links (Bedienung mit der linken Hand), Titel dahinter.
+            // Im Hochformat reicht der Platz nicht: dann steht der Titel in einer eigenen Zeile darüber.
+            val narrow = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 600
+            val title = if (filter.trash) "Papierkorb" else "Geschichten"
+            if (narrow) Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 1)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (!filter.trash) {
                     Box {
                         TextButton(onClick = { menu = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            DropdownMenuItem(text = { Text("Zu Serie zusammenführen …") }, onClick = { menu = false; viewModel.startSelection() })
+                            DropdownMenuItem(text = { Text("Geschichten zusammenführen …") }, onClick = { menu = false; viewModel.startSelection() })
+                            DropdownMenuItem(
+                                text = { Text(if (filterActive(filter)) "Angezeigte Geschichten löschen …" else "Alle Geschichten löschen …") },
+                                onClick = { menu = false; confirmBulk = viewModel.visibleStoryUuids() },
+                            )
                             DropdownMenuItem(text = { Text("Duplikate suchen") }, onClick = { menu = false; onDuplicates() })
                             DropdownMenuItem(text = { Text("Serien erkennen") }, onClick = { menu = false; onSeriesSuggest() })
                             DropdownMenuItem(text = { Text("Statistik und Export") }, onClick = { menu = false; onTools() })
@@ -118,14 +138,16 @@ fun StoriesScreen(
                 } else {
                     TextButton(onClick = { viewModel.update { it.copy(trash = false) } }) { Text("← Zurück") }
                 }
-                Text(
-                    if (filter.trash) "Papierkorb" else "Geschichten",
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.weight(1f),
-                )
+                if (!narrow) Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 1, modifier = Modifier.weight(1f))
             }
             selection?.let { sel ->
                 // Auswahl zum Zusammenführen: Antippen wählt aus statt zu öffnen.
+                Text(
+                    "Zusammenführen: Geschichten in der Reihenfolge der Teile antippen (Teil 1 zuerst). Auch die Suche oben hilft beim Finden.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
                 Row(
                     Modifier.fillMaxWidth().padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -134,7 +156,7 @@ fun StoriesScreen(
                     Button(onClick = { mergeName = firstTitleOf(sel, items) }, enabled = sel.size >= 2) { Text("Zusammenführen") }
                     OutlinedButton(onClick = viewModel::cancelSelection) { Text("Abbrechen") }
                     Text(
-                        if (sel.size < 2) "Geschichten in der gewünschten Reihenfolge antippen (mind. 2)" else "${sel.size} ausgewählt",
+                        if (sel.size < 2) "${sel.size} von mind. 2 gewählt" else "${sel.size} ausgewählt",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.weight(1f),
                     )
@@ -157,7 +179,7 @@ fun StoriesScreen(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
                 )
-                val activeFilters = listOf(filter.favoritesOnly, filter.continueOnly, filter.partsMissingOnly, filter.readState != ReadState.ALL).count { it }
+                val activeFilters = listOf(filter.favoritesOnly, filter.continueOnly, filter.partsMissingOnly, filter.maxWords != null, filter.readState != ReadState.ALL).count { it }
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -174,6 +196,20 @@ fun StoriesScreen(
                     OutlinedButton(onClick = { showView = true }) { Text("Ansicht: ${filter.view.label}") }
                     if (activeFilters > 0) Button(onClick = { showFilter = true }) { Text("Filter ($activeFilters)") }
                     else OutlinedButton(onClick = { showFilter = true }) { Text("Filter") }
+                }
+                if (filter.maxWords != null && selection == null) {
+                    // Kurze Geschichten aufräumen: gefilterte Liste direkt löschen können.
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { confirmBulk = viewModel.visibleStoryUuids() }) { Text("🗑 Alle angezeigten löschen") }
+                        Text("Unter ${filter.maxWords} Wörtern", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    }
+                }
+                if (lastBulk.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = viewModel::undoBulkDelete) { Text("Rückgängig") }
+                        TextButton(onClick = viewModel::dismissBulk) { Text("✕") }
+                        Text("${lastBulk.size} Geschichten im Papierkorb", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    }
                 }
                 if (filter.view == StoryView.FOLDERS) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -197,6 +233,11 @@ fun StoriesScreen(
             if (filter.trash) {
                 if (trash.isEmpty()) {
                     Text("Der Papierkorb ist leer. Gelöschte Geschichten bleiben hier 30 Tage.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Row(Modifier.padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = viewModel::restoreAll) { Text("Alle wiederherstellen") }
+                        OutlinedButton(onClick = { confirmEmptyTrash = true }) { Text("Papierkorb leeren") }
+                    }
                 }
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(trash, key = { it.uuid }) { row ->
@@ -234,9 +275,10 @@ fun StoriesScreen(
                                 onResume = { onOpen(item.resumePart.uuid) },
                                 onFolder = { pickFor = item.parts.map { it.uuid } },
                                 onEdit = { onEditSeries(item.uuid) },
+                                onLongPress = { if (selection == null) viewModel.startSelection(item.parts.map { it.uuid }) },
                             )
                             is ListItem.Single -> StoryCard(
-                                item.row, item.indent,
+                                item.row, item.indent, item.partNo, item.seriesName,
                                 highlight = item.row.uuid == lastOpened,
                                 selectedIndex = selection?.indexOf(item.row.uuid)?.takeIf { it >= 0 }?.plus(1),
                                 selecting = selection != null,
@@ -248,6 +290,7 @@ fun StoriesScreen(
                                 onContinue = { viewModel.toggleContinue(item.row) },
                                 onFolder = { pickFor = listOf(item.row.uuid) },
                                 onDelete = { viewModel.delete(item.row) },
+                                onLongPress = { if (selection == null) viewModel.startSelection(listOf(item.row.uuid)) },
                             )
                         }
                     }
@@ -288,6 +331,31 @@ fun StoriesScreen(
     }
     renameFolder?.let { name ->
         NameDialog("Ordner umbenennen", name, onDismiss = { renameFolder = null }) { currentFolder?.let { f -> viewModel.renameFolder(f.uuid, it) }; renameFolder = null }
+    }
+    confirmBulk?.let { ids ->
+        AlertDialog(
+            onDismissRequest = { confirmBulk = null },
+            title = { Text(if (filterActive(filter)) "Angezeigte Geschichten löschen?" else "Alle Geschichten löschen?") },
+            text = {
+                Text(
+                    if (ids.isEmpty()) "Die Liste ist leer – es gibt nichts zu löschen."
+                    else "${ids.size} Geschichten kommen in den Papierkorb. Dort bleiben sie 30 Tage und lassen sich wiederherstellen.",
+                )
+            },
+            confirmButton = {
+                if (ids.isNotEmpty()) TextButton(onClick = { viewModel.deleteVisible(ids); confirmBulk = null }) { Text("${ids.size} löschen") }
+            },
+            dismissButton = { TextButton(onClick = { confirmBulk = null }) { Text("Abbrechen") } },
+        )
+    }
+    if (confirmEmptyTrash) {
+        AlertDialog(
+            onDismissRequest = { confirmEmptyTrash = false },
+            title = { Text("Papierkorb leeren?") },
+            text = { Text("${trash.size} Geschichten werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.") },
+            confirmButton = { TextButton(onClick = { viewModel.emptyTrash(); confirmEmptyTrash = false }) { Text("Endgültig löschen") } },
+            dismissButton = { TextButton(onClick = { confirmEmptyTrash = false }) { Text("Abbrechen") } },
+        )
     }
     if (confirmDeleteFolder && currentFolder != null) {
         AlertDialog(
@@ -335,28 +403,45 @@ private fun FolderCard(item: ListItem.Folder, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SeriesCard(item: ListItem.SeriesGroup, highlight: Boolean, onToggle: () -> Unit, onResume: () -> Unit, onFolder: () -> Unit, onEdit: () -> Unit) {
+private fun SeriesCard(
+    item: ListItem.SeriesGroup,
+    highlight: Boolean,
+    onToggle: () -> Unit,
+    onResume: () -> Unit,
+    onFolder: () -> Unit,
+    onEdit: () -> Unit,
+    onLongPress: () -> Unit,
+) {
     Card(
         colors = glassCardColors(MaterialTheme.colorScheme.secondaryContainer),
         border = if (highlight) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-        modifier = Modifier.fillMaxWidth().padding(start = (item.indent * 16).dp).bounceClick(onClick = onToggle),
+        modifier = Modifier.fillMaxWidth().padding(start = (item.indent * 16).dp).bounceClick(onLongClick = onLongPress, onClick = onToggle),
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PartBadge("📚 Serie · ${item.parts.size} Teile")
+                Text(if (item.expanded) "▾" else "▸", style = MaterialTheme.typography.titleMedium)
+            }
             Text(
-                (if (item.expanded) "▾ " else "▸ ") + "📚 " + item.name + if (item.parts.any { it.partsMissing }) "  🧩" else "",
+                item.name + if (item.parts.any { it.partsMissing }) "  🧩" else "",
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                "${item.parts.size} Kapitel · ${item.doneCount} gelesen" +
+                "${item.doneCount} von ${item.parts.size} gelesen" +
                     (item.parts.sumOf { it.wordCount }.takeIf { it > 0 }?.let { " · ${formatWords(it)}" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
             )
             LinearProgressIndicator(progress = { item.avgProgress }, modifier = Modifier.fillMaxWidth())
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = onResume) { Text("▶ Weiterlesen (Teil ${partNumber(item)})") }
-                TextButton(onClick = onFolder) { Text("📁") }
-                TextButton(onClick = onEdit) { Text("✎ Bearbeiten") }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
+                Button(onClick = onResume) { Text("▶ Weiterlesen (Teil ${partNumber(item)})", maxLines = 1) }
+                TextButton(onClick = onEdit) { Text("✎ Bearbeiten", maxLines = 1, softWrap = false) }
+                TextButton(onClick = onFolder) { Text("📁", style = MaterialTheme.typography.titleLarge) }
             }
+            if (!item.expanded) Text(
+                "▸ Antippen zeigt die ${item.parts.size} Teile",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -367,6 +452,8 @@ private fun partNumber(item: ListItem.SeriesGroup): Int = item.parts.indexOfFirs
 private fun StoryCard(
     row: StoryRow,
     indent: Int,
+    partNo: Int?,
+    seriesName: String?,
     highlight: Boolean,
     selectedIndex: Int?,
     selecting: Boolean,
@@ -378,18 +465,36 @@ private fun StoryCard(
     onContinue: () -> Unit,
     onFolder: () -> Unit,
     onDelete: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
     val selected = selectedIndex != null
+    // Teile einer aufgeklappten Serie: weiter eingerückt, in der Farbe der Serie und mit Balken links,
+    // damit sie sich deutlich von einzelnen Geschichten abheben.
+    val inSeries = partNo != null
+    val stripe = MaterialTheme.colorScheme.secondary
     Card(
-        colors = glassCardColors(MaterialTheme.colorScheme.surfaceContainer),
+        colors = glassCardColors(if (inSeries) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer),
         border = if (highlight || selected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
-        modifier = Modifier.fillMaxWidth().padding(start = (indent * 16).dp).bounceClick(onClick = onOpen),
+        modifier = Modifier.fillMaxWidth().padding(start = if (inSeries) 28.dp else (indent * 16).dp).bounceClick(onLongClick = onLongPress, onClick = onOpen),
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                (selectedIndex?.let { "$it. " } ?: if (selecting) "○ " else "") + row.title + if (row.partsMissing) "  🧩" else "",
-                style = MaterialTheme.typography.titleMedium,
-            )
+        Column(
+            Modifier
+                .then(if (inSeries) Modifier.drawBehind { drawRect(stripe, size = Size(6.dp.toPx(), size.height)) } else Modifier)
+                .padding(start = if (inSeries) 18.dp else 12.dp, end = 12.dp, top = 12.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            val prefix = selectedIndex?.let { "$it. " } ?: if (selecting) "○ " else ""
+            val missing = if (row.partsMissing) "  🧩" else ""
+            if (inSeries) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (prefix.isNotEmpty()) Text(prefix, style = MaterialTheme.typography.titleMedium)
+                    PartBadge("Teil $partNo")
+                    val rest = partTitle(row.title, seriesName)
+                    if (rest.isNotEmpty() || missing.isNotEmpty()) Text(rest + missing, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                }
+            } else {
+                Text(prefix + row.title + missing, style = MaterialTheme.typography.titleMedium)
+            }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CategoryChip(row.category, onCategory)
                 val meta = listOfNotNull(
@@ -405,22 +510,51 @@ private fun StoryCard(
                 LinearProgressIndicator(progress = { row.readProgress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
             }
             if (!selecting) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // Sterne und Aktionen brechen im Hochformat in zwei Zeilen um, damit nichts (z. B. 🗑) aus dem Bild rutscht.
+                FlowRow(verticalArrangement = Arrangement.Center) {
                     StarRow(row.rating, onRate)
-                    Text(if (row.favorite) "♥" else "♡", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable(onClickLabel = "Favorit", onClick = onFavorite).padding(10.dp))
-                    Text("✏", style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = if (row.continueFlag) 1f else 0.3f),
-                        modifier = Modifier.clickable(onClickLabel = "Weiterschreiben", onClick = onContinue).padding(10.dp))
-                    Text("🧩", style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.graphicsLayer { alpha = if (row.partsMissing) 1f else 0.3f }
-                            .clickable(onClickLabel = "Teile fehlen noch", onClick = onPartsMissing).padding(10.dp))
-                    Text("📁", style = MaterialTheme.typography.titleLarge, modifier = Modifier.clickable(onClick = onFolder).padding(10.dp))
-                    Text("🗑", style = MaterialTheme.typography.titleLarge, modifier = Modifier.clickable(onClick = onDelete).padding(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CardAction(if (row.favorite) "♥" else "♡", "Favorit", active = true, tint = MaterialTheme.colorScheme.primary, onClick = onFavorite)
+                        CardAction("✏", "Weiterschreiben", active = row.continueFlag, tint = MaterialTheme.colorScheme.primary, onClick = onContinue)
+                        CardAction("🧩", "Teile fehlen noch", active = row.partsMissing, onClick = onPartsMissing)
+                        CardAction("📁", "In Ordner", active = true, onClick = onFolder)
+                        CardAction("🗑", "Löschen (Papierkorb)", active = true, onClick = onDelete)
+                    }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun CardAction(symbol: String, label: String, active: Boolean, tint: Color? = null, onClick: () -> Unit) {
+    Text(
+        symbol,
+        style = MaterialTheme.typography.titleLarge,
+        color = tint ?: Color.Unspecified,
+        textAlign = TextAlign.Center,
+        modifier = Modifier
+            .graphicsLayer { alpha = if (active) 1f else 0.3f }
+            .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+            .clickable(onClickLabel = label, onClick = onClick)
+            .padding(10.dp),
+    )
+}
+
+/** Kleines Etikett „Teil 2“ bzw. „📚 Serie · 3 Teile“ in der Serienfarbe. */
+@Composable
+private fun PartBadge(text: String) {
+    Surface(color = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary, shape = RoundedCornerShape(50)) {
+        Text(text, style = MaterialTheme.typography.labelLarge, maxLines = 1, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+    }
+}
+
+/** Titel eines Serienteils ohne den Seriennamen und ohne „Teil N“, damit nur das Unterscheidende bleibt. */
+internal fun partTitle(title: String, seriesName: String?): String {
+    var t = title.trim()
+    if (!seriesName.isNullOrBlank() && t.startsWith(seriesName.trim(), ignoreCase = true)) t = t.substring(seriesName.trim().length)
+    t = t.replace(Regex("(?i)\\b(Teil|Kapitel|Part)\\s*\\d+\\b"), "")
+    return t.trim(' ', '-', '–', '—', ':', '·', ',', '.', '(', ')').trim()
 }
 
 /** Kategorie als Chip; Antippen öffnet die Auswahl Männer / Frauen / Gemischt. */
@@ -598,6 +732,11 @@ private fun StoryFilterDialog(filter: StoryFilter, onDismiss: () -> Unit, onChan
                     FilterChip(selected = filter.continueOnly, onClick = { onChange(filter.copy(continueOnly = !filter.continueOnly)) }, label = { Text("✏ Weiterschreiben") })
                     FilterChip(selected = filter.partsMissingOnly, onClick = { onChange(filter.copy(partsMissingOnly = !filter.partsMissingOnly)) }, label = { Text("🧩 Teile fehlen") })
                 }
+                FilterChip(
+                    selected = filter.maxWords != null,
+                    onClick = { onChange(filter.copy(maxWords = if (filter.maxWords == null) SHORT_STORY_WORDS else null)) },
+                    label = { Text("✂ Kurz: unter $SHORT_STORY_WORDS Wörter") },
+                )
                 Text("Lesestand", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for (r in ReadState.entries) {
@@ -608,3 +747,11 @@ private fun StoryFilterDialog(filter: StoryFilter, onDismiss: () -> Unit, onChan
         },
     )
 }
+
+/** Grenze für „kurze Geschichten“ (Bruchstücke, die man aufräumen möchte). */
+internal const val SHORT_STORY_WORDS = 200
+
+/** Schränkt irgendetwas die Liste ein? Dann löscht „Angezeigte löschen“ nur diese, sonst alle. */
+internal fun filterActive(f: StoryFilter): Boolean =
+    f.query.isNotBlank() || f.category != null || f.favoritesOnly || f.continueOnly || f.partsMissingOnly || f.maxWords != null ||
+        f.readState != ReadState.ALL || f.folder != null || f.view == StoryView.FOLDERS

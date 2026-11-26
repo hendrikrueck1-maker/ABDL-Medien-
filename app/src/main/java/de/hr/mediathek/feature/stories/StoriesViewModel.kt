@@ -134,7 +134,8 @@ class StoriesViewModel @Inject constructor(
     /** null = keine Auswahl aktiv; sonst die gewählten Geschichten in der Reihenfolge des Antippens. */
     val selection: StateFlow<List<String>?> = _selection
 
-    fun startSelection() { _selection.value = emptyList() }
+    /** Auswahl beginnen, optional gleich mit der lang gedrückten Geschichte (bzw. allen Teilen einer Serie). */
+    fun startSelection(initial: List<String> = emptyList()) { _selection.value = initial.distinct() }
     fun cancelSelection() { _selection.value = null }
     fun toggleSelected(uuids: List<String>) = _selection.update { sel ->
         sel?.let { if (uuids.all { it in sel }) sel - uuids.toSet() else sel + uuids.filter { it !in sel } }
@@ -150,6 +151,43 @@ class StoriesViewModel @Inject constructor(
     }
 
     fun delete(row: StoryRow) = viewModelScope.launch { repository.delete(row.uuid) }
+
+    /** Alle Geschichten, die die Liste mit Suche und Filter gerade zeigt (über alle Seiten, Serien mit allen Teilen). */
+    fun visibleStoryUuids(): List<String> = items.value.flatMap { i ->
+        when (i) {
+            is ListItem.Single -> listOf(i.row.uuid)
+            is ListItem.SeriesGroup -> i.parts.map { it.uuid }
+            else -> emptyList()
+        }
+    }.distinct()
+
+    private val _lastBulk = MutableStateFlow<List<String>>(emptyList())
+    /** Zuletzt gesammelt gelöschte Geschichten, damit „Rückgängig“ möglich ist. */
+    val lastBulk: StateFlow<List<String>> = _lastBulk
+
+    /** Die angezeigten Geschichten in den Papierkorb (läuft auch weiter, wenn die Seite verlassen wird). */
+    fun deleteVisible(uuids: List<String>) {
+        _lastBulk.value = uuids
+        de.hr.mediathek.core.AppScope.launch { repository.deleteMany(uuids) }
+    }
+
+    fun undoBulkDelete() {
+        val ids = _lastBulk.value
+        _lastBulk.value = emptyList()
+        de.hr.mediathek.core.AppScope.launch { repository.restoreMany(ids) }
+    }
+
+    fun dismissBulk() { _lastBulk.value = emptyList() }
+
+    fun restoreAll() {
+        val ids = trash.value.map { it.uuid }
+        de.hr.mediathek.core.AppScope.launch { repository.restoreMany(ids) }
+    }
+
+    fun emptyTrash() {
+        val ids = trash.value.map { it.uuid }
+        de.hr.mediathek.core.AppScope.launch { repository.purgeMany(ids) }
+    }
     fun restore(row: StoryRow) = viewModelScope.launch { repository.restore(row.uuid) }
     fun purge(row: StoryRow) = viewModelScope.launch { repository.purge(row.uuid) }
 

@@ -7,7 +7,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.hr.mediathek.core.AppScope
 import de.hr.mediathek.data.db.StoryFolderEntity
 import de.hr.mediathek.data.story.StoryRepository
+import de.hr.mediathek.data.story.organize.ExportScope
 import de.hr.mediathek.data.story.organize.StoryExporter
+import de.hr.mediathek.data.story.organize.sourceKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -60,6 +62,11 @@ class StoryToolsViewModel @Inject constructor(
     val folders: StateFlow<List<StoryFolderEntity>> = repository.observeFolders()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** Quellen (Seiten) mit Anzahl der Geschichten, die größten zuerst; "" = ohne Quelle. */
+    val sources: StateFlow<List<Pair<String, Int>>> = repository.observeActive().map { rows ->
+        rows.groupingBy { sourceKey(it.sourceText) }.eachCount().toList().sortedWith(compareBy({ it.first.isEmpty() }, { -it.second }, { it.first }))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val _export = MutableStateFlow(ExportUi())
     val export: StateFlow<ExportUi> = _export
 
@@ -69,16 +76,16 @@ class StoryToolsViewModel @Inject constructor(
      * Export im App-Bereich: läuft auch weiter, wenn die Seite verlassen wird. Bei einem Fehler wird die halb
      * geschriebene Datei gelöscht, damit keine unvollständige Datei liegen bleibt.
      */
-    fun export(target: Uri, folderUuid: String?, format: Format = Format.ZIP) {
+    fun export(target: Uri, scope: ExportScope, format: Format = Format.ZIP) {
         if (_export.value.running) return
         _export.value = ExportUi(running = true)
         AppScope.launch {
             try {
                 val progress = { d: Int, t: Int -> _export.update { it.copy(done = d, total = t) } }
                 val text = when (format) {
-                    Format.ZIP -> "${exporter.export(target, folderUuid, progress)} Geschichten exportiert."
-                    Format.JSON -> "${exporter.exportJson(target, folderUuid, progress)} Geschichten exportiert."
-                    Format.LINKS -> "${exporter.exportLinks(target, folderUuid)} Links exportiert. Am Tablet in die Link-Liste einfügen."
+                    Format.ZIP -> "${exporter.export(target, scope, progress)} Geschichten exportiert."
+                    Format.JSON -> "${exporter.exportJson(target, scope, progress)} Geschichten exportiert."
+                    Format.LINKS -> "${exporter.exportLinks(target, scope)} Links exportiert. Am Tablet in die Link-Liste einfügen."
                 }
                 _export.value = ExportUi(message = text)
             } catch (e: Exception) {

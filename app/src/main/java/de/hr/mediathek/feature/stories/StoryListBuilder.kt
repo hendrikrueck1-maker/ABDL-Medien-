@@ -22,6 +22,8 @@ data class StoryFilter(
     val continueOnly: Boolean = false,
     /** Nur Geschichten mit der Markierung „Teile fehlen noch“. */
     val partsMissingOnly: Boolean = false,
+    /** Nur kurze Geschichten (weniger Wörter als dieser Wert), z. B. um Bruchstücke aufzuräumen. */
+    val maxWords: Int? = null,
     val sort: StorySort = StorySort.NEWEST,
     val trash: Boolean = false,
     val view: StoryView = StoryView.LIST,
@@ -43,7 +45,8 @@ sealed interface ListItem {
         override val key get() = "cat:${category.name}"
     }
 
-    data class Single(val row: StoryRow, val indent: Int) : ListItem {
+    /** [partNo]/[seriesName] sind gesetzt, wenn die Geschichte als Teil einer aufgeklappten Serie erscheint. */
+    data class Single(val row: StoryRow, val indent: Int, val partNo: Int? = null, val seriesName: String? = null) : ListItem {
         override val key get() = "story:${row.uuid}"
     }
 
@@ -72,6 +75,7 @@ object StoryListBuilder {
             (!f.favoritesOnly || s.favorite) &&
             (!f.continueOnly || s.continueFlag) &&
             (!f.partsMissingOnly || s.partsMissing) &&
+            (f.maxWords == null || s.wordCount < f.maxWords) &&
             when (f.readState) {
                 ReadState.ALL -> true
                 ReadState.UNREAD -> s.lastReadAt == null && s.readProgress <= 0f
@@ -116,7 +120,7 @@ object StoryListBuilder {
         val flat = ArrayList<ListItem>()
         for (i in sorted) {
             flat += i
-            if (i is ListItem.SeriesGroup && i.expanded) for (p in i.parts) flat += ListItem.Single(p, indent + 1)
+            if (i is ListItem.SeriesGroup && i.expanded) i.parts.forEachIndexed { n, p -> flat += ListItem.Single(p, indent + 1, n + 1, i.name) }
         }
         return flat
     }

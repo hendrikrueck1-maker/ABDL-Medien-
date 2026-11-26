@@ -28,13 +28,15 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.hr.mediathek.core.ui.glassCardColors
+import de.hr.mediathek.data.story.organize.ExportScope
 
 @Composable
 fun StoryToolsScreen(onBack: () -> Unit, viewModel: StoryToolsViewModel = hiltViewModel()) {
     val stats by viewModel.stats.collectAsStateWithLifecycle()
     val folders by viewModel.folders.collectAsStateWithLifecycle()
     val export by viewModel.export.collectAsStateWithLifecycle()
-    var scope by remember { mutableStateOf<String?>(null) }
+    val sources by viewModel.sources.collectAsStateWithLifecycle()
+    var scope by remember { mutableStateOf<ExportScope>(ExportScope.All) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) viewModel.export(uri, scope)
     }
@@ -75,11 +77,11 @@ fun StoryToolsScreen(onBack: () -> Unit, viewModel: StoryToolsViewModel = hiltVi
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Button(
-                    onClick = { scope = null; launcher.launch("geschichten.zip") },
+                    onClick = { scope = ExportScope.All; launcher.launch("geschichten.zip") },
                     enabled = !export.running,
                 ) { Text("Alle Geschichten exportieren") }
                 OutlinedButton(
-                    onClick = { scope = null; jsonLauncher.launch("geschichten.json") },
+                    onClick = { scope = ExportScope.All; jsonLauncher.launch("geschichten.json") },
                     enabled = !export.running,
                 ) { Text("Alle als JSON-Datei exportieren (mit Datum und Link)") }
                 Text(
@@ -88,14 +90,36 @@ fun StoryToolsScreen(onBack: () -> Unit, viewModel: StoryToolsViewModel = hiltVi
                     style = MaterialTheme.typography.bodySmall,
                 )
                 OutlinedButton(
-                    onClick = { scope = null; linksLauncher.launch("geschichten-links.txt") },
+                    onClick = { scope = ExportScope.All; linksLauncher.launch("geschichten-links.txt") },
                     enabled = !export.running,
                 ) { Text("Nur die Links exportieren (Textdatei)") }
                 for (f in folders) {
                     OutlinedButton(
-                        onClick = { scope = f.uuid; launcher.launch("${f.name}.zip") },
+                        onClick = { scope = ExportScope.Folder(f.uuid); launcher.launch("${f.name}.zip") },
                         enabled = !export.running,
                     ) { Text("Ordner „${f.name}“ exportieren") }
+                }
+                if (sources.isNotEmpty()) {
+                    Text("Nur eine Seite / Quelle", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+                    Text(
+                        "Exportiert nur die Geschichten dieser Seite – als ZIP (Markdown) oder JSON.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                for ((key, count) in sources) {
+                    val label = key.ifEmpty { "Ohne Quelle (eigene)" }
+                    val file = safeFileName(key.ifEmpty { "ohne-quelle" })
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { scope = ExportScope.Source(key); launcher.launch("$file.zip") },
+                            enabled = !export.running,
+                        ) { Text("ZIP") }
+                        OutlinedButton(
+                            onClick = { scope = ExportScope.Source(key); jsonLauncher.launch("$file.json") },
+                            enabled = !export.running,
+                        ) { Text("JSON") }
+                        Text("$label ($count)", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    }
                 }
                 if (export.running) {
                     Text("Exportiere … ${export.done} von ${export.total}")
@@ -106,5 +130,7 @@ fun StoryToolsScreen(onBack: () -> Unit, viewModel: StoryToolsViewModel = hiltVi
         }
     }
 }
+
+private fun safeFileName(name: String): String = name.replace(Regex("[^A-Za-z0-9._-]+"), "-").trim('-').ifEmpty { "geschichten" }
 
 private fun formatMinutes(m: Long): String = if (m >= 120) "${m / 60} Std." else "$m Min."
