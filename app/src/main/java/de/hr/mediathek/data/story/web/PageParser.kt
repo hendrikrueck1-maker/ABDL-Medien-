@@ -1,5 +1,6 @@
 package de.hr.mediathek.data.story.web
 
+import de.hr.mediathek.data.story.web.blogger.BloggerPage
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
@@ -13,6 +14,7 @@ object PageParser {
     fun parse(doc: Document): WebPage {
         val forum = parseForum(doc)
         if (forum.posts.isNotEmpty()) return forum
+        parseBlogger(doc)?.let { return it }
         val article = parseArticle(doc)
         if (article != null) return article
         return WebPage(pageTitle(doc), emptyList(), null, looksLikeLogin(doc), "forum")
@@ -150,6 +152,18 @@ object PageParser {
         "[itemprop=articleBody]", "article .entry-content", ".entry-content", ".post-content", ".post-body", ".article-body",
         ".article__body", "article", "main",
     )
+
+    /** Blogger-Beitragsseite: Titel, Text, Datum (ISO hat Vorrang vor dem sichtbaren Text), Verfasser und Labels. */
+    private fun parseBlogger(doc: Document): WebPage? {
+        if (!BloggerPage.isBlogger(doc)) return null
+        val post = BloggerPage.post(doc) ?: return null
+        val date = post.publishedIso?.let { runCatching { java.time.OffsetDateTime.parse(it).toInstant().toEpochMilli() }.getOrNull() }
+            ?.let { WebDate(it, relative = false, hasTime = true) }
+            ?: post.dateText?.let { WebDates.findIn(it) }
+        val title = cleanTitle(post.title).ifEmpty { if (date != null) "Beitrag vom ${WebDates.formatDay(date.millis)}" else "Ohne Titel" }
+        val web = WebPost("blogger", 1, post.author, date, null, post.text, post.labels)
+        return WebPage(title, listOf(web), null, false, "article")
+    }
 
     private fun parseArticle(doc: Document): WebPage? {
         val body = ARTICLE_BODY.firstNotNullOfOrNull { sel -> doc.selectFirst(sel)?.takeIf { plainText(it).length > 200 } }

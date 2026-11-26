@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import de.hr.mediathek.data.story.web.blogger.HttpResult
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import java.io.ByteArrayInputStream
@@ -83,6 +84,38 @@ class WebStoryFetcher @Inject constructor(
             )
         }
         found.values.toList()
+    }
+
+    /**
+     * Roher Abruf für den Blogger-Sammler: gleicher User-Agent und Cookies, Weiterleitungen werden verfolgt.
+     * Statuscodes werden durchgereicht (429 behandelt der Sammler); code 0 = Netzwerkfehler.
+     */
+    suspend fun get(url: String): HttpResult = withContext(Dispatchers.IO) {
+        coroutineContext.ensureActive()
+        val conn = try {
+            URL(url).openConnection() as HttpURLConnection
+        } catch (e: IOException) {
+            return@withContext HttpResult(0, null)
+        }
+        try {
+            conn.instanceFollowRedirects = true
+            conn.connectTimeout = 15_000
+            conn.readTimeout = 30_000
+            conn.setRequestProperty("User-Agent", userAgent())
+            conn.setRequestProperty("Accept", "application/atom+xml,text/html;q=0.9,*/*;q=0.5")
+            conn.setRequestProperty("Accept-Language", "de-DE,de;q=0.9,en;q=0.6")
+            val code = conn.responseCode
+            val finalUrl = conn.url.toString()
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val body = stream?.use { String(readLimited(it), Charsets.UTF_8) }
+            HttpResult(code, body, finalUrl)
+        } catch (e: WebFetchException) {
+            HttpResult(0, null)
+        } catch (e: IOException) {
+            HttpResult(0, null)
+        } finally {
+            conn.disconnect()
+        }
     }
 
     private fun userAgent(): String =

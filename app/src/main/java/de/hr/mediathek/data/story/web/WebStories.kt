@@ -16,7 +16,7 @@ object WebStories {
                 slug = ThreadBuilder.slug(thread, part),
                 title = partTitle(title, part, n, multiple),
                 category = category,
-                tags = emptyList(),
+                tags = part.tags,
                 status = "published",
                 author = part.author,
                 createdAt = now,

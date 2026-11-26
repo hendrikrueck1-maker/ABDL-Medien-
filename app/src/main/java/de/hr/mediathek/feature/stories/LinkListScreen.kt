@@ -146,6 +146,38 @@ private fun InputPart(state: LinkListUi, viewModel: LinkListViewModel) {
             state.collectMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         }
     }
+    Card(colors = glassCardColors(MaterialTheme.colorScheme.surfaceContainer), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Blogs sammeln (Blogger)", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Für Blogs auf Blogger (blogspot.com oder eigene Adresse), mehrere auf einmal, ohne Anmeldung. " +
+                    "Startseite, Beitragslink oder Label-Seite (nur dieses Label) sind möglich. Die ältesten Beiträge stehen danach zuerst in der Liste.",
+                style = MaterialTheme.typography.bodySmall,
+                color = c.onCardVariant,
+            )
+            OutlinedTextField(
+                value = state.blogInput,
+                onValueChange = viewModel::setBlogInput,
+                label = { Text("Eine Blog-Adresse pro Zeile") },
+                minLines = 3,
+                maxLines = 6,
+                enabled = !state.blogCollecting,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (state.blogCollecting) {
+                Text(state.blogProgress.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                    OutlinedButton(onClick = viewModel::cancelBlogs) { Text("Abbrechen") }
+                }
+            } else {
+                // Links ausgerichtet wegen der Bedienung mit der linken Hand.
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
+                    Button(onClick = viewModel::collectBlogs, enabled = state.blogInput.isNotBlank()) { Text("Sammeln") }
+                }
+            }
+            for (line in state.blogSummary) Text(line, style = MaterialTheme.typography.bodySmall)
+        }
+    }
     OutlinedTextField(
         value = state.input,
         onValueChange = viewModel::setInput,

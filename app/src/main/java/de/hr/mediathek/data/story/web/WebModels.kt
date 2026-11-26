@@ -8,6 +8,8 @@ data class WebPost(
     val date: WebDate?,
     val title: String?,
     val text: String,
+    /** Schlagwörter der Seite (bei Blogger: Labels); werden beim ersten Import als Tags übernommen. */
+    val tags: List<String> = emptyList(),
 )
 
 /** Eine gelesene Seite. [nextUrl] ist die nächste Seite eines mehrseitigen Themas, sonst null. */
@@ -29,6 +31,7 @@ data class WebPart(
     val postTitle: String?,
     val text: String,
     val selected: Boolean,
+    val tags: List<String> = emptyList(),
 )
 
 /** Alles, was zu einem Link gelesen wurde. */

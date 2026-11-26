@@ -84,6 +84,7 @@ object ThreadBuilder {
                 dateRelative = p.date?.relative == true,
                 postTitle = p.title,
                 text = p.text,
+                tags = p.tags,
                 selected = when {
                     !forum -> true
                     opAuthor != null -> p.author == opAuthor
